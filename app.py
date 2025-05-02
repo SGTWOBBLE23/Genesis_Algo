@@ -349,19 +349,51 @@ class OandaService:
     """Service for OANDA integration"""
     
     def __init__(self):
-        self.api_key = None
-        self.account_id = None
+        self.api_key = os.environ.get("OANDA_API_KEY")
+        self.account_id = os.environ.get("OANDA_ACCOUNT_ID")
+        self.api = None
+        if self.api_key and self.account_id:
+            self._init_api()
         logger.info("OANDA service initialized")
+    
+    def _init_api(self):
+        from oanda_api import OandaAPI
+        self.api = OandaAPI(self.api_key, self.account_id)
     
     def update_api_key(self, api_key, account_id):
         self.api_key = api_key
         self.account_id = account_id
+        if self.api_key and self.account_id:
+            self._init_api()
+    
+    def test_connection(self):
+        if not self.api:
+            return False
+        return self.api.test_connection()
     
     def account_info(self):
-        # Simulated account info
-        if not self.api_key or not self.account_id:
+        if not self.api:
             return None
-        return {"accountId": self.account_id, "balance": 10000.0}
+        result = self.api.get_account_summary()
+        if "error" in result:
+            logger.error(f"Error getting account info: {result['error']}")
+            return None
+        return result
+    
+    def get_instruments(self):
+        if not self.api:
+            return []
+        return self.api.get_instruments()
+    
+    def get_candles(self, instrument, granularity="H1", count=50):
+        if not self.api:
+            return []
+        return self.api.get_candles(instrument, granularity, count)
+    
+    def get_open_trades(self):
+        if not self.api:
+            return []
+        return self.api.get_open_trades()
 
 class VisionService:
     """Service for OpenAI Vision API integration"""
@@ -552,6 +584,42 @@ def get_ea_version():
         "release_date": "2025-05-01",
         "changelog": "Fixed connection issues with MT5 terminal"
     })
+
+# OANDA API Routes
+@app.route('/api/oanda/account', methods=['GET'])
+def get_oanda_account():
+    """Get OANDA account information"""
+    account_info = oanda_service.account_info()
+    if not account_info:
+        return jsonify({"error": "Unable to retrieve account information"}), 400
+    return jsonify(account_info)
+
+@app.route('/api/oanda/instruments', methods=['GET'])
+def get_oanda_instruments():
+    """Get available instruments from OANDA"""
+    instruments = oanda_service.get_instruments()
+    return jsonify(instruments)
+
+@app.route('/api/oanda/candles/<instrument>', methods=['GET'])
+def get_oanda_candles(instrument):
+    """Get price candles for a specific instrument"""
+    granularity = request.args.get('granularity', 'H1')
+    count = request.args.get('count', 50, type=int)
+    
+    candles = oanda_service.get_candles(instrument, granularity, count)
+    return jsonify(candles)
+
+@app.route('/api/oanda/trades', methods=['GET'])
+def get_oanda_trades():
+    """Get open trades from OANDA"""
+    trades = oanda_service.get_open_trades()
+    return jsonify(trades)
+
+@app.route('/api/oanda/test-connection', methods=['GET'])
+def test_oanda_connection():
+    """Test OANDA API connection"""
+    is_connected = oanda_service.test_connection()
+    return jsonify({"connected": is_connected})
 
 # Initialize tables and run app
 with app.app_context():
