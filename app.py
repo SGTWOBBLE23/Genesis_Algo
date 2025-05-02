@@ -291,6 +291,36 @@ class Log(db.Model):
         db.session.commit()
         return log
 
+# Risk Profile class for storing risk management profiles
+class RiskProfile(db.Model):
+    """Risk management profiles"""
+    __tablename__ = "risk_profiles"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    is_default = db.Column(db.Boolean, default=False)
+    json_rules = db.Column(db.Text, nullable=False)  # JSON string of risk rules
+    created_at = db.Column(db.DateTime, server_default=func.now())
+    updated_at = db.Column(db.DateTime, onupdate=func.now())
+    
+    @property
+    def rules(self) -> Dict[str, Any]:
+        return json.loads(self.json_rules)
+    
+    @rules.setter
+    def rules(self, val: Dict[str, Any]) -> None:
+        self.json_rules = json.dumps(val)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "is_default": self.is_default,
+            "rules": self.rules,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
+        }
+
 # ---- Service Classes ----
 class MT5Service:
     """Service for MetaTrader 5 integration"""
@@ -495,6 +525,33 @@ def get_current_signals():
     ).order_by(Signal.created_at.desc()).all()
     
     return jsonify([signal.to_dict() for signal in signals])
+
+@app.route('/api/settings/<section>', methods=['GET'])
+def get_settings(section):
+    # Get all settings for the section
+    settings = Settings.get_section(section)
+    return jsonify(settings)
+
+@app.route('/api/settings/<section>', methods=['POST'])
+def update_settings(section):
+    # Update settings for the section
+    settings_data = request.json
+    if not settings_data:
+        return jsonify({"error": "No settings data provided"}), 400
+        
+    for key, value in settings_data.items():
+        Settings.set_value(section, key, value)
+    
+    return jsonify({"status": "success"})
+
+@app.route('/api/ea-version', methods=['GET'])
+def get_ea_version():
+    # Get the current EA version
+    return jsonify({
+        "version": "1.0.5",
+        "release_date": "2025-05-01",
+        "changelog": "Fixed connection issues with MT5 terminal"
+    })
 
 # Initialize tables and run app
 with app.app_context():
