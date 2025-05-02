@@ -622,6 +622,11 @@ def test_oanda_connection():
     return jsonify({"connected": is_connected})
 
 # Initialize tables and run app
+# Register the MT5 API blueprint
+from mt5_ea_api import mt5_api
+app.register_blueprint(mt5_api)
+
+# Initialize tables and run app
 with app.app_context():
     try:
         db.create_all()
