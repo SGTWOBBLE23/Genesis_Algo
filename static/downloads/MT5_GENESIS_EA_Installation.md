@@ -47,7 +47,7 @@ Alternatively, you can:
    - Allow automated trading
    - Allow WebRequest for listed URL
 4. In the "WebRequest" field, add the GENESIS platform URL:
-   `https://daff8876-e606-4c4e-9a8e-5e11d74ef5e3-00-1blloyttmbbgt.riker.replit.dev/mt5_ea_api`
+   `https://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev/mt5_ea_api`
 5. Click "OK" to save changes
 
 ### Step 5: Configure the EA

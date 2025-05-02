@@ -16,7 +16,7 @@
 
 bool IsMarketOpenForSymbol(string symbol, bool force_execution=false);
 // Constants
-#define API_ENDPOINT "https://daff8876-e606-4c4e-9a8e-5e11d74ef5e3-00-1blloyttmbbgt.riker.replit.dev/mt5_ea_api"  // Replace with your GENESIS platform URL
+#define API_ENDPOINT "https://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev/mt5_ea_api"  // Current GENESIS platform URL
 #define API_TIMEOUT  5000            // Timeout for API requests in milliseconds
 #define SIGNAL_CHECK_INTERVAL 10     // How often to check for new signals (seconds)
 #define HEARTBEAT_INTERVAL 60        // How often to send heartbeat (seconds)
