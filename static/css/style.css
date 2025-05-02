@@ -1,0 +1,154 @@
+/* GENESIS Trading Platform - Main Styles */
+
+/* Global Styles */
+body {
+    font-family: 'Roboto', 'Segoe UI', Arial, sans-serif;
+    background-color: #f8f9fa;
+    color: #212529;
+}
+
+/* Navigation */
+.navbar-brand {
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+/* Cards */
+.card {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    margin-bottom: 1.5rem;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+    padding: 0.75rem 1.25rem;
+}
+
+/* Tables */
+.table th {
+    font-weight: 600;
+    border-top: none;
+    background-color: #f8f9fa;
+}
+
+/* Status Badges */
+.badge {
+    padding: 0.5em 0.8em;
+    font-weight: 500;
+}
+
+/* Form Controls */
+.form-control:focus,
+.form-select:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Statistics Summary */
+.stat-card {
+    border-radius: 0.5rem;
+    background: white;
+    padding: 1.5rem;
+    transition: transform 0.3s;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #0d6efd;
+}
+
+.stat-label {
+    color: #6c757d;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Trade status colors */
+.status-open {
+    color: #198754;
+}
+
+.status-closed {
+    color: #6c757d;
+}
+
+.status-cancelled {
+    color: #dc3545;
+}
+
+/* Signal confidence levels */
+.confidence-high {
+    color: #198754;
+}
+
+.confidence-medium {
+    color: #fd7e14;
+}
+
+.confidence-low {
+    color: #dc3545;
+}
+
+/* Settings page */
+.settings-section {
+    padding-bottom: 2rem;
+}
+
+/* Dark mode overrides - will be toggled by JS */
+.dark-mode {
+    background-color: #222;
+    color: #f8f9fa;
+}
+
+.dark-mode .card,
+.dark-mode .list-group-item {
+    background-color: #333;
+    border-color: #444;
+    color: #f8f9fa;
+}
+
+.dark-mode .card-header,
+.dark-mode .table th {
+    background-color: #2a2a2a;
+    border-color: #444;
+}
+
+.dark-mode .form-control,
+.dark-mode .form-select {
+    background-color: #444;
+    border-color: #666;
+    color: #f8f9fa;
+}
+
+.dark-mode .table {
+    color: #f8f9fa;
+}
+
+.dark-mode .table td,
+.dark-mode .table th {
+    border-color: #444;
+}
+
+.dark-mode hr {
+    border-color: #444;
+}
+
+/* Loading spinner */
+.spinner-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+}
+
+.spinner-border {
+    width: 3rem;
+    height: 3rem;
+}

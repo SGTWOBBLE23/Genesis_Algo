@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - GENESIS Trading Platform</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">GENESIS Trading</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/history">History</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/settings">Settings</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1>Settings</h1>
+        
+        <div class="row">
+            <div class="col-md-3">
+                <div class="list-group" id="settings-tabs" role="tablist">
+                    <a class="list-group-item list-group-item-action active" id="connections-tab" data-bs-toggle="list" href="#connections" role="tab">Connections</a>
+                    <a class="list-group-item list-group-item-action" id="risk-tab" data-bs-toggle="list" href="#risk" role="tab">Risk Management</a>
+                    <a class="list-group-item list-group-item-action" id="notifications-tab" data-bs-toggle="list" href="#notifications" role="tab">Notifications</a>
+                    <a class="list-group-item list-group-item-action" id="appearance-tab" data-bs-toggle="list" href="#appearance" role="tab">Appearance</a>
+                    <a class="list-group-item list-group-item-action" id="advanced-tab" data-bs-toggle="list" href="#advanced" role="tab">Advanced</a>
+                </div>
+            </div>
+            
+            <div class="col-md-9">
+                <div class="tab-content">
+                    <!-- Connections Settings -->
+                    <div class="tab-pane fade show active" id="connections" role="tabpanel">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title">Connection Settings</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="connections-form">
+                                    <h6 class="mb-3">MetaTrader 5</h6>
+                                    <div class="mb-3">
+                                        <label for="mt5-endpoint" class="form-label">MT5 API Endpoint</label>
+                                        <input type="text" class="form-control" id="mt5-endpoint" placeholder="https://mt5-api.example.com/v1">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="mt5-token" class="form-label">MT5 API Token</label>
+                                        <input type="password" class="form-control" id="mt5-token">
+                                    </div>
+                                    <div class="mb-3">
+                                        <button type="button" class="btn btn-sm btn-primary" id="test-mt5">Test Connection</button>
+                                        <span id="mt5-status" class="ms-2"></span>
+                                    </div>
+                                    
+                                    <hr class="my-4">
+                                    
+                                    <h6 class="mb-3">OANDA</h6>
+                                    <div class="mb-3">
+                                        <label for="oanda-api-key" class="form-label">OANDA API Key</label>
+                                        <input type="password" class="form-control" id="oanda-api-key">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="oanda-account-id" class="form-label">OANDA Account ID</label>
+                                        <input type="text" class="form-control" id="oanda-account-id">
+                                    </div>
+                                    <div class="mb-3">
+                                        <button type="button" class="btn btn-sm btn-primary" id="test-oanda">Test Connection</button>
+                                        <span id="oanda-status" class="ms-2"></span>
+                                    </div>
+                                    
+                                    <hr class="my-4">
+                                    
+                                    <h6 class="mb-3">OpenAI Vision API</h6>
+                                    <div class="mb-3">
+                                        <label for="openai-api-key" class="form-label">OpenAI API Key</label>
+                                        <input type="password" class="form-control" id="openai-api-key">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="openai-model" class="form-label">Model</label>
+                                        <select class="form-select" id="openai-model">
+                                            <option value="gpt-4o">GPT-4o (Recommended)</option>
+                                            <option value="gpt-4-vision">GPT-4 Vision</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <hr class="my-4">
+                                    
+                                    <h6 class="mb-3">Telegram Notifications</h6>
+                                    <div class="mb-3">
+                                        <label for="telegram-bot-token" class="form-label">Telegram Bot Token</label>
+                                        <input type="password" class="form-control" id="telegram-bot-token">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="telegram-chat-id" class="form-label">Chat ID</label>
+                                        <input type="text" class="form-control" id="telegram-chat-id">
+                                    </div>
+                                    <div class="mb-3">
+                                        <button type="button" class="btn btn-sm btn-primary" id="test-telegram">Test Notification</button>
+                                        <span id="telegram-status" class="ms-2"></span>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-primary mt-3">Save Connection Settings</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Risk Management Settings -->
+                    <div class="tab-pane fade" id="risk" role="tabpanel">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title">Risk Management</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="risk-form">
+                                    <div class="mb-3">
+                                        <label for="max-lot-size" class="form-label">Maximum Lot Size</label>
+                                        <input type="number" class="form-control" id="max-lot-size" value="1.0" step="0.01" min="0.01" max="10">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="max-daily-loss" class="form-label">Maximum Daily Loss (%)</label>
+                                        <input type="number" class="form-control" id="max-daily-loss" value="2.0" step="0.1" min="0.1" max="10">
+                                        <div class="form-text">Percentage of account balance</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="max-position-risk" class="form-label">Maximum Position Risk (%)</label>
+                                        <input type="number" class="form-control" id="max-position-risk" value="1.0" step="0.1" min="0.1" max="5">
+                                        <div class="form-text">Percentage of account balance per position</div>
+                                    </div>
+                                    <div class="mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" id="auto-sl" checked>
+                                        <label class="form-check-label" for="auto-sl">Auto Stop Loss</label>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="default-sl-pips" class="form-label">Default Stop Loss (pips)</label>
+                                        <input type="number" class="form-control" id="default-sl-pips" value="30" step="1" min="5" max="200">
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-primary">Save Risk Settings</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Notifications Settings -->
+                    <div class="tab-pane fade" id="notifications" role="tabpanel">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title">Notification Settings</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="notifications-form">
+                                    <div class="mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" id="notify-signals" checked>
+                                        <label class="form-check-label" for="notify-signals">New Signal Alerts</label>
+                                    </div>
+                                    <div class="mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" id="notify-trades" checked>
+                                        <label class="form-check-label" for="notify-trades">Trade Execution Alerts</label>
+                                    </div>
+                                    <div class="mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" id="notify-closures" checked>
+                                        <label class="form-check-label" for="notify-closures">Trade Closure Alerts</label>
+                                    </div>
+                                    <div class="mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" id="notify-daily-summary">
+                                        <label class="form-check-label" for="notify-daily-summary">Daily Performance Summary</label>
+                                    </div>
+                                    <div class="mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" id="notify-errors" checked>
+                                        <label class="form-check-label" for="notify-errors">System Error Alerts</label>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-primary">Save Notification Settings</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Appearance Settings -->
+                    <div class="tab-pane fade" id="appearance" role="tabpanel">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title">Appearance Settings</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="appearance-form">
+                                    <div class="mb-3">
+                                        <label class="form-label">Theme</label>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="theme" id="theme-light" checked>
+                                            <label class="form-check-label" for="theme-light">Light</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="theme" id="theme-dark">
+                                            <label class="form-check-label" for="theme-dark">Dark</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="theme" id="theme-system">
+                                            <label class="form-check-label" for="theme-system">System Default</label>
+                                        </div>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-primary">Save Appearance Settings</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Advanced Settings -->
+                    <div class="tab-pane fade" id="advanced" role="tabpanel">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title">Advanced Settings</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="advanced-form">
+                                    <div class="mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" id="debug-mode">
+                                        <label class="form-check-label" for="debug-mode">Debug Mode</label>
+                                        <div class="form-text">Enables additional logging and debug information</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="update-interval" class="form-label">Update Interval (seconds)</label>
+                                        <input type="number" class="form-control" id="update-interval" value="60" step="10" min="10" max="600">
+                                        <div class="form-text">How often to check for new data and signals</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <button type="button" class="btn btn-danger" id="reset-settings">Reset All Settings</button>
+                                        <div class="form-text">This will reset all settings to their default values</div>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-primary">Save Advanced Settings</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/settings.js"></script>
+</body>
+</html>
