@@ -94,7 +94,10 @@ function loadTrades() {
  */
 function updateTradesTable() {
     const tableBody = document.getElementById('trades-table-body');
-    if (!tableBody) return;
+    if (!tableBody) {
+        console.error('Could not find trades-table-body element');
+        return;
+    }
     
     // Clear existing rows
     tableBody.innerHTML = '';
@@ -102,7 +105,7 @@ function updateTradesTable() {
     if (trades.length === 0) {
         // Show empty state
         const emptyRow = document.createElement('tr');
-        emptyRow.innerHTML = `<td colspan="9" class="text-center">No trades found</td>`;
+        emptyRow.innerHTML = `<td colspan="10" class="text-center">No trades found. Connect your MT5 terminal to see trade history.</td>`;
         tableBody.appendChild(emptyRow);
         return;
     }
@@ -112,7 +115,7 @@ function updateTradesTable() {
         const row = document.createElement('tr');
         
         // Format dates
-        const openedDate = new Date(trade.opened_at);
+        const openedDate = trade.opened_at ? new Date(trade.opened_at) : null;
         const closedDate = trade.closed_at ? new Date(trade.closed_at) : null;
         
         // Format P&L with color
@@ -127,18 +130,16 @@ function updateTradesTable() {
                 </span>
             </td>
             <td>${trade.lot}</td>
-            <td>${trade.entry || '--'}</td>
-            <td>${trade.exit || '--'}</td>
-            <td class="${pnlClass}">${trade.pnl ? trade.pnl.toFixed(2) : '--'}</td>
+            <td>${trade.entry !== null ? trade.entry.toFixed(5) : '--'}</td>
+            <td>${trade.exit !== null ? trade.exit.toFixed(5) : '--'}</td>
+            <td class="${pnlClass}">${trade.pnl !== null ? trade.pnl.toFixed(2) : '--'}</td>
             <td>
                 <span class="badge ${getBadgeClass(trade.status)}">
                     ${trade.status}
                 </span>
             </td>
-            <td>
-                <div>${formatDate(openedDate)}</div>
-                ${closedDate ? `<div>${formatDate(closedDate)}</div>` : ''}
-            </td>
+            <td>${openedDate ? formatDate(openedDate) : '--'}</td>
+            <td>${closedDate ? formatDate(closedDate) : '--'}</td>
         `;
         
         tableBody.appendChild(row);
@@ -324,49 +325,70 @@ function updateTradingStats() {
 function updateStatsUI(stats) {
     // Update win rate
     const winRateEl = document.getElementById('win-rate');
-    if (winRateEl && stats.win_rate !== undefined) {
-        winRateEl.textContent = `${stats.win_rate.toFixed(1)}%`;
+    if (winRateEl) {
+        if (stats.win_rate !== undefined && !isNaN(stats.win_rate)) {
+            winRateEl.textContent = `${stats.win_rate.toFixed(1)}%`;
+        } else {
+            winRateEl.textContent = '0.0%';
+        }
     }
     
     // Update total trades
     const totalTradesEl = document.getElementById('total-closed-trades');
-    if (totalTradesEl && stats.total_trades !== undefined) {
-        totalTradesEl.textContent = stats.total_trades;
+    if (totalTradesEl) {
+        totalTradesEl.textContent = stats.total_trades || 0;
     }
     
     // Update profit factor
     const profitFactorEl = document.getElementById('profit-factor');
-    if (profitFactorEl && stats.profit_factor !== undefined) {
-        profitFactorEl.textContent = stats.profit_factor.toFixed(2);
+    if (profitFactorEl) {
+        if (stats.profit_factor !== undefined && !isNaN(stats.profit_factor)) {
+            profitFactorEl.textContent = stats.profit_factor.toFixed(2);
+        } else {
+            profitFactorEl.textContent = '0.00';
+        }
     }
     
     // Update average win
     const avgWinEl = document.getElementById('avg-win');
-    if (avgWinEl && stats.avg_win !== undefined) {
-        avgWinEl.textContent = `$${stats.avg_win.toFixed(2)}`;
-        avgWinEl.classList.add('text-success');
+    if (avgWinEl) {
+        avgWinEl.className = ''; // Clear any existing classes
+        if (stats.avg_win !== undefined && !isNaN(stats.avg_win)) {
+            avgWinEl.textContent = `$${stats.avg_win.toFixed(2)}`;
+            avgWinEl.classList.add('text-success');
+        } else {
+            avgWinEl.textContent = '$0.00';
+        }
     }
     
     // Update average loss
     const avgLossEl = document.getElementById('avg-loss');
-    if (avgLossEl && stats.avg_loss !== undefined) {
-        avgLossEl.textContent = `$${Math.abs(stats.avg_loss).toFixed(2)}`;
-        avgLossEl.classList.add('text-danger');
+    if (avgLossEl) {
+        avgLossEl.className = ''; // Clear any existing classes
+        if (stats.avg_loss !== undefined && !isNaN(stats.avg_loss)) {
+            avgLossEl.textContent = `$${Math.abs(stats.avg_loss).toFixed(2)}`;
+            avgLossEl.classList.add('text-danger');
+        } else {
+            avgLossEl.textContent = '$0.00';
+        }
     }
     
     // Update total profit
     const totalProfitEl = document.getElementById('total-profit');
-    if (totalProfitEl && stats.total_profit !== undefined) {
-        totalProfitEl.textContent = `$${stats.total_profit.toFixed(2)}`;
-        
-        if (stats.total_profit > 0) {
-            totalProfitEl.classList.add('text-success');
-        } else if (stats.total_profit < 0) {
-            totalProfitEl.classList.add('text-danger');
+    if (totalProfitEl) {
+        totalProfitEl.className = ''; // Clear any existing classes
+        if (stats.total_profit !== undefined && !isNaN(stats.total_profit)) {
+            totalProfitEl.textContent = `$${stats.total_profit.toFixed(2)}`;
+            
+            if (stats.total_profit > 0) {
+                totalProfitEl.classList.add('text-success');
+            } else if (stats.total_profit < 0) {
+                totalProfitEl.classList.add('text-danger');
+            }
+        } else {
+            totalProfitEl.textContent = '$0.00';
         }
     }
-    
-    // Monthly chart removed per user request
 }
 
 /**

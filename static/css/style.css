@@ -70,6 +70,44 @@ body {
     letter-spacing: 1px;
 }
 
+/* Badge styles */
+.badge-success {
+    background-color: #198754;
+}
+
+.badge-danger {
+    background-color: #dc3545;
+}
+
+.badge-primary {
+    background-color: #0d6efd;
+}
+
+.badge-secondary {
+    background-color: #6c757d;
+}
+
+.badge-warning {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.badge-info {
+    background-color: #0dcaf0;
+    color: #212529;
+}
+
+/* P&L colors */
+.positive {
+    color: #198754;
+    font-weight: 500;
+}
+
+.negative {
+    color: #dc3545;
+    font-weight: 500;
+}
+
 /* Trade status colors */
 .status-open {
     color: #198754;
