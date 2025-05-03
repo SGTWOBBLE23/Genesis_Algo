@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 from typing import Dict, Any, Optional, List, Union
 
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, Response, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.sql import func
@@ -512,6 +512,10 @@ def history():
 @app.route('/settings')
 def settings():
     return render_template('settings.html', title='Settings')
+
+@app.route('/downloads')
+def downloads():
+    return render_template('downloads.html', title='Downloads')
 
 # API Routes
 @app.route('/api/trades', methods=['GET'])

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MT5 GENESIS EA Update Guide</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2, h3 {
+            color: #0066cc;
+        }
+        .step {
+            background-color: #f9f9f9;
+            border-left: 4px solid #0066cc;
+            margin-bottom: 20px;
+            padding: 15px;
+        }
+        code {
+            background-color: #f0f0f0;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: Consolas, monospace;
+        }
+        .important {
+            background-color: #fff8e1;
+            border-left: 4px solid #ffc107;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>MT5 GENESIS EA Update Guide</h1>
+    
+    <div class="important">
+        <h3>⚠️ Why Update?</h3>
+        <p>We've identified an issue where the MT5 EA is successfully connecting to our GENESIS platform but not sending trade data back. This update fixes that issue by implementing proper account status and trade data reporting.</p>
+    </div>
+    
+    <h2>Updating Your MT5 GENESIS EA</h2>
+    
+    <div class="step">
+        <h3>Step 1: Download the Updated EA</h3>
+        <p>Download the updated MT5_GENESIS_EA_UPDATE.mq5 file from this page.</p>
+    </div>
+    
+    <div class="step">
+        <h3>Step 2: Install in MetaTrader 5</h3>
+        <ol>
+            <li>Open MetaTrader 5</li>
+            <li>Click on <code>File</code> -> <code>Open Data Folder</code></li>
+            <li>Navigate to <code>MQL5/Experts</code></li>
+            <li>Copy the downloaded MT5_GENESIS_EA_UPDATE.mq5 file to this folder</li>
+            <li>Rename the file to MT5_GENESIS_EA.mq5 (or keep as a separate EA if you prefer)</li>
+        </ol>
+    </div>
+    
+    <div class="step">
+        <h3>Step 3: Compile the EA</h3>
+        <ol>
+            <li>In MetaTrader 5, press <code>F4</code> to open MetaEditor</li>
+            <li>Open the MT5_GENESIS_EA.mq5 file</li>
+            <li>Press <code>F7</code> or click the Compile button to compile the EA</li>
+            <li>Ensure there are no compilation errors</li>
+        </ol>
+    </div>
+    
+    <div class="step">
+        <h3>Step 4: Configure the EA</h3>
+        <ol>
+            <li>Ensure the API_ENDPOINT is correctly set to your GENESIS platform URL</li>
+            <li>Set proper values for account name and other parameters</li>
+            <li>The default value for ACCOUNT_UPDATE_INTERVAL is now 15 seconds</li>
+            <li>The default value for TRADES_UPDATE_INTERVAL is now 20 seconds</li>
+        </ol>
+    </div>
+    
+    <div class="step">
+        <h3>Step 5: Restart the EA</h3>
+        <ol>
+            <li>Drag the compiled EA onto your chart</li>
+            <li>Configure input parameters as needed</li>
+            <li>Click OK to start the EA</li>
+        </ol>
+    </div>
+    
+    <div class="important">
+        <h3>What's Changed in the Update?</h3>
+        <ul>
+            <li>Added regular account status updates (every 15 seconds)</li>
+            <li>Added regular trade data updates (every 20 seconds)</li>
+            <li>Improved error handling and logging</li>
+            <li>Fixed issues with trade data not being sent to the GENESIS platform</li>
+            <li>Added better signal handling for BUY_NOW and SELL_NOW actions</li>
+        </ul>
+    </div>
+    
+    <h2>Troubleshooting</h2>
+    <p>If you encounter any issues after updating:</p>
+    <ol>
+        <li>Check the EA's log output in the Journal tab (press Ctrl+T in MT5)</li>
+        <li>Verify the API_ENDPOINT is correctly set</li>
+        <li>Ensure your MT5 platform allows WebRequest for the API_ENDPOINT URL</li>
+        <li>If the problem persists, please contact support</li>
+    </ol>
+    
+    <p><strong>Last Updated:</strong> May 3, 2025</p>
+</body>
+</html>

@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1>Downloads</h1>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2>MetaTrader 5 Expert Advisor</h2>
+                </div>
+                <div class="card-body">
+                    <p>The GENESIS MT5 Expert Advisor connects your MetaTrader 5 platform to our GENESIS Trading system. It allows automated execution of signals and provides real-time trading data back to the platform.</p>
+                    
+                    <div class="alert alert-info">
+                        <h4>New Update Available! (May 3, 2025)</h4>
+                        <p>We've released an important update to the MT5 EA that fixes issues with trade data reporting.</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h5>Files:</h5>
+                        <ul class="list-group">
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                MT5 GENESIS EA (Updated)
+                                <a href="/static/downloads/MT5_GENESIS_EA_UPDATE.mq5" class="btn btn-primary btn-sm">Download</a>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                Update Guide
+                                <a href="/static/downloads/MT5_UPDATE_GUIDE.html" class="btn btn-info btn-sm">View</a>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                MT5 GENESIS EA (Original)
+                                <a href="/static/downloads/MT5_GENESIS_EA.mq5" class="btn btn-secondary btn-sm">Download</a>
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <h5>Features:</h5>
+                    <ul>
+                        <li>Automated trading based on GENESIS signals</li>
+                        <li>Real-time account and trade data reporting</li>
+                        <li>Risk management controls</li>
+                        <li>Visual signal indicators on charts</li>
+                        <li>Support for multiple trading symbols</li>
+                    </ul>
+                    
+                    <h5>Requirements:</h5>
+                    <ul>
+                        <li>MetaTrader 5 platform</li>
+                        <li>Trading account with MT5 broker</li>
+                        <li>GENESIS platform access</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h2>Documentation</h2>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <h5>User Guides:</h5>
+                        <ul class="list-group">
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                GENESIS Platform User Guide
+                                <a href="#" class="btn btn-info btn-sm">View</a>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                MT5 EA Installation Guide
+                                <a href="#" class="btn btn-info btn-sm">View</a>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                Trading Signals Guide
+                                <a href="#" class="btn btn-info btn-sm">View</a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Quick Setup</h3>
+                </div>
+                <div class="card-body">
+                    <ol>
+                        <li>Download the MT5 GENESIS EA</li>
+                        <li>Copy to your MT5/MQL5/Experts folder</li>
+                        <li>Compile the EA in MetaEditor</li>
+                        <li>Drag onto a chart and configure settings</li>
+                        <li>Enable WebRequest for the API URL</li>
+                    </ol>
+                    <a href="/static/downloads/MT5_UPDATE_GUIDE.html" class="btn btn-primary">View Full Instructions</a>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h3>Support</h3>
+                </div>
+                <div class="card-body">
+                    <p>Need help with installation or configuration?</p>
+                    <p><i class="fas fa-envelope"></i> <a href="mailto:support@example.com">support@example.com</a></p>
+                    <p><i class="fas fa-phone"></i> +1 (555) 123-4567</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
