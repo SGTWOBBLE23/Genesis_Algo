@@ -499,7 +499,30 @@ telegram_service = TelegramService()
 # ---- Routes ----
 @app.route('/')
 def index():
-    return render_template('index.html', title='Dashboard')
+    # Get MT5 account info to display on dashboard
+    mt5_account = {
+        'balance': Settings.get_value('mt5_account', 'balance', 0.0),
+        'equity': Settings.get_value('mt5_account', 'equity', 0.0),
+        'margin': Settings.get_value('mt5_account', 'margin', 0.0),
+        'free_margin': Settings.get_value('mt5_account', 'free_margin', 0.0),
+        'leverage': Settings.get_value('mt5_account', 'leverage', 1),
+        'open_positions': Settings.get_value('mt5_account', 'open_positions', 0),
+        'account_id': Settings.get_value('mt5_account', 'id', 'Not connected'),
+        'last_update': Settings.get_value('mt5_account', 'last_update', None)
+    }
+    
+    # Check if there's an active MT5 connection
+    last_heartbeat = Settings.get_value('mt5', 'last_heartbeat', None)
+    mt5_connected = False
+    if last_heartbeat:
+        try:
+            # Parse the timestamp and check if it's recent (within the last 5 minutes)
+            last_time = datetime.fromisoformat(last_heartbeat)
+            mt5_connected = (datetime.now() - last_time).total_seconds() < 300
+        except:
+            mt5_connected = False
+    
+    return render_template('index.html', title='Dashboard', mt5_account=mt5_account, mt5_connected=mt5_connected)
 
 @app.route('/health')
 def health():
@@ -507,7 +530,17 @@ def health():
 
 @app.route('/history')
 def history():
-    return render_template('history.html', title='Trading History')
+    # Get MT5 account info to display on history page
+    mt5_account = {
+        'balance': Settings.get_value('mt5_account', 'balance', 0.0),
+        'equity': Settings.get_value('mt5_account', 'equity', 0.0),
+        'margin': Settings.get_value('mt5_account', 'margin', 0.0),
+        'free_margin': Settings.get_value('mt5_account', 'free_margin', 0.0),
+        'account_id': Settings.get_value('mt5_account', 'id', 'Not connected'),
+        'last_update': Settings.get_value('mt5_account', 'last_update', None)
+    }
+    
+    return render_template('history.html', title='Trading History', mt5_account=mt5_account)
 
 @app.route('/settings')
 def settings():
@@ -637,6 +670,32 @@ def get_mt5_heartbeat():
         "last_heartbeat": last_heartbeat,
         "connected_terminals": connected_terminals
     })
+
+@app.route('/api/mt5/account', methods=['GET'])
+def get_mt5_account():
+    """Get MT5 account information"""
+    account_info = {
+        'balance': Settings.get_value('mt5_account', 'balance', 0.0),
+        'equity': Settings.get_value('mt5_account', 'equity', 0.0),
+        'margin': Settings.get_value('mt5_account', 'margin', 0.0),
+        'free_margin': Settings.get_value('mt5_account', 'free_margin', 0.0),
+        'leverage': Settings.get_value('mt5_account', 'leverage', 1),
+        'open_positions': Settings.get_value('mt5_account', 'open_positions', 0),
+        'account_id': Settings.get_value('mt5_account', 'id', 'Not connected'),
+        'last_update': Settings.get_value('mt5_account', 'last_update', None)
+    }
+    
+    # Check if there's a recent update (within last 5 minutes)
+    if account_info['last_update']:
+        try:
+            last_time = datetime.fromisoformat(account_info['last_update'])
+            account_info['connected'] = (datetime.now() - last_time).total_seconds() < 300
+        except:
+            account_info['connected'] = False
+    else:
+        account_info['connected'] = False
+        
+    return jsonify(account_info)
 
 # Register the MT5 API blueprint
 from mt5_ea_api import mt5_api
