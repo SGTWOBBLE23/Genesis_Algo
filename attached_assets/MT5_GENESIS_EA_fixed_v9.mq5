@@ -762,57 +762,111 @@ void SendAccountStatus()
 
 //+------------------------------------------------------------------+
 
+
 void SendTradeUpdates()
 {
-
-    int total = PositionsTotal();
-
     JsonToSend.Clear();
-
     JsonToSend["account_id"] = IntegerToString((int)AccountInfoInteger(ACCOUNT_LOGIN));
-
     CJAVal tradesArray;
-
-    for(int i=0;i<total;i++)
-
+    
+    // First, add currently open positions
+    int total = PositionsTotal();
+    for(int i=0; i<total; i++)
     {
-
         ulong ticket = PositionGetTicket(i);
         if(PositionSelectByTicket(ticket))
         {
-
             string symbol = PositionGetString(POSITION_SYMBOL);
-
+            
             CJAVal trade;
-
             trade["ticket"] = IntegerToString(PositionGetInteger(POSITION_TICKET));
-
             trade["symbol"] = symbol;
-
             trade["lot"] = DoubleToString(PositionGetDouble(POSITION_VOLUME),2);
-
             trade["type"] = (PositionGetInteger(POSITION_TYPE)==POSITION_TYPE_BUY) ? "BUY" : "SELL";
-
             trade["open_price"] = DoubleToString(PositionGetDouble(POSITION_PRICE_OPEN), GetSymbolDigits(symbol));
-
             trade["sl"] = DoubleToString(PositionGetDouble(POSITION_SL), GetSymbolDigits(symbol));
-
             trade["tp"] = DoubleToString(PositionGetDouble(POSITION_TP), GetSymbolDigits(symbol));
-
             trade["profit"] = DoubleToString(PositionGetDouble(POSITION_PROFIT), 2);
-
+            trade["status"] = "OPEN";
+            
+            // Add to trades array
             tradesArray[IntegerToString(i)] = trade;
-
         }
-
     }
-
+    
+    // Now add closed trades from history (last 7 days)
+    datetime endTime = TimeCurrent();
+    datetime startTime = endTime - 7*24*60*60; // 7 days history
+    
+    // Select history range
+    if(HistorySelect(startTime, endTime))
+    {
+        // Get total deals in the selected history range
+        int totalDeals = HistoryDealsTotal();
+        
+        for(int i=0; i<totalDeals; i++)
+        {
+            ulong dealTicket = HistoryDealGetTicket(i);
+            
+            if(dealTicket > 0 && HistoryDealSelect(dealTicket))
+            {
+                // Only process deals that are actual trades (not balance operations, etc.)
+                if(HistoryDealGetInteger(dealTicket, DEAL_ENTRY) == DEAL_ENTRY_OUT)
+                {
+                    string symbol = HistoryDealGetString(dealTicket, DEAL_SYMBOL);
+                    double volume = HistoryDealGetDouble(dealTicket, DEAL_VOLUME);
+                    double price = HistoryDealGetDouble(dealTicket, DEAL_PRICE);
+                    double profit = HistoryDealGetDouble(dealTicket, DEAL_PROFIT);
+                    datetime closeTime = (datetime)HistoryDealGetInteger(dealTicket, DEAL_TIME);
+                    
+                    // Get the order that originated this deal to get open price
+                    ulong orderTicket = HistoryDealGetInteger(dealTicket, DEAL_ORDER);
+                    
+                    // Set default values
+                    string tradeSide = (HistoryDealGetInteger(dealTicket, DEAL_TYPE) == DEAL_TYPE_BUY) ? "BUY" : "SELL";
+                    double openPrice = 0.0;
+                    double sl = 0.0;
+                    double tp = 0.0;
+                    datetime openTime = 0;
+                    
+                    // Try to get the open price from the order
+                    if(HistoryOrderSelect(orderTicket))
+                    {
+                        openPrice = HistoryOrderGetDouble(orderTicket, ORDER_PRICE_OPEN);
+                        sl = HistoryOrderGetDouble(orderTicket, ORDER_SL);
+                        tp = HistoryOrderGetDouble(orderTicket, ORDER_TP);
+                        openTime = (datetime)HistoryOrderGetInteger(orderTicket, ORDER_TIME_SETUP);
+                    }
+                    
+                    // Create trade object
+                    CJAVal trade;
+                    trade["ticket"] = IntegerToString(dealTicket);
+                    trade["symbol"] = symbol;
+                    trade["lot"] = DoubleToString(volume, 2);
+                    trade["type"] = tradeSide;
+                    trade["open_price"] = DoubleToString(openPrice, GetSymbolDigits(symbol));
+                    trade["exit_price"] = DoubleToString(price, GetSymbolDigits(symbol));
+                    trade["sl"] = DoubleToString(sl, GetSymbolDigits(symbol));
+                    trade["tp"] = DoubleToString(tp, GetSymbolDigits(symbol));
+                    trade["profit"] = DoubleToString(profit, 2);
+                    trade["status"] = "CLOSED";
+                    trade["opened_at"] = TimeToString(openTime, TIME_DATE|TIME_SECONDS);
+                    trade["closed_at"] = TimeToString(closeTime, TIME_DATE|TIME_SECONDS);
+                    
+                    // Add to trades array
+                    tradesArray[IntegerToString(total + i)] = trade;
+                }
+            }
+        }
+    }
+    
     JsonToSend["trades"] = tradesArray;
-
     string jsonString = JsonToSend.Serialize();
-
     string response = "";
-
+    
     SendPostRequest(TRADE_UPDATE_URL, jsonString, response);
-
+    
+    // Debug output
+    Print("Sent update with ", tradesArray.Size(), " trades (", total, " open, ", tradesArray.Size() - total, " closed)");
 }
+
