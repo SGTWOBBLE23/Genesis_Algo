@@ -74,15 +74,20 @@ function loadTrades() {
         params.append('end_date', activeFilters.endDate);
     }
     
+    const apiUrl = `/api/trades?${params.toString()}`;
+    console.log('Fetching trades from:', apiUrl);
+    
     // Fetch trades
-    fetch(`/api/trades?${params.toString()}`)
+    fetch(apiUrl)
         .then(response => {
+            console.log('API response status:', response.status);
             if (!response.ok) {
                 throw new Error(`Network response was not ok: ${response.statusText}`);
             }
             return response.json();
         })
         .then(data => {
+            console.log('Received trade data:', data);
             trades = data.data;
             totalTrades = data.total;
             totalPages = data.pages;
