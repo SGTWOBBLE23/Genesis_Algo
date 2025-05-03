@@ -8,6 +8,8 @@ let currentPage = 1;
 let pageSize = 20;
 let totalTrades = 0;
 let totalPages = 0;
+let statsRefreshTimer = null;
+let tradesRefreshTimer = null;
 let activeFilters = {
     symbol: '',
     status: '',
@@ -36,10 +38,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Periodically refresh data
-    setInterval(function() {
-        loadTrades();
-        updateTradingStats();
-    }, 30000); // Refresh every 30 seconds
+    // Clear any existing timers
+    if (tradesRefreshTimer) clearInterval(tradesRefreshTimer);
+    if (statsRefreshTimer) clearInterval(statsRefreshTimer);
+    
+    // Set up separate timers with different intervals
+    tradesRefreshTimer = setInterval(loadTrades, 30000); // Refresh trades every 30 seconds
+    statsRefreshTimer = setInterval(updateTradingStats, 15000); // Refresh stats every 15 seconds
 });
 
 /**
@@ -111,9 +116,21 @@ function updateTradesTable() {
     tableBody.innerHTML = '';
     
     if (trades.length === 0) {
-        // Show empty state
+        // Show a more informative empty state with guidance
         const emptyRow = document.createElement('tr');
-        emptyRow.innerHTML = `<td colspan="10" class="text-center">No trades found. Connect your MT5 terminal to see trade history.</td>`;
+        emptyRow.innerHTML = `<td colspan="10" class="text-center">
+            <div class="alert alert-info mb-0">
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>No trades found.</strong> 
+                <p class="mb-0 mt-2">To see your trading history here:</p>
+                <ol class="text-start mt-2 mb-0">
+                    <li>Ensure your MetaTrader 5 terminal is running</li>
+                    <li>Verify the GENESIS EA is installed and configured</li>
+                    <li>Execute some trades in your MT5 terminal</li>
+                </ol>
+                <p class="mt-2 mb-0"><small>Trade data will automatically appear here once trades are executed or closed.</small></p>
+            </div>
+        </td>`;
         tableBody.appendChild(emptyRow);
         return;
     }
@@ -309,6 +326,12 @@ function setupFilters() {
  * Update trading statistics
  */
 function updateTradingStats() {
+    // Show the stats section with loading state if needed
+    const statsSection = document.querySelector('.card.mt-4');
+    if (statsSection) {
+        statsSection.style.opacity = '1';
+    }
+    
     // Fetch stats from API
     fetch('/api/trades/stats')
         .then(response => {
@@ -320,9 +343,16 @@ function updateTradingStats() {
         .then(data => {
             // Update UI with stats
             updateStatsUI(data);
+            
+            // Make sure the stats section remains visible after update
+            if (statsSection) {
+                statsSection.style.opacity = '1';
+            }
         })
         .catch(error => {
             console.error('Error loading trading stats:', error);
+            // Show a more informative empty state in the stats UI
+            updateStatsUI({});
         });
 }
 
@@ -331,10 +361,39 @@ function updateTradingStats() {
  * @param {Object} stats - Trading statistics data
  */
 function updateStatsUI(stats) {
+    // Check if there's data to display
+    const hasData = stats && stats.total_trades && stats.total_trades > 0;
+    
+    // Get the stats card body for adding a message if needed
+    const statsCardBody = document.querySelector('.card.mt-4 .card-body');
+    const existingMessage = document.getElementById('no-stats-message');
+    
+    // Handle empty state with a message
+    if (!hasData) {
+        if (statsCardBody && !existingMessage) {
+            // Add an informative message when there's no data
+            const noDataMsg = document.createElement('div');
+            noDataMsg.id = 'no-stats-message';
+            noDataMsg.className = 'alert alert-info';
+            noDataMsg.innerHTML = 'No closed trades found. Waiting for trade data from MT5 terminal. Statistics will appear once trades are completed.';
+            
+            // Insert before the first child of card body
+            const firstChild = statsCardBody.querySelector('.row');
+            if (firstChild) {
+                statsCardBody.insertBefore(noDataMsg, firstChild);
+            } else {
+                statsCardBody.appendChild(noDataMsg);
+            }
+        }
+    } else if (existingMessage) {
+        // Remove the message if it exists and we now have data
+        existingMessage.remove();
+    }
+    
     // Update win rate
     const winRateEl = document.getElementById('win-rate');
     if (winRateEl) {
-        if (stats.win_rate !== undefined && !isNaN(stats.win_rate)) {
+        if (hasData && stats.win_rate !== undefined && !isNaN(stats.win_rate)) {
             winRateEl.textContent = `${stats.win_rate.toFixed(1)}%`;
         } else {
             winRateEl.textContent = '0.0%';
@@ -344,13 +403,13 @@ function updateStatsUI(stats) {
     // Update total trades
     const totalTradesEl = document.getElementById('total-closed-trades');
     if (totalTradesEl) {
-        totalTradesEl.textContent = stats.total_trades || 0;
+        totalTradesEl.textContent = hasData ? stats.total_trades : 0;
     }
     
     // Update profit factor
     const profitFactorEl = document.getElementById('profit-factor');
     if (profitFactorEl) {
-        if (stats.profit_factor !== undefined && !isNaN(stats.profit_factor)) {
+        if (hasData && stats.profit_factor !== undefined && !isNaN(stats.profit_factor)) {
             profitFactorEl.textContent = stats.profit_factor.toFixed(2);
         } else {
             profitFactorEl.textContent = '0.00';
@@ -361,7 +420,7 @@ function updateStatsUI(stats) {
     const avgWinEl = document.getElementById('avg-win');
     if (avgWinEl) {
         avgWinEl.className = ''; // Clear any existing classes
-        if (stats.avg_win !== undefined && !isNaN(stats.avg_win)) {
+        if (hasData && stats.avg_win !== undefined && !isNaN(stats.avg_win)) {
             avgWinEl.textContent = `$${stats.avg_win.toFixed(2)}`;
             avgWinEl.classList.add('text-success');
         } else {
@@ -373,7 +432,7 @@ function updateStatsUI(stats) {
     const avgLossEl = document.getElementById('avg-loss');
     if (avgLossEl) {
         avgLossEl.className = ''; // Clear any existing classes
-        if (stats.avg_loss !== undefined && !isNaN(stats.avg_loss)) {
+        if (hasData && stats.avg_loss !== undefined && !isNaN(stats.avg_loss)) {
             avgLossEl.textContent = `$${Math.abs(stats.avg_loss).toFixed(2)}`;
             avgLossEl.classList.add('text-danger');
         } else {
@@ -385,7 +444,7 @@ function updateStatsUI(stats) {
     const totalProfitEl = document.getElementById('total-profit');
     if (totalProfitEl) {
         totalProfitEl.className = ''; // Clear any existing classes
-        if (stats.total_profit !== undefined && !isNaN(stats.total_profit)) {
+        if (hasData && stats.total_profit !== undefined && !isNaN(stats.total_profit)) {
             totalProfitEl.textContent = `$${stats.total_profit.toFixed(2)}`;
             
             if (stats.total_profit > 0) {
