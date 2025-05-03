@@ -33,6 +33,62 @@
     <div class="container mt-4">
         <h1>Trading History</h1>
         
+        <!-- MT5 Account Summary -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title">MT5 Account Summary</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-12">
+                        {% if mt5_account %}
+                        <div class="row">
+                            <div class="col-md-3">
+                                <p><strong>Account ID:</strong> {{ mt5_account.account_id }}</p>
+                            </div>
+                            <div class="col-md-3">
+                                <p><strong>Balance:</strong> ${{ "%.2f"|format(mt5_account.balance) }}</p>
+                            </div>
+                            <div class="col-md-3">
+                                <p><strong>Equity:</strong> ${{ "%.2f"|format(mt5_account.equity) }}</p>
+                            </div>
+                            <div class="col-md-3">
+                                <p><strong>Open Positions:</strong> {{ mt5_account.open_positions }}</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <p><strong>Margin:</strong> ${{ "%.2f"|format(mt5_account.margin) }}</p>
+                            </div>
+                            <div class="col-md-3">
+                                <p><strong>Free Margin:</strong> ${{ "%.2f"|format(mt5_account.free_margin) }}</p>
+                            </div>
+                            <div class="col-md-3">
+                                <p><strong>Leverage:</strong> {{ mt5_account.leverage }}:1</p>
+                            </div>
+                            <div class="col-md-3">
+                                {% if mt5_account.connected %}
+                                <p><span class="badge bg-success">Connected</span></p>
+                                {% else %}
+                                <p><span class="badge bg-danger">Disconnected</span></p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if mt5_account.last_update %}
+                        <div class="row">
+                            <div class="col-md-12">
+                                <p class="text-muted small">Last updated: {{ mt5_account.last_update }}</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% else %}
+                        <p>No MT5 account data available.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <div class="card">
             <div class="card-header">
                 <div class="row">

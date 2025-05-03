@@ -64,9 +64,22 @@
                     </div>
                     <div class="card-body">
                         <div id="account-info">
-                            <p>Balance: $10,000.00</p>
+                            {% if mt5_account %}
+                            <p>Account: {{ mt5_account.account_id }}</p>
+                            <p>Balance: ${{ "%.2f"|format(mt5_account.balance) }}</p>
+                            <p>Equity: ${{ "%.2f"|format(mt5_account.equity) }}</p>
+                            <p>Margin: ${{ "%.2f"|format(mt5_account.margin) }}</p>
+                            <p>Free Margin: ${{ "%.2f"|format(mt5_account.free_margin) }}</p>
+                            <p>Open Positions: {{ mt5_account.open_positions }}</p>
+                            {% if mt5_account.last_update %}
+                            <p><small class="text-muted">Last updated: {{ mt5_account.last_update }}</small></p>
+                            {% endif %}
+                            {% else %}
+                            <p>Balance: $0.00</p>
                             <p>Open Positions: 0</p>
                             <p>P&L Today: $0.00</p>
+                            <p><small class="text-muted">No MT5 account data available</small></p>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -77,7 +90,13 @@
                     </div>
                     <div class="card-body">
                         <div id="status-info">
-                            <p><span class="badge bg-success">MT5: Connected</span></p>
+                            <p>
+                                {% if mt5_connected %}
+                                <span class="badge bg-success">MT5: Connected</span>
+                                {% else %}
+                                <span class="badge bg-danger">MT5: Disconnected</span>
+                                {% endif %}
+                            </p>
                             <p><span class="badge bg-success">OANDA: Connected</span></p>
                             <p><span class="badge bg-success">Vision: Connected</span></p>
                             <p><span class="badge bg-success">Telegram: Connected</span></p>
