@@ -457,13 +457,21 @@ def update_trades():
                     closed_at = None
                     if 'opened_at' in trade_info:
                         try:
-                            opened_at = datetime.strptime(trade_info['opened_at'], '%Y.%m.%d %H:%M:%S')
+                            # Try both date formats that might come from MT5
+                            try:
+                                opened_at = datetime.strptime(trade_info['opened_at'], '%Y.%m.%d %H:%M:%S')
+                            except ValueError:
+                                opened_at = datetime.strptime(trade_info['opened_at'], '%Y-%m-%d %H:%M:%S')
                         except Exception as e:
                             logger.warning(f"Failed to parse opened_at: {e}")
                     
                     if 'closed_at' in trade_info:
                         try:
-                            closed_at = datetime.strptime(trade_info['closed_at'], '%Y.%m.%d %H:%M:%S')
+                            # Try both date formats that might come from MT5
+                            try:
+                                closed_at = datetime.strptime(trade_info['closed_at'], '%Y.%m.%d %H:%M:%S')
+                            except ValueError:
+                                closed_at = datetime.strptime(trade_info['closed_at'], '%Y-%m-%d %H:%M:%S')
                         except Exception as e:
                             logger.warning(f"Failed to parse closed_at: {e}")
                     
