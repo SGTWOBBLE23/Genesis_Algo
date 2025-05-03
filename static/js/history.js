@@ -20,6 +20,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load initial trades
     loadTrades();
     
+    // Update trading statistics
+    updateTradingStats();
+    
     // Set up pagination buttons
     setupPagination();
     
@@ -31,6 +34,12 @@ document.addEventListener('DOMContentLoaded', function() {
     if (exportBtn) {
         exportBtn.addEventListener('click', exportTrades);
     }
+    
+    // Periodically refresh data
+    setInterval(function() {
+        loadTrades();
+        updateTradingStats();
+    }, 30000); // Refresh every 30 seconds
 });
 
 /**
@@ -77,7 +86,6 @@ function loadTrades() {
             // Update UI
             updateTradesTable();
             updatePagination();
-            updateTradingStats();
             
             // Hide loading
             showLoading(false);
