@@ -344,7 +344,7 @@ def update_trades():
     try:
         # Debug the raw request data
         raw_data = request.data
-        logger.info(f"Received raw request data: {raw_data}")
+        logger.info(f"Received raw trade update data: {raw_data}")
         
         # Clean the input data by removing null bytes
         try:
@@ -427,11 +427,80 @@ def update_trades():
         
         # Update each trade in the database
         updated_count = 0
+        created_count = 0
         for ticket, trade_info in trades_data.items():
             # Find the trade by ticket
             trade = db.session.query(Trade).filter(Trade.ticket == ticket).first()
             
-            if trade:
+            # If trade doesn't exist, create it - handle field name mapping
+            if not trade:
+                try:
+                    # Map field names from EA to our model
+                    # Convert type (BUY/SELL) to side enum
+                    side_value = TradeSide.BUY if trade_info.get('type', '').upper() == 'BUY' else TradeSide.SELL
+                    
+                    # Map open_price to entry and exit_price to exit
+                    entry_value = float(trade_info.get('open_price', 0)) if trade_info.get('open_price') else None
+                    exit_value = float(trade_info.get('exit_price', 0)) if trade_info.get('exit_price') else None
+                    
+                    # Handle other fields
+                    symbol = trade_info.get('symbol', '')
+                    lot = float(trade_info.get('lot', 0))
+                    sl = float(trade_info.get('sl', 0)) if trade_info.get('sl') else None
+                    tp = float(trade_info.get('tp', 0)) if trade_info.get('tp') else None
+                    profit = float(trade_info.get('profit', 0))
+                    status_str = trade_info.get('status', 'OPEN')
+                    status_value = TradeStatus.CLOSED if status_str == 'CLOSED' else TradeStatus.OPEN
+                    
+                    # Convert timestamp strings to datetime objects
+                    opened_at = None
+                    closed_at = None
+                    if 'opened_at' in trade_info:
+                        try:
+                            opened_at = datetime.strptime(trade_info['opened_at'], '%Y.%m.%d %H:%M:%S')
+                        except Exception as e:
+                            logger.warning(f"Failed to parse opened_at: {e}")
+                    
+                    if 'closed_at' in trade_info:
+                        try:
+                            closed_at = datetime.strptime(trade_info['closed_at'], '%Y.%m.%d %H:%M:%S')
+                        except Exception as e:
+                            logger.warning(f"Failed to parse closed_at: {e}")
+                    
+                    # Create new trade object
+                    trade = Trade(
+                        ticket=ticket,
+                        symbol=symbol,
+                        side=side_value,
+                        lot=lot,
+                        entry=entry_value,
+                        exit=exit_value,
+                        sl=sl,
+                        tp=tp,
+                        pnl=profit,
+                        status=status_value,
+                        opened_at=opened_at,
+                        closed_at=closed_at
+                    )
+                    
+                    # Add extra data to context
+                    context = {}
+                    context['source'] = 'mt5_import'
+                    context['import_time'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    if 'swap' in trade_info:
+                        context['swap'] = float(trade_info['swap'])
+                    if 'commission' in trade_info:
+                        context['commission'] = float(trade_info['commission'])
+                    trade.context = context
+                    
+                    db.session.add(trade)
+                    created_count += 1
+                    logger.info(f"Created new trade from MT5: {ticket} {symbol}")
+                except Exception as e:
+                    logger.error(f"Error creating trade {ticket}: {str(e)}")
+            
+            # If trade exists, update it
+            elif trade:  
                 # Update trade information
                 if 'current_price' in trade_info:
                     # Calculate PnL
@@ -454,6 +523,12 @@ def update_trades():
                 if 'tp' in trade_info:
                     trade.tp = float(trade_info['tp']) if trade_info['tp'] else None
                 
+                # Handle open_price and exit_price mapping
+                if 'open_price' in trade_info:
+                    trade.entry = float(trade_info['open_price'])
+                if 'exit_price' in trade_info:
+                    trade.exit = float(trade_info['exit_price'])
+                
                 # Update trade status if it has changed
                 if 'status' in trade_info and trade_info['status'] != 'OPEN':
                     trade.status = TradeStatus(trade_info['status'])
@@ -471,14 +546,15 @@ def update_trades():
                 
                 updated_count += 1
         
-        if updated_count > 0:
+        if updated_count > 0 or created_count > 0:
             db.session.commit()
-            logger.info(f"Updated {updated_count} trades for account {account_id}")
+            logger.info(f"Updated {updated_count} and created {created_count} trades for account {account_id}")
         
         return jsonify({
             "status": "success",
             "updated_count": updated_count,
-            "message": f"Updated {updated_count} trades"
+            "created_count": created_count,
+            "message": f"Updated {updated_count} and created {created_count} trades"
         })
         
     except Exception as e:
