@@ -648,21 +648,33 @@ def get_capture_status():
     """Get status of capture and analysis jobs"""
     try:
         import redis
-        redis_client = redis.Redis(
-            host=os.environ.get('REDIS_HOST', 'localhost'),
-            port=int(os.environ.get('REDIS_PORT', 6379)),
-            db=int(os.environ.get('REDIS_DB', 0)),
-            password=os.environ.get('REDIS_PASSWORD', None),
-            decode_responses=True
-        )
-        
-        vision_queue_length = redis_client.llen("vision_queue")
-        signal_queue_length = redis_client.llen("signal_queue")
-        
-        return jsonify({
-            "vision_queue_length": vision_queue_length,
-            "signal_queue_length": signal_queue_length
-        })
+        try:
+            redis_client = redis.Redis(
+                host=os.environ.get('REDIS_HOST', 'localhost'),
+                port=int(os.environ.get('REDIS_PORT', 6379)),
+                db=int(os.environ.get('REDIS_DB', 0)),
+                password=os.environ.get('REDIS_PASSWORD', None),
+                decode_responses=True,
+                socket_connect_timeout=1
+            )
+            
+            vision_queue_length = redis_client.llen("vision_queue")
+            signal_queue_length = redis_client.llen("signal_queue")
+            
+            return jsonify({
+                "vision_queue_length": vision_queue_length,
+                "signal_queue_length": signal_queue_length,
+                "redis_connected": True
+            })
+        except redis.exceptions.ConnectionError as e:
+            # Redis connection failed but system can still function
+            logger.warning(f"Redis connection failed: {str(e)}")
+            return jsonify({
+                "vision_queue_length": 0,
+                "signal_queue_length": 0,
+                "redis_connected": False,
+                "redis_message": f"Not connected: {str(e)}"
+            })
     except Exception as e:
         logger.error(f"Error getting capture status: {str(e)}")
         return jsonify({"error": str(e)}), 500
