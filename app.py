@@ -621,16 +621,65 @@ def test_oanda_connection():
     is_connected = oanda_service.test_connection()
     return jsonify({"connected": is_connected})
 
-# Initialize tables and run app
 # Register the MT5 API blueprint
 from mt5_ea_api import mt5_api
 app.register_blueprint(mt5_api)
+
+# Endpoints for capture and analysis jobs
+@app.route('/api/capture/manual', methods=['POST'])
+def manual_capture():
+    """Manually trigger a capture job for a specific symbol"""
+    data = request.json
+    symbol = data.get('symbol')
+    
+    if not symbol:
+        return jsonify({"error": "Symbol is required"}), 400
+        
+    try:
+        import capture_job
+        result = capture_job.run(symbol)
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Error running manual capture for {symbol}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/capture/status', methods=['GET'])
+def get_capture_status():
+    """Get status of capture and analysis jobs"""
+    try:
+        import redis
+        redis_client = redis.Redis(
+            host=os.environ.get('REDIS_HOST', 'localhost'),
+            port=int(os.environ.get('REDIS_PORT', 6379)),
+            db=int(os.environ.get('REDIS_DB', 0)),
+            password=os.environ.get('REDIS_PASSWORD', None),
+            decode_responses=True
+        )
+        
+        vision_queue_length = redis_client.llen("vision_queue")
+        signal_queue_length = redis_client.llen("signal_queue")
+        
+        return jsonify({
+            "vision_queue_length": vision_queue_length,
+            "signal_queue_length": signal_queue_length
+        })
+    except Exception as e:
+        logger.error(f"Error getting capture status: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 # Initialize tables and run app
 with app.app_context():
     try:
         db.create_all()
         logger.info("Database tables created successfully")
+        
+        # Start the scheduler
+        try:
+            from scheduler import start_scheduler
+            scheduler = start_scheduler()
+            logger.info("Capture scheduler started successfully")
+        except Exception as e:
+            logger.error(f"Error starting scheduler: {str(e)}")
     except Exception as e:
         logger.error(f"Error creating database tables: {str(e)}")
 

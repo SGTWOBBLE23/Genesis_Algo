@@ -1,0 +1,50 @@
+Thought for a couple of seconds
+
+
+**Message to paste into Replit-AI chat (no code blocks, pure instructions):**
+
+---
+
+Please implement a *synchronised capture + analysis* flow so that every chart screenshot is paired with the exact OANDA quote taken at the same moment and delivered to Vision-AI as a single payload.
+
+**Do the following in order:**
+
+1. **Create a new module called `capture_job.py`**
+
+   * It must:
+     • Accept a `symbol` and optional timestamp.
+     • Take a chart screenshot, timestamp it, and upload it to S3.
+     • Call the existing `get_quote(symbol)` helper to fetch bid/ask.
+     • Derive a simple features dict (e.g., spread, 1-minute ATR).
+     • Bundle id, ISO timestamp, symbol, S3 path, quote, features into one JSON object and push it onto a Redis list named `vision_queue`.
+
+2. **Update the scheduler**
+
+   * Replace the old screenshot cron with two jobs that call `capture_job.run`:
+     – Every **15 minutes** for each asset in the config.
+     – Every **top of the hour** for the 1-hour timeframe.
+
+3. **Modify the Vision worker**
+
+   * Consume payloads from `vision_queue`.
+   * Send only `image_s3` to the Vision API endpoint (async HTTP call).
+   * Merge Vision API response (`entry`, `sl`, `tp`, `confidence`) back into the payload.
+   * Push the enriched payload onto a new Redis list called `signal_queue`.
+   * Add retry logic: re-queue up to 2 more times, then publish an alert message.
+
+4. **Add a fast unit test**
+
+   * Validate that `capture_job.run("EURUSD")` returns a dict containing keys: id, ts, symbol, image\_s3, quote, features.
+
+5. **Run `pytest -q`** to ensure all existing and new tests pass.
+
+   * If any fail, fix before proceeding.
+
+6. **Commit locally only**
+
+   * `git add .` and commit with message “sync capture + quote payload; vision worker updated; tests green”.
+   * Do **not** push to any remote yet.
+
+When all steps succeed, stop and report: **“Sync capture pipeline implemented, tests green.”**
+
+---
