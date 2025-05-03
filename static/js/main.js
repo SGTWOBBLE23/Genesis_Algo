@@ -183,28 +183,25 @@ function fetchAccountInfo() {
                         updateAccountDisplay();
                         updateConnectionStatus('oanda', true);
                     } else {
-                // Fallback for testing
-                accountData = {
-                    balance: 10256.75,
-                    open_positions: 1,
-                    daily_pnl: 25.5,
-                    currency: 'USD',
-                    name: 'Demo Account'
-                };
-            }
-            updateAccountDisplay();
-        })
-        .catch(error => {
-            console.error('Error fetching account data:', error);
-            // Fallback data
-            accountData = {
-                balance: 10256.75,
-                open_positions: 1,
-                daily_pnl: 25.5,
-                currency: 'USD',
-                name: 'Demo Account'
-            };
-            updateAccountDisplay();
+                        // Fallback for no account data
+                        accountData = {
+                            type: 'UNKNOWN',
+                            balance: 0,
+                            open_positions: 0
+                        };
+                        updateAccountDisplay();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching OANDA account data:', error);
+                    // Minimal fallback data
+                    accountData = {
+                        type: 'UNKNOWN',
+                        balance: 0,
+                        open_positions: 0
+                    };
+                    updateAccountDisplay();
+                });
         });
 }
 
