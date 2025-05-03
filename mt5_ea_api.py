@@ -375,55 +375,12 @@ def update_trades():
         # If trades data is empty, just acknowledge the request
         if not trades_data:
             logger.info(f"No trades data for account {account_id}")
-            # For debugging: Create a sample trade for testing the history page
-            if account_id == "163499":
-                logger.info("Creating a sample closed trade for testing")
-                # First, create a sample trade for testing
-                sample_trade = Trade(
-                    ticket="15642812",
-                    symbol="XAUUSD",
-                    side=TradeSide.BUY,
-                    lot=0.15,
-                    entry=2273.45,
-                    exit=2272.82,
-                    sl=2270.00,
-                    tp=2280.00,
-                    pnl=-13.95,
-                    status=TradeStatus.CLOSED,
-                    opened_at=datetime.now() - timedelta(hours=2),
-                    closed_at=datetime.now() - timedelta(minutes=30),
-                )
-                
-                # Now we will update the context separately with the property setter
-                db.session.add(sample_trade)
-                db.session.flush()
-                
-                # Then create a second sample trade
-                sample_trade2 = Trade(
-                    ticket="15642813",
-                    symbol="EURUSD",
-                    side=TradeSide.SELL,
-                    lot=0.5,
-                    entry=1.0845,
-                    exit=1.0861,
-                    sl=1.0880,
-                    tp=1.0800,
-                    pnl=-80.00,
-                    status=TradeStatus.CLOSED,
-                    opened_at=datetime.now() - timedelta(days=1),
-                    closed_at=datetime.now() - timedelta(hours=8),
-                )
-                
-                db.session.add(sample_trade2)
-                db.session.commit()
-                
-                logger.info("Sample trades created for testing purposes")
-                
-                # Update context after commit
-                sample_trade.context = {"source": "testing", "note": "Gold position"}
-                sample_trade2.context = {"source": "testing", "note": "Euro position"}
-                db.session.commit()
-            return jsonify({"status": "success", "message": "No trades to update"}), 200
+            return jsonify({
+                "status": "success",
+                "message": "No trades to update",
+                "updated_count": 0,
+                "created_count": 0
+            })
         
         # Update each trade in the database
         updated_count = 0
