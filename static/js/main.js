@@ -129,25 +129,60 @@ function fetchOpenTrades() {
  * Fetch account information
  */
 function fetchAccountInfo() {
-    // Check if OANDA integration is available and working
-    fetch('/api/oanda/account')
+    // First try to get MT5 account info
+    fetch('/api/mt5/account')
         .then(response => {
             if (!response.ok) {
-                throw new Error('Failed to fetch account information');
+                throw new Error('Failed to fetch MT5 account information');
             }
             return response.json();
         })
         .then(data => {
-            // Format the account data
-            if (data.account) {
+            // Format the MT5 account data
+            if (data) {
                 accountData = {
-                    balance: parseFloat(data.account.balance),
-                    open_positions: data.account.openTradeCount || 0,
-                    daily_pnl: parseFloat(data.account.unrealizedPL || 0),
-                    currency: data.account.currency,
-                    name: data.account.alias || data.account.id
+                    type: 'MT5',
+                    balance: parseFloat(data.balance),
+                    equity: parseFloat(data.equity),
+                    margin: parseFloat(data.margin),
+                    free_margin: parseFloat(data.free_margin),
+                    leverage: data.leverage,
+                    open_positions: data.open_positions || 0,
+                    account_id: data.account_id,
+                    last_update: data.last_update,
+                    connected: data.connected
                 };
+                updateAccountDisplay();
+                updateConnectionStatus('mt5', data.connected);
+                return; // Successfully got MT5 data, no need to try OANDA
             } else {
+                throw new Error('No MT5 account data available');
+            }
+        })
+        .catch(error => {
+            console.log('MT5 account data not available, trying OANDA:', error);
+            // Fall back to OANDA if MT5 fails
+            fetch('/api/oanda/account')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch OANDA account information');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Format the OANDA account data
+                    if (data.account) {
+                        accountData = {
+                            type: 'OANDA',
+                            balance: parseFloat(data.account.balance),
+                            open_positions: data.account.openTradeCount || 0,
+                            daily_pnl: parseFloat(data.account.unrealizedPL || 0),
+                            currency: data.account.currency,
+                            name: data.account.alias || data.account.id
+                        };
+                        updateAccountDisplay();
+                        updateConnectionStatus('oanda', true);
+                    } else {
                 // Fallback for testing
                 accountData = {
                     balance: 10256.75,
@@ -306,15 +341,49 @@ function updateAccountDisplay() {
     const container = document.getElementById('account-info');
     if (!container) return;
     
-    const pnlClass = accountData.daily_pnl > 0 ? 'text-success' : (accountData.daily_pnl < 0 ? 'text-danger' : '');
+    let html = '';
     
-    let html = `<p>Balance: $${accountData.balance.toFixed(2)}</p>`;
-    html += `<p>Open Positions: ${accountData.open_positions}</p>`;
-    html += `<p>P&L Today: <span class="${pnlClass}">${accountData.daily_pnl > 0 ? '+' : ''}$${accountData.daily_pnl.toFixed(2)}</span></p>`;
-    
-    // Calculate P&L percentage
-    const pnlPercentage = accountData.balance > 0 ? (accountData.daily_pnl / accountData.balance) * 100 : 0;
-    html += `<p>P&L %: <span class="${pnlClass}">${pnlPercentage > 0 ? '+' : ''}${pnlPercentage.toFixed(2)}%</span></p>`;
+    // Check if we have MT5 account data
+    if (accountData.type === 'MT5') {
+        html += `<p><strong>Account:</strong> ${accountData.account_id}</p>`;
+        html += `<p><strong>Balance:</strong> $${accountData.balance.toFixed(2)}</p>`;
+        html += `<p><strong>Equity:</strong> $${accountData.equity.toFixed(2)}</p>`;
+        
+        // Calculate P&L (difference between equity and balance)
+        const pnl = accountData.equity - accountData.balance;
+        const pnlClass = pnl > 0 ? 'text-success' : (pnl < 0 ? 'text-danger' : '');
+        html += `<p><strong>Floating P&L:</strong> <span class="${pnlClass}">${pnl > 0 ? '+' : ''}$${pnl.toFixed(2)}</span></p>`;
+        
+        html += `<p><strong>Margin:</strong> $${accountData.margin.toFixed(2)}</p>`;
+        html += `<p><strong>Free Margin:</strong> $${accountData.free_margin.toFixed(2)}</p>`;
+        html += `<p><strong>Leverage:</strong> ${accountData.leverage}:1</p>`;
+        html += `<p><strong>Open Positions:</strong> ${accountData.open_positions}</p>`;
+        
+        if (accountData.last_update) {
+            html += `<p class="text-muted small">Last updated: ${formatDateTime(accountData.last_update)}</p>`;
+        }
+    } else if (accountData.type === 'OANDA') {
+        // OANDA account format
+        const pnlClass = accountData.daily_pnl > 0 ? 'text-success' : (accountData.daily_pnl < 0 ? 'text-danger' : '');
+        
+        html += `<p><strong>Account:</strong> ${accountData.name}</p>`;
+        html += `<p><strong>Balance:</strong> $${accountData.balance.toFixed(2)}</p>`;
+        html += `<p><strong>Open Positions:</strong> ${accountData.open_positions}</p>`;
+        html += `<p><strong>P&L Today:</strong> <span class="${pnlClass}">${accountData.daily_pnl > 0 ? '+' : ''}$${accountData.daily_pnl.toFixed(2)}</span></p>`;
+        
+        // Calculate P&L percentage
+        const pnlPercentage = accountData.balance > 0 ? (accountData.daily_pnl / accountData.balance) * 100 : 0;
+        html += `<p><strong>P&L %:</strong> <span class="${pnlClass}">${pnlPercentage > 0 ? '+' : ''}${pnlPercentage.toFixed(2)}%</span></p>`;
+    } else {
+        // Default account data format
+        html += `<p><strong>Balance:</strong> $${accountData.balance ? accountData.balance.toFixed(2) : '0.00'}</p>`;
+        html += `<p><strong>Open Positions:</strong> ${accountData.open_positions || 0}</p>`;
+        
+        if (accountData.daily_pnl !== undefined) {
+            const pnlClass = accountData.daily_pnl > 0 ? 'text-success' : (accountData.daily_pnl < 0 ? 'text-danger' : '');
+            html += `<p><strong>P&L Today:</strong> <span class="${pnlClass}">${accountData.daily_pnl > 0 ? '+' : ''}$${accountData.daily_pnl.toFixed(2)}</span></p>`;
+        }
+    }
     
     container.innerHTML = html;
 }

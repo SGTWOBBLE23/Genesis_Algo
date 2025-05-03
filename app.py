@@ -522,6 +522,9 @@ def index():
         except:
             mt5_connected = False
     
+    # Add connected status to the account data for the template
+    mt5_account['connected'] = mt5_connected
+    
     return render_template('index.html', title='Dashboard', mt5_account=mt5_account, mt5_connected=mt5_connected)
 
 @app.route('/health')
@@ -536,11 +539,27 @@ def history():
         'equity': Settings.get_value('mt5_account', 'equity', 0.0),
         'margin': Settings.get_value('mt5_account', 'margin', 0.0),
         'free_margin': Settings.get_value('mt5_account', 'free_margin', 0.0),
+        'leverage': Settings.get_value('mt5_account', 'leverage', 1),  # Added leverage
+        'open_positions': Settings.get_value('mt5_account', 'open_positions', 0),  # Added open positions
         'account_id': Settings.get_value('mt5_account', 'id', 'Not connected'),
         'last_update': Settings.get_value('mt5_account', 'last_update', None)
     }
     
-    return render_template('history.html', title='Trading History', mt5_account=mt5_account)
+    # Check if there's an active MT5 connection
+    last_heartbeat = Settings.get_value('mt5', 'last_heartbeat', None)
+    mt5_connected = False
+    if last_heartbeat:
+        try:
+            # Parse the timestamp and check if it's recent (within the last 5 minutes)
+            last_time = datetime.fromisoformat(last_heartbeat)
+            mt5_connected = (datetime.now() - last_time).total_seconds() < 300
+        except:
+            mt5_connected = False
+    
+    # Add connected status to the account data for the template
+    mt5_account['connected'] = mt5_connected
+    
+    return render_template('history.html', title='Trading History', mt5_account=mt5_account, mt5_connected=mt5_connected)
 
 @app.route('/settings')
 def settings():
