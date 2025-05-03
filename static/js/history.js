@@ -150,7 +150,7 @@ function updateTradesTable() {
             <td>${trade.id}</td>
             <td>${trade.symbol}</td>
             <td>
-                <span class="badge ${trade.side === 'BUY' ? 'badge-success' : 'badge-danger'}">
+                <span class="badge ${trade.side === 'BUY' ? 'bg-success' : 'bg-danger'}">
                     ${trade.side}
                 </span>
             </td>
@@ -200,15 +200,15 @@ function formatDate(date) {
 function getBadgeClass(status) {
     switch (status) {
         case 'OPEN':
-            return 'badge-primary';
+            return 'bg-primary';
         case 'CLOSED':
-            return 'badge-secondary';
+            return 'bg-secondary';
         case 'CANCELLED':
-            return 'badge-danger';
+            return 'bg-danger';
         case 'PARTIALLY_CLOSED':
-            return 'badge-warning';
+            return 'bg-warning';
         default:
-            return 'badge-info';
+            return 'bg-info';
     }
 }
 

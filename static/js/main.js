@@ -132,7 +132,12 @@ function fetchAccountInfo() {
     let cacheBuster = Date.now();
     // First try to get MT5 account info
     fetch('/api/mt5/account?t=' + cacheBuster)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`MT5 API returned ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             // Check if we have valid data
             if (data && data.balance !== undefined) {
@@ -160,7 +165,12 @@ function fetchAccountInfo() {
             console.log('MT5 account data not available, trying OANDA:', error);
             // Fall back to OANDA if MT5 fails
             return fetch('/api/oanda/account?t=' + cacheBuster)
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`OANDA API returned ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     // Format the OANDA account data
                     if (data && data.account) {
@@ -181,13 +191,15 @@ function fetchAccountInfo() {
         })
         .catch(error => {
             console.error('Error fetching account data:', error);
-            // Minimal fallback data without setting mock data
+            // Set minimal data structure but don't use any mock values
             accountData = {
                 type: 'UNKNOWN',
                 balance: 0,
                 open_positions: 0
             };
             updateAccountDisplay();
+            updateConnectionStatus('mt5', false);
+            updateConnectionStatus('oanda', false);
         });
 }
 
