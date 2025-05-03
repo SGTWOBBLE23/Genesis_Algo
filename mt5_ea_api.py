@@ -89,28 +89,47 @@ def get_signals():
         # Log the raw data for debugging
         logger.info(f"Raw data from MT5: {data}")
         
+        # Check if forex market is open
+        now = datetime.now()
+        is_weekend = now.weekday() >= 5  # 5 = Saturday, 6 = Sunday
+        
         # Get signals from database that are in PENDING or ACTIVE status
-        # Simplify logic by checking for new signals first, then falling back to all signals if none found
         new_signals = []
         
         if last_signal_id > 0:
-            # Try to get any new signals first (higher ID than last_signal_id)
+            # Only get signals with higher IDs than what MT5 already has
             new_signals = db.session.query(Signal).filter(
                 Signal.id > last_signal_id,
                 Signal.status.in_(['PENDING', 'ACTIVE'])
             ).order_by(Signal.id.asc()).all()
             
+            # Do NOT fall back to previous signals if no new ones are found
             if not new_signals:
-                logger.info(f"No new signals found after ID {last_signal_id}, returning up to 5 latest active signals")
-                # Fall back to returning the 5 most recent signals if no new ones
-                new_signals = db.session.query(Signal).filter(
-                    Signal.status.in_(['PENDING', 'ACTIVE'])
-                ).order_by(Signal.id.asc()).limit(5).all()
+                logger.info(f"No new signals found after ID {last_signal_id}, returning empty list")
+                return jsonify({
+                    "status": "success",
+                    "signals": []
+                })
         else:
             # First request, return all pending/active signals
             new_signals = db.session.query(Signal).filter(
                 Signal.status.in_(['PENDING', 'ACTIVE'])
             ).order_by(Signal.id.asc()).all()
+        
+        # Filter by market hours if needed
+        if is_weekend:
+            # Filter out forex pairs but keep crypto and metals
+            filtered_by_market = []
+            for signal in new_signals:
+                # Keep crypto and precious metals
+                if any(asset in signal.symbol for asset in ['BTC', 'ETH', 'XAU', 'XAG']):
+                    filtered_by_market.append(signal)
+                # Filter out forex pairs during weekend
+                elif any(pair in signal.symbol for pair in ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'NZD']):
+                    logger.info(f"Filtering out forex signal for {signal.symbol} during weekend")
+                else:
+                    filtered_by_market.append(signal)
+            new_signals = filtered_by_market
         
         # Check if we received valid symbols array
         valid_symbols = []
@@ -130,7 +149,7 @@ def get_signals():
             logger.info(f"Filtering signals for symbols: {valid_symbols}")
             filtered_signals = [s for s in new_signals if s.symbol in valid_symbols]
         else:
-            logger.info("No valid symbols received, returning all pending/active signals")
+            logger.info("No valid symbols received, returning available signals")
             filtered_signals = new_signals
         
         signals = filtered_signals  # Use the filtered list for formatting
@@ -163,8 +182,16 @@ def get_signals():
                     formatted_signal["force_execution"] = bool(signal.context['force_execution'])
             
             formatted_signals.append(formatted_signal)
-        
-        logger.info(f"Sending {len(formatted_signals)} signals to MT5 terminal for account {account_id}")
+            
+            # Update signal status to indicate it has been sent to MT5
+            # This prevents resending unless explicitly requested
+            signal.status = 'ACTIVE'
+            
+        if formatted_signals:
+            db.session.commit()  # Save the status changes
+            logger.info(f"Sending {len(formatted_signals)} signals to MT5 terminal for account {account_id}")
+        else:
+            logger.info(f"No signals to send to MT5 terminal for account {account_id}")
         
         return jsonify({
             "status": "success",
