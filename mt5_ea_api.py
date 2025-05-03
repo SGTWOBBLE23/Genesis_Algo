@@ -3,7 +3,7 @@ import time
 import logging
 from datetime import datetime
 from flask import Blueprint, request, jsonify
-from app import db, Signal, Trade, SignalAction, TradeStatus, TradeSide
+from app import db, Signal, Trade, SignalAction, TradeStatus, TradeSide, Settings
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -24,7 +24,26 @@ def get_signals_hyphen():
 def heartbeat():
     """Receive heartbeat from MT5 EA"""
     try:
-        data = request.json
+        # Debug the raw request data
+        raw_data = request.data
+        logger.info(f"Received raw heartbeat data: {raw_data}")
+        
+        # Clean the input data by removing null bytes
+        try:
+            if b'\x00' in raw_data:
+                logger.info("Found null character in the request data, cleaning it")
+                clean_data = raw_data.replace(b'\x00', b'')
+                # Try to parse the cleaned JSON
+                data = json.loads(clean_data.decode('utf-8'))
+                logger.info(f"Successfully parsed cleaned JSON: {data}")
+            else:
+                # Use Flask's built-in parser if no null characters
+                data = request.json
+                
+            logger.info(f"Heartbeat received: {data}")
+        except Exception as json_err:
+            logger.error(f"Error parsing JSON: {str(json_err)}")
+            return jsonify({"status": "error", "message": f"Invalid JSON: {str(json_err)}"}), 400
         
         if not data:
             return jsonify({"status": "error", "message": "No data provided"}), 400
@@ -72,7 +91,24 @@ def heartbeat():
 def get_signals():
     """Return new trading signals to MT5 EA"""
     try:
-        data = request.json
+        # Debug the raw request data
+        raw_data = request.data
+        logger.info(f"Received raw signals request data: {raw_data}")
+        
+        # Clean the input data by removing null bytes
+        try:
+            if b'\x00' in raw_data:
+                logger.info("Found null character in the request data, cleaning it")
+                clean_data = raw_data.replace(b'\x00', b'')
+                # Try to parse the cleaned JSON
+                data = json.loads(clean_data.decode('utf-8'))
+                logger.info(f"Successfully parsed cleaned JSON: {data}")
+            else:
+                # Use Flask's built-in parser if no null characters
+                data = request.json
+        except Exception as json_err:
+            logger.error(f"Error parsing JSON: {str(json_err)}")
+            return jsonify({"status": "error", "message": f"Invalid JSON: {str(json_err)}"}), 400
         
         if not data:
             return jsonify({"status": "error", "message": "No data provided"}), 400
@@ -206,7 +242,26 @@ def get_signals():
 def trade_report():
     """Receive trade execution reports from MT5 EA"""
     try:
-        data = request.json
+        # Debug the raw request data
+        raw_data = request.data
+        logger.info(f"Received raw trade report data: {raw_data}")
+        
+        # Clean the input data by removing null bytes
+        try:
+            if b'\x00' in raw_data:
+                logger.info("Found null character in the request data, cleaning it")
+                clean_data = raw_data.replace(b'\x00', b'')
+                # Try to parse the cleaned JSON
+                data = json.loads(clean_data.decode('utf-8'))
+                logger.info(f"Successfully parsed cleaned JSON: {data}")
+            else:
+                # Use Flask's built-in parser if no null characters
+                data = request.json
+                
+            logger.info(f"Trade report received: {data}")
+        except Exception as json_err:
+            logger.error(f"Error parsing JSON: {str(json_err)}")
+            return jsonify({"status": "error", "message": f"Invalid JSON: {str(json_err)}"}), 400
         
         if not data:
             return jsonify({"status": "error", "message": "No data provided"}), 400
@@ -287,7 +342,26 @@ def trade_report():
 def update_trades():
     """Receive updates on open trades from MT5 EA"""
     try:
-        data = request.json
+        # Debug the raw request data
+        raw_data = request.data
+        logger.info(f"Received raw request data: {raw_data}")
+        
+        # Clean the input data by removing null bytes
+        try:
+            if b'\x00' in raw_data:
+                logger.info("Found null character in the request data, cleaning it")
+                clean_data = raw_data.replace(b'\x00', b'')
+                # Try to parse the cleaned JSON
+                data = json.loads(clean_data.decode('utf-8'))
+                logger.info(f"Successfully parsed cleaned JSON: {data}")
+            else:
+                # Use Flask's built-in parser if no null characters
+                data = request.json
+                
+            logger.info(f"Trade update received: {data}")
+        except Exception as json_err:
+            logger.error(f"Error parsing JSON: {str(json_err)}")
+            return jsonify({"status": "error", "message": f"Invalid JSON: {str(json_err)}"}), 400
         
         if not data:
             return jsonify({"status": "error", "message": "No data provided"}), 400
@@ -295,8 +369,13 @@ def update_trades():
         account_id = data.get('account_id')
         trades_data = data.get('trades', {})
         
-        if not account_id or not trades_data:
-            return jsonify({"status": "error", "message": "Missing account_id or trades data"}), 400
+        if not account_id:
+            return jsonify({"status": "error", "message": "Missing account_id"}), 400
+            
+        # If trades data is empty, just acknowledge the request
+        if not trades_data:
+            logger.info(f"No trades data for account {account_id}")
+            return jsonify({"status": "success", "message": "No trades to update"}), 200
         
         # Update each trade in the database
         updated_count = 0
@@ -362,7 +441,26 @@ def update_trades():
 def account_status():
     """Receive account status updates from MT5 EA"""
     try:
-        data = request.json
+        # Debug the raw request data
+        raw_data = request.data
+        logger.info(f"Received raw account status data: {raw_data}")
+        
+        # Clean the input data by removing null bytes
+        try:
+            if b'\x00' in raw_data:
+                logger.info("Found null character in the request data, cleaning it")
+                clean_data = raw_data.replace(b'\x00', b'')
+                # Try to parse the cleaned JSON
+                data = json.loads(clean_data.decode('utf-8'))
+                logger.info(f"Successfully parsed cleaned JSON: {data}")
+            else:
+                # Use Flask's built-in parser if no null characters
+                data = request.json
+                
+            logger.info(f"Account status update received: {data}")
+        except Exception as json_err:
+            logger.error(f"Error parsing JSON: {str(json_err)}")
+            return jsonify({"status": "error", "message": f"Invalid JSON: {str(json_err)}"}), 400
         
         if not data:
             return jsonify({"status": "error", "message": "No data provided"}), 400
@@ -378,8 +476,27 @@ def account_status():
         if not account_id:
             return jsonify({"status": "error", "message": "Missing account_id"}), 400
         
-        # Store account status in session or database
-        # For now, we'll just store it in memory
+        # Store account status in Settings
+        from app import Settings
+        
+        # Store latest account stats in settings table
+        if balance is not None:
+            Settings.set_value('mt5_account', 'balance', float(balance))
+        if equity is not None:
+            Settings.set_value('mt5_account', 'equity', float(equity))
+        if margin is not None:
+            Settings.set_value('mt5_account', 'margin', float(margin))
+        if free_margin is not None:
+            Settings.set_value('mt5_account', 'free_margin', float(free_margin))
+        if leverage is not None:
+            Settings.set_value('mt5_account', 'leverage', leverage)
+        if open_positions is not None:
+            Settings.set_value('mt5_account', 'open_positions', open_positions)
+        
+        # Store the last update time
+        Settings.set_value('mt5_account', 'last_update', datetime.now().isoformat())
+        # Store the account ID
+        Settings.set_value('mt5_account', 'id', account_id)
         active_terminals[account_id] = {
             'last_update': datetime.now(),
             'balance': balance,
