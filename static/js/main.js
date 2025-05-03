@@ -226,7 +226,7 @@ function updateSignalsDisplay() {
     }
     
     let html = '<div class="table-responsive"><table class="table table-hover"><thead><tr>';
-    html += '<th>Symbol</th><th>Action</th><th>Entry</th><th>SL</th><th>TP</th><th>Confidence</th><th>Status</th><th>Actions</th>';
+    html += '<th>Symbol</th><th>Action</th><th>Entry</th><th>SL</th><th>TP</th><th>Confidence</th><th>Status</th><th>Created</th><th>Actions</th>';
     html += '</tr></thead><tbody>';
     
     signalsData.forEach(signal => {
@@ -241,6 +241,7 @@ function updateSignalsDisplay() {
         html += `<td>${signal.tp}</td>`;
         html += `<td><span class="${confidenceClass}">${Math.round(signal.confidence * 100)}%</span></td>`;
         html += `<td><span class="badge bg-${signal.status === 'ACTIVE' ? 'success' : 'warning'}">${signal.status}</span></td>`;
+        html += `<td>${formatDateTime(signal.created_at)}</td>`;
         html += `<td>`;
         if (signal.status === 'PENDING' || signal.status === 'ACTIVE') {
             html += `<button class="btn btn-sm btn-primary me-1" onclick="executeTrade(${signal.id})">Execute</button>`;
@@ -310,6 +311,10 @@ function updateAccountDisplay() {
     let html = `<p>Balance: $${accountData.balance.toFixed(2)}</p>`;
     html += `<p>Open Positions: ${accountData.open_positions}</p>`;
     html += `<p>P&L Today: <span class="${pnlClass}">${accountData.daily_pnl > 0 ? '+' : ''}$${accountData.daily_pnl.toFixed(2)}</span></p>`;
+    
+    // Calculate P&L percentage
+    const pnlPercentage = accountData.balance > 0 ? (accountData.daily_pnl / accountData.balance) * 100 : 0;
+    html += `<p>P&L %: <span class="${pnlClass}">${pnlPercentage > 0 ? '+' : ''}${pnlPercentage.toFixed(2)}%</span></p>`
     
     container.innerHTML = html;
 }
