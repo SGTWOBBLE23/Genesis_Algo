@@ -1,0 +1,46 @@
+
+//+------------------------------------------------------------------+
+//| Return symbol's digits                                           |
+//+------------------------------------------------------------------+
+int GetSymbolDigits(const string sym)
+{
+    int digits = (int)SymbolInfoInteger(sym, SYMBOL_DIGITS);
+    if(digits < 0)
+        digits = _Digits;
+    return digits;
+}
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+//|                                             MT5_GENESIS_EA.mq5 |
+//|                                       GENESIS Trading Platform |
+//|                                                                |
+//+------------------------------------------------------------------+
+#property copyright "GENESIS Trading Platform"
+#property link      ""
+#property version   "1.00"
+#property strict
+
+// Include required libraries
+#include <Trade/Trade.mqh>           // For trading operations
+#include <Arrays/ArrayString.mqh>    // For string array operations
+#include <JAson.mqh>                 // For JSON operations, needs to be installed
+#include <StdLib.mqh>               // For ErrorDescription()
+//--- Updated API constants 2025-05-03
+#define API_ENDPOINT "https://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev"
+#define MT5_API_PATH "/mt5"
+#define GET_SIGNALS_PATH "/get_signals"
+#define HEARTBEAT_PATH "/heartbeat"
+#define ACCOUNT_STATUS_PATH "/account_status"
+#define TRADE_UPDATE_PATH "/update_trades"
+const string SIGNALS_URL      = API_ENDPOINT + MT5_API_PATH + GET_SIGNALS_PATH;
+const string HEARTBEAT_URL    = API_ENDPOINT + MT5_API_PATH + HEARTBEAT_PATH;
+const string ACCOUNT_STATUS_URL = API_ENDPOINT + MT5_API_PATH + ACCOUNT_STATUS_PATH;
+const string TRADE_UPDATE_URL   = API_ENDPOINT + MT5_API_PATH + TRADE_UPDATE_PATH;
+
+
+bool IsMarketOpenForSymbol(string symbol, bool force_execution=false);
+// Constants
+#define API_TIMEOUT  5000            // Timeout for API requests in milliseconds
+#define SIGNAL_CHECK_INTERVAL 10     // How often to check for new signals (seconds)
+#define HEARTBEAT_INTERVAL 60        // How often to send heartbeat (seconds)
