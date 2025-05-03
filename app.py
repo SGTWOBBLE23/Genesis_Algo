@@ -572,183 +572,276 @@ def downloads():
 # API Routes
 @app.route('/api/trades', methods=['GET'])
 def get_trades():
-    page = request.args.get('page', 1, type=int)
-    limit = request.args.get('limit', 50, type=int)
-    status = request.args.get('status')
-    symbol = request.args.get('symbol')
-    side = request.args.get('side')
-    start_date = request.args.get('start_date')
-    end_date = request.args.get('end_date')
-    
-    query = db.session.query(Trade)
-    
-    # Apply filters if provided
-    if status:
-        try:
-            query = query.filter(Trade.status == TradeStatus(status))
-        except ValueError:
-            # If invalid status, just ignore this filter
-            pass
-    if symbol:
-        query = query.filter(Trade.symbol == symbol)
-    if side:
-        try:
-            query = query.filter(Trade.side == TradeSide(side))
-        except ValueError:
-            # If invalid side, just ignore this filter
-            pass
-            
-    # Apply date filters if provided
-    if start_date:
-        try:
-            start_date_obj = datetime.fromisoformat(start_date)
-            query = query.filter(Trade.opened_at >= start_date_obj)
-        except (ValueError, TypeError):
-            # Invalid date format, ignore
-            pass
-            
-    if end_date:
-        try:
-            end_date_obj = datetime.fromisoformat(end_date)
-            query = query.filter(Trade.opened_at <= end_date_obj)
-        except (ValueError, TypeError):
-            # Invalid date format, ignore
-            pass
-    
-    # Get total count for pagination
-    total = query.count()
-    pages = (total + limit - 1) // limit if limit > 0 else 1
-    
-    # Apply pagination
-    trades = query.order_by(Trade.created_at.desc()).limit(limit).offset((page - 1) * limit).all()
-    
-    # Convert to dictionaries
-    trade_list = [trade.to_dict() for trade in trades]
-    
-    return jsonify({
-        'data': trade_list,
-        'page': page,
-        'limit': limit,
-        'total': total,
-        'pages': pages
-    })
+    try:
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 50, type=int)
+        status = request.args.get('status')
+        symbol = request.args.get('symbol')
+        side = request.args.get('side')
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        
+        # Define the columns we want to select (avoiding any that might not exist in the DB)
+        columns = [
+            Trade.id,
+            Trade.signal_id,
+            Trade.ticket,
+            Trade.symbol, 
+            Trade.side,
+            Trade.lot,
+            Trade.entry,
+            Trade.exit,
+            Trade.sl,
+            Trade.tp,
+            Trade.pnl,
+            Trade.status,
+            Trade.opened_at,
+            Trade.closed_at,
+            Trade.created_at,
+            Trade.updated_at
+        ]
+        
+        query = db.session.query(*columns)
+        
+        # Apply filters if provided
+        if status:
+            try:
+                query = query.filter(Trade.status == TradeStatus(status))
+            except ValueError:
+                # If invalid status, just ignore this filter
+                pass
+        if symbol:
+            query = query.filter(Trade.symbol == symbol)
+        if side:
+            try:
+                query = query.filter(Trade.side == TradeSide(side))
+            except ValueError:
+                # If invalid side, just ignore this filter
+                pass
+                
+        # Apply date filters if provided
+        if start_date:
+            try:
+                start_date_obj = datetime.fromisoformat(start_date)
+                query = query.filter(Trade.opened_at >= start_date_obj)
+            except (ValueError, TypeError):
+                # Invalid date format, ignore
+                pass
+                
+        if end_date:
+            try:
+                end_date_obj = datetime.fromisoformat(end_date)
+                query = query.filter(Trade.opened_at <= end_date_obj)
+            except (ValueError, TypeError):
+                # Invalid date format, ignore
+                pass
+        
+        # Get total count for pagination
+        total_query = db.session.query(func.count(Trade.id))
+        if status:
+            try:
+                total_query = total_query.filter(Trade.status == TradeStatus(status))
+            except ValueError:
+                pass
+        if symbol:
+            total_query = total_query.filter(Trade.symbol == symbol)
+        if side:
+            try:
+                total_query = total_query.filter(Trade.side == TradeSide(side))
+            except ValueError:
+                pass
+        
+        total = total_query.scalar() or 0
+        pages = (total + limit - 1) // limit if limit > 0 else 1
+        
+        # Apply pagination
+        trades = query.order_by(Trade.created_at.desc()).limit(limit).offset((page - 1) * limit).all()
+        
+        # Convert to dictionaries - manually create the dict since the to_dict method might use columns not in our select
+        trade_list = []
+        for trade in trades:
+            trade_dict = {
+                "id": trade.id,
+                "signal_id": trade.signal_id,
+                "ticket": trade.ticket,
+                "symbol": trade.symbol,
+                "side": trade.side.value if trade.side else None,
+                "lot": trade.lot,
+                "entry": trade.entry,
+                "exit": trade.exit,
+                "sl": trade.sl,
+                "tp": trade.tp,
+                "pnl": trade.pnl,
+                "status": trade.status.value if trade.status else None,
+                "opened_at": trade.opened_at.isoformat() if trade.opened_at else None,
+                "closed_at": trade.closed_at.isoformat() if trade.closed_at else None,
+                "created_at": trade.created_at.isoformat() if trade.created_at else None,
+                "updated_at": trade.updated_at.isoformat() if trade.updated_at else None,
+                "context": {}
+            }
+            trade_list.append(trade_dict)
+        
+        return jsonify({
+            'data': trade_list,
+            'page': page,
+            'limit': limit,
+            'total': total,
+            'pages': pages
+        })
+    except Exception as e:
+        # Log error and return empty response
+        print(f"Error fetching trades: {str(e)}")
+        return jsonify({
+            'data': [],
+            'page': 1,
+            'limit': 50,
+            'total': 0,
+            'pages': 0,
+            'error': str(e)
+        }), 500
 
 @app.route('/api/trades/stats', methods=['GET'])
 def get_trades_stats():
     """Get trading statistics for closed trades"""
-    # Query filters - can add filters later like date range, symbols, etc.
-    symbol = request.args.get('symbol')
-    start_date = request.args.get('start_date')
-    end_date = request.args.get('end_date')
-    
-    # Get closed trades for statistics
-    query = db.session.query(Trade).filter(Trade.status == TradeStatus.CLOSED)
-    
-    # Apply additional filters if provided
-    if symbol:
-        query = query.filter(Trade.symbol == symbol)
+    try:
+        # Query filters - can add filters later like date range, symbols, etc.
+        symbol = request.args.get('symbol')
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
         
-    # Apply date filters if provided
-    if start_date:
-        try:
-            start_date_obj = datetime.fromisoformat(start_date)
-            query = query.filter(Trade.closed_at >= start_date_obj)
-        except (ValueError, TypeError):
-            # Invalid date format, ignore
-            pass
+        # Define the columns we want to select (avoiding any that might not exist in the DB)
+        columns = [
+            Trade.id,
+            Trade.symbol, 
+            Trade.side,
+            Trade.pnl,
+            Trade.status,
+            Trade.closed_at
+        ]
+        
+        # Get closed trades for statistics
+        query = db.session.query(*columns).filter(Trade.status == TradeStatus.CLOSED)
+        
+        # Apply additional filters if provided
+        if symbol:
+            query = query.filter(Trade.symbol == symbol)
             
-    if end_date:
-        try:
-            end_date_obj = datetime.fromisoformat(end_date)
-            query = query.filter(Trade.closed_at <= end_date_obj)
-        except (ValueError, TypeError):
-            # Invalid date format, ignore
-            pass
-    
-    closed_trades = query.all()
-    
-    # Calculate statistics
-    stats = {
-        'total_trades': len(closed_trades),
-        'win_count': 0,
-        'loss_count': 0,
-        'win_rate': 0.0,
-        'avg_win': 0.0,
-        'avg_loss': 0.0,
-        'profit_factor': 0.0,
-        'total_profit': 0.0,
-        'max_drawdown': 0.0
-    }
-    
-    # No trades, return default stats
-    if not closed_trades:
+        # Apply date filters if provided
+        if start_date:
+            try:
+                start_date_obj = datetime.fromisoformat(start_date)
+                query = query.filter(Trade.closed_at >= start_date_obj)
+            except (ValueError, TypeError):
+                # Invalid date format, ignore
+                pass
+                
+        if end_date:
+            try:
+                end_date_obj = datetime.fromisoformat(end_date)
+                query = query.filter(Trade.closed_at <= end_date_obj)
+            except (ValueError, TypeError):
+                # Invalid date format, ignore
+                pass
+        
+        closed_trades = query.all()
+        
+        # Calculate statistics
+        stats = {
+            'total_trades': len(closed_trades),
+            'win_count': 0,
+            'loss_count': 0,
+            'win_rate': 0.0,
+            'avg_win': 0.0,
+            'avg_loss': 0.0,
+            'profit_factor': 0.0,
+            'total_profit': 0.0,
+            'max_drawdown': 0.0
+        }
+        
+        # No trades, return default stats
+        if not closed_trades:
+            return jsonify(stats)
+        
+        # Calculate win/loss counts and profit/loss
+        total_profit = 0.0
+        winning_trades = []
+        losing_trades = []
+        
+        for trade in closed_trades:
+            if trade.pnl is None:
+                # Skip trades with no P&L info
+                continue
+                
+            total_profit += trade.pnl
+            
+            if trade.pnl > 0:
+                stats['win_count'] += 1
+                winning_trades.append(trade.pnl)
+            elif trade.pnl < 0:
+                stats['loss_count'] += 1
+                losing_trades.append(trade.pnl)
+        
+        # Update stats
+        stats['total_profit'] = total_profit
+        
+        # Calculate win rate
+        if stats['total_trades'] > 0 and (stats['win_count'] + stats['loss_count']) > 0:
+            stats['win_rate'] = (stats['win_count'] / (stats['win_count'] + stats['loss_count'])) * 100
+        
+        # Calculate average win/loss
+        if winning_trades:
+            stats['avg_win'] = sum(winning_trades) / len(winning_trades)
+        
+        if losing_trades:
+            stats['avg_loss'] = sum(losing_trades) / len(losing_trades)
+        
+        # Calculate profit factor
+        total_wins = sum(winning_trades) if winning_trades else 0
+        total_losses = abs(sum(losing_trades)) if losing_trades else 0
+        
+        if total_losses > 0:
+            stats['profit_factor'] = total_wins / total_losses
+        elif total_wins > 0:
+            stats['profit_factor'] = float('inf')  # No losses but has wins
+        
+        # Calculate drawdown (simplified version)
+        running_balance = 0
+        peak_balance = 0
+        max_drawdown = 0
+        
+        sorted_trades = sorted(closed_trades, key=lambda t: t.closed_at if t.closed_at else datetime.min)
+        
+        for trade in sorted_trades:
+            if trade.pnl is None:
+                continue
+                
+            running_balance += trade.pnl
+            
+            if running_balance > peak_balance:
+                peak_balance = running_balance
+            
+            drawdown = peak_balance - running_balance
+            if drawdown > max_drawdown:
+                max_drawdown = drawdown
+        
+        stats['max_drawdown'] = max_drawdown
+        
         return jsonify(stats)
-    
-    # Calculate win/loss counts and profit/loss
-    total_profit = 0.0
-    winning_trades = []
-    losing_trades = []
-    
-    for trade in closed_trades:
-        if trade.pnl is None:
-            # Skip trades with no P&L info
-            continue
-            
-        total_profit += trade.pnl
-        
-        if trade.pnl > 0:
-            stats['win_count'] += 1
-            winning_trades.append(trade.pnl)
-        elif trade.pnl < 0:
-            stats['loss_count'] += 1
-            losing_trades.append(trade.pnl)
-    
-    # Update stats
-    stats['total_profit'] = total_profit
-    
-    # Calculate win rate
-    if stats['total_trades'] > 0 and (stats['win_count'] + stats['loss_count']) > 0:
-        stats['win_rate'] = (stats['win_count'] / (stats['win_count'] + stats['loss_count'])) * 100
-    
-    # Calculate average win/loss
-    if winning_trades:
-        stats['avg_win'] = sum(winning_trades) / len(winning_trades)
-    
-    if losing_trades:
-        stats['avg_loss'] = sum(losing_trades) / len(losing_trades)
-    
-    # Calculate profit factor
-    total_wins = sum(winning_trades) if winning_trades else 0
-    total_losses = abs(sum(losing_trades)) if losing_trades else 0
-    
-    if total_losses > 0:
-        stats['profit_factor'] = total_wins / total_losses
-    elif total_wins > 0:
-        stats['profit_factor'] = float('inf')  # No losses but has wins
-    
-    # Calculate drawdown (simplified version)
-    running_balance = 0
-    peak_balance = 0
-    max_drawdown = 0
-    
-    sorted_trades = sorted(closed_trades, key=lambda t: t.closed_at if t.closed_at else datetime.min)
-    
-    for trade in sorted_trades:
-        if trade.pnl is None:
-            continue
-            
-        running_balance += trade.pnl
-        
-        if running_balance > peak_balance:
-            peak_balance = running_balance
-        
-        drawdown = peak_balance - running_balance
-        if drawdown > max_drawdown:
-            max_drawdown = drawdown
-    
-    stats['max_drawdown'] = max_drawdown
-    
-    return jsonify(stats)
+    except Exception as e:
+        # Log error and return default stats
+        print(f"Error calculating trade stats: {str(e)}")
+        return jsonify({
+            'total_trades': 0,
+            'win_count': 0,
+            'loss_count': 0,
+            'win_rate': 0.0,
+            'avg_win': 0.0,
+            'avg_loss': 0.0,
+            'profit_factor': 0.0,
+            'total_profit': 0.0,
+            'max_drawdown': 0.0,
+            'error': str(e)
+        })
 
 @app.route('/api/signals/current', methods=['GET'])
 def get_current_signals():
