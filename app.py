@@ -577,20 +577,47 @@ def get_trades():
     status = request.args.get('status')
     symbol = request.args.get('symbol')
     side = request.args.get('side')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
     
     query = db.session.query(Trade)
     
     # Apply filters if provided
     if status:
-        query = query.filter(Trade.status == TradeStatus(status))
+        try:
+            query = query.filter(Trade.status == TradeStatus(status))
+        except ValueError:
+            # If invalid status, just ignore this filter
+            pass
     if symbol:
         query = query.filter(Trade.symbol == symbol)
     if side:
-        query = query.filter(Trade.side == TradeSide(side))
+        try:
+            query = query.filter(Trade.side == TradeSide(side))
+        except ValueError:
+            # If invalid side, just ignore this filter
+            pass
+            
+    # Apply date filters if provided
+    if start_date:
+        try:
+            start_date_obj = datetime.fromisoformat(start_date)
+            query = query.filter(Trade.opened_at >= start_date_obj)
+        except (ValueError, TypeError):
+            # Invalid date format, ignore
+            pass
+            
+    if end_date:
+        try:
+            end_date_obj = datetime.fromisoformat(end_date)
+            query = query.filter(Trade.opened_at <= end_date_obj)
+        except (ValueError, TypeError):
+            # Invalid date format, ignore
+            pass
     
     # Get total count for pagination
     total = query.count()
-    pages = (total + limit - 1) // limit
+    pages = (total + limit - 1) // limit if limit > 0 else 1
     
     # Apply pagination
     trades = query.order_by(Trade.created_at.desc()).limit(limit).offset((page - 1) * limit).all()
@@ -605,6 +632,123 @@ def get_trades():
         'total': total,
         'pages': pages
     })
+
+@app.route('/api/trades/stats', methods=['GET'])
+def get_trades_stats():
+    """Get trading statistics for closed trades"""
+    # Query filters - can add filters later like date range, symbols, etc.
+    symbol = request.args.get('symbol')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    
+    # Get closed trades for statistics
+    query = db.session.query(Trade).filter(Trade.status == TradeStatus.CLOSED)
+    
+    # Apply additional filters if provided
+    if symbol:
+        query = query.filter(Trade.symbol == symbol)
+        
+    # Apply date filters if provided
+    if start_date:
+        try:
+            start_date_obj = datetime.fromisoformat(start_date)
+            query = query.filter(Trade.closed_at >= start_date_obj)
+        except (ValueError, TypeError):
+            # Invalid date format, ignore
+            pass
+            
+    if end_date:
+        try:
+            end_date_obj = datetime.fromisoformat(end_date)
+            query = query.filter(Trade.closed_at <= end_date_obj)
+        except (ValueError, TypeError):
+            # Invalid date format, ignore
+            pass
+    
+    closed_trades = query.all()
+    
+    # Calculate statistics
+    stats = {
+        'total_trades': len(closed_trades),
+        'win_count': 0,
+        'loss_count': 0,
+        'win_rate': 0.0,
+        'avg_win': 0.0,
+        'avg_loss': 0.0,
+        'profit_factor': 0.0,
+        'total_profit': 0.0,
+        'max_drawdown': 0.0
+    }
+    
+    # No trades, return default stats
+    if not closed_trades:
+        return jsonify(stats)
+    
+    # Calculate win/loss counts and profit/loss
+    total_profit = 0.0
+    winning_trades = []
+    losing_trades = []
+    
+    for trade in closed_trades:
+        if trade.pnl is None:
+            # Skip trades with no P&L info
+            continue
+            
+        total_profit += trade.pnl
+        
+        if trade.pnl > 0:
+            stats['win_count'] += 1
+            winning_trades.append(trade.pnl)
+        elif trade.pnl < 0:
+            stats['loss_count'] += 1
+            losing_trades.append(trade.pnl)
+    
+    # Update stats
+    stats['total_profit'] = total_profit
+    
+    # Calculate win rate
+    if stats['total_trades'] > 0 and (stats['win_count'] + stats['loss_count']) > 0:
+        stats['win_rate'] = (stats['win_count'] / (stats['win_count'] + stats['loss_count'])) * 100
+    
+    # Calculate average win/loss
+    if winning_trades:
+        stats['avg_win'] = sum(winning_trades) / len(winning_trades)
+    
+    if losing_trades:
+        stats['avg_loss'] = sum(losing_trades) / len(losing_trades)
+    
+    # Calculate profit factor
+    total_wins = sum(winning_trades) if winning_trades else 0
+    total_losses = abs(sum(losing_trades)) if losing_trades else 0
+    
+    if total_losses > 0:
+        stats['profit_factor'] = total_wins / total_losses
+    elif total_wins > 0:
+        stats['profit_factor'] = float('inf')  # No losses but has wins
+    
+    # Calculate drawdown (simplified version)
+    running_balance = 0
+    peak_balance = 0
+    max_drawdown = 0
+    
+    sorted_trades = sorted(closed_trades, key=lambda t: t.closed_at if t.closed_at else datetime.min)
+    
+    for trade in sorted_trades:
+        if trade.pnl is None:
+            continue
+            
+        running_balance += trade.pnl
+        
+        if running_balance > peak_balance:
+            peak_balance = running_balance
+        
+        drawdown = peak_balance - running_balance
+        if drawdown > max_drawdown:
+            max_drawdown = drawdown
+    
+    stats['max_drawdown'] = max_drawdown
+    
+    return jsonify(stats)
 
 @app.route('/api/signals/current', methods=['GET'])
 def get_current_signals():
