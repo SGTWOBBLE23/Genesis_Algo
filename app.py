@@ -621,6 +621,19 @@ def test_oanda_connection():
     is_connected = oanda_service.test_connection()
     return jsonify({"connected": is_connected})
 
+@app.route('/api/mt5/heartbeat', methods=['GET'])
+def get_mt5_heartbeat():
+    """Get the latest MT5 heartbeat timestamp"""
+    # Retrieve the latest heartbeat from the Settings table
+    last_heartbeat = Settings.get_value('mt5', 'last_heartbeat', None)
+    # Get connected terminals count
+    connected_terminals = Settings.get_value('mt5', 'connected_terminals', 0)
+    
+    return jsonify({
+        "last_heartbeat": last_heartbeat,
+        "connected_terminals": connected_terminals
+    })
+
 # Register the MT5 API blueprint
 from mt5_ea_api import mt5_api
 app.register_blueprint(mt5_api)

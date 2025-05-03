@@ -46,36 +46,23 @@ function refreshData() {
  * Fetch current trading signals
  */
 function fetchCurrentSignals() {
-    // Simulated fetch for development
-    // In production, replace with actual API call
-    setTimeout(() => {
-        // Sample data for development
-        signalsData = [
-            {
-                id: 1,
-                symbol: 'EURUSD',
-                action: 'BUY_NOW',
-                entry: 1.0750,
-                sl: 1.0720,
-                tp: 1.0800,
-                confidence: 0.85,
-                status: 'ACTIVE',
-                created_at: '2023-07-22T14:30:00Z'
-            },
-            {
-                id: 2,
-                symbol: 'GBPUSD',
-                action: 'ANTICIPATED_SHORT',
-                entry: 1.2650,
-                sl: 1.2700,
-                tp: 1.2550,
-                confidence: 0.75,
-                status: 'PENDING',
-                created_at: '2023-07-22T15:15:00Z'
+    fetch('/api/signals/current')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to fetch current signals');
             }
-        ];
-        updateSignalsDisplay();
-    }, 300);
+            return response.json();
+        })
+        .then(data => {
+            signalsData = data;
+            updateSignalsDisplay();
+        })
+        .catch(error => {
+            console.error('Error fetching signals data:', error);
+            // Fallback to empty signals if error occurs
+            signalsData = [];
+            updateSignalsDisplay();
+        });
 }
 
 /**
@@ -190,6 +177,26 @@ function fetchAccountInfo() {
  * Check connection status of integrated services
  */
 function checkConnectionStatus() {
+    // Initialize default status while we check
+    connectionStatus = {
+        mt5: false,
+        oanda: false,
+        vision: true, // Assuming API key is present
+        telegram: false
+    };
+    
+    // Check MT5 connection status by checking for heartbeat timestamps
+    fetch('/api/mt5/heartbeat')
+        .then(response => response.json())
+        .then(data => {
+            connectionStatus.mt5 = !!data.last_heartbeat;
+            updateStatusDisplay();
+        })
+        .catch(() => {
+            connectionStatus.mt5 = false;
+            updateStatusDisplay();
+        });
+        
     // Check OANDA connection
     fetch('/api/oanda/test-connection')
         .then(response => response.json())
@@ -201,14 +208,6 @@ function checkConnectionStatus() {
             connectionStatus.oanda = false;
             updateStatusDisplay();
         });
-    
-    // Initialize default status while we check
-    connectionStatus = {
-        mt5: false,
-        oanda: false,
-        vision: true, // Assuming API key is present
-        telegram: false
-    };
     
     updateStatusDisplay();
 }
@@ -270,7 +269,7 @@ function updateTradesDisplay() {
     }
     
     let html = '<div class="table-responsive"><table class="table table-hover"><thead><tr>';
-    html += '<th>Symbol</th><th>Side</th><th>Lot</th><th>Entry</th><th>SL</th><th>TP</th><th>P&L</th><th>Status</th><th>Actions</th>';
+    html += '<th>Symbol</th><th>Side</th><th>Lot</th><th>Entry</th><th>SL</th><th>TP</th><th>P&L</th><th>Status</th><th>Opened</th><th>Actions</th>';
     html += '</tr></thead><tbody>';
     
     tradesData.forEach(trade => {
@@ -285,6 +284,7 @@ function updateTradesDisplay() {
         html += `<td>${trade.tp || '-'}</td>`;
         html += `<td class="${pnlClass}">${trade.pnl > 0 ? '+' : ''}${trade.pnl}</td>`;
         html += `<td><span class="badge bg-${trade.status === 'OPEN' ? 'success' : 'secondary'}">${trade.status}</span></td>`;
+        html += `<td>${formatDateTime(trade.opened_at)}</td>`;
         html += `<td>`;
         if (trade.status === 'OPEN') {
             html += `<button class="btn btn-sm btn-warning" onclick="closeTrade(${trade.id})">Close</button>`;
@@ -314,7 +314,7 @@ function updateAccountDisplay() {
     
     // Calculate P&L percentage
     const pnlPercentage = accountData.balance > 0 ? (accountData.daily_pnl / accountData.balance) * 100 : 0;
-    html += `<p>P&L %: <span class="${pnlClass}">${pnlPercentage > 0 ? '+' : ''}${pnlPercentage.toFixed(2)}%</span></p>`
+    html += `<p>P&L %: <span class="${pnlClass}">${pnlPercentage > 0 ? '+' : ''}${pnlPercentage.toFixed(2)}%</span></p>`;
     
     container.innerHTML = html;
 }
@@ -377,4 +377,29 @@ function closeTrade(tradeId) {
     // In production, replace with actual API call
     console.log(`Closing trade ${tradeId}`);
     alert(`Trade #${tradeId} has been closed`);
+}
+
+/**
+ * Format a datetime string to a more readable format
+ * @param {string} dateTimeString - ISO datetime string
+ * @returns {string} Formatted date and time
+ */
+function formatDateTime(dateTimeString) {
+    if (!dateTimeString) return '-';
+    
+    const date = new Date(dateTimeString);
+    if (isNaN(date.getTime())) return dateTimeString; // If invalid date, return original
+    
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    // Check if it's today or yesterday
+    if (date.toDateString() === today.toDateString()) {
+        return `Today ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+    } else if (date.toDateString() === yesterday.toDateString()) {
+        return `Yesterday ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+    } else {
+        return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+    }
 }
