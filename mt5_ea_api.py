@@ -76,11 +76,28 @@ def get_signals():
         # Log the raw data for debugging
         logger.info(f"Raw data from MT5: {data}")
         
-        # Get new signals from database
-        signals_query = db.session.query(Signal).filter(
-            Signal.id > last_signal_id,
-            Signal.status.in_(['PENDING', 'ACTIVE'])
-        )
+        # Get signals from database that are in PENDING or ACTIVE status
+        # Simplify logic by checking for new signals first, then falling back to all signals if none found
+        new_signals = []
+        
+        if last_signal_id > 0:
+            # Try to get any new signals first (higher ID than last_signal_id)
+            new_signals = db.session.query(Signal).filter(
+                Signal.id > last_signal_id,
+                Signal.status.in_(['PENDING', 'ACTIVE'])
+            ).order_by(Signal.id.asc()).all()
+            
+            if not new_signals:
+                logger.info(f"No new signals found after ID {last_signal_id}, returning up to 5 latest active signals")
+                # Fall back to returning the 5 most recent signals if no new ones
+                new_signals = db.session.query(Signal).filter(
+                    Signal.status.in_(['PENDING', 'ACTIVE'])
+                ).order_by(Signal.id.asc()).limit(5).all()
+        else:
+            # First request, return all pending/active signals
+            new_signals = db.session.query(Signal).filter(
+                Signal.status.in_(['PENDING', 'ACTIVE'])
+            ).order_by(Signal.id.asc()).all()
         
         # Check if we received valid symbols array
         valid_symbols = []
@@ -94,14 +111,16 @@ def get_signals():
                     else:
                         valid_symbols.append(symbol)
         
-        # If we have valid symbols, filter by them
+        # If we have valid symbols, filter the signals we already retrieved
+        filtered_signals = []
         if valid_symbols:
             logger.info(f"Filtering signals for symbols: {valid_symbols}")
-            signals_query = signals_query.filter(Signal.symbol.in_(valid_symbols))
+            filtered_signals = [s for s in new_signals if s.symbol in valid_symbols]
         else:
             logger.info("No valid symbols received, returning all pending/active signals")
+            filtered_signals = new_signals
         
-        signals = signals_query.order_by(Signal.id.asc()).all()
+        signals = filtered_signals  # Use the filtered list for formatting
         
         # Format signals for MT5 EA
         formatted_signals = []
@@ -109,12 +128,10 @@ def get_signals():
             # Convert SignalAction enum to string
             action = signal.action.value if hasattr(signal.action, 'value') else str(signal.action)
             
-            # Format signal data for MT5
+            # Format signal data for MT5 EA, matching expected format
             formatted_signal = {
                 "id": signal.id,
-                "asset": {
-                    "symbol": signal.symbol
-                },
+                "symbol": signal.symbol,  # Direct symbol without nesting in asset
                 "action": action,
                 "entry_price": float(signal.entry) if signal.entry else 0.0,
                 "stop_loss": float(signal.sl) if signal.sl else 0.0,
