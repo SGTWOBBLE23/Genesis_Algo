@@ -366,8 +366,7 @@ function updateStatsUI(stats) {
         }
     }
     
-    // Update the monthly chart
-    updateMonthlyChart(stats);
+    // Monthly chart removed per user request
 }
 
 /**
@@ -478,55 +477,4 @@ function showAlert(message, type = 'info') {
     }, 5000);
 }
 
-/**
- * Update the monthly performance chart
- * @param {Object} stats - Trading statistics data
- */
-function updateMonthlyChart(stats) {
-    const chartCanvas = document.getElementById('monthly-chart');
-    if (!chartCanvas) return;
-    
-    // For now, we'll create a placeholder chart
-    // In the future, this should use actual monthly data
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const currentMonth = new Date().getMonth();
-    
-    // Create random performance data for previous months as placeholder
-    // This should be replaced with real data from API
-    const data = [];
-    for (let i = 0; i < 6; i++) {
-        // Get month index (going back from current month)
-        const monthIndex = (currentMonth - i + 12) % 12;
-        data.unshift({
-            month: months[monthIndex],
-            value: stats.total_profit / (i + 1) // Just a placeholder calculation
-        });
-    }
-    
-    // Ensure Chart instance doesn't already exist
-    if (window.monthlyChart) {
-        window.monthlyChart.destroy();
-    }
-    
-    // Create chart
-    window.monthlyChart = new Chart(chartCanvas, {
-        type: 'bar',
-        data: {
-            labels: data.map(d => d.month),
-            datasets: [{
-                label: 'Monthly P&L',
-                data: data.map(d => d.value),
-                backgroundColor: data.map(d => d.value >= 0 ? 'rgba(75, 192, 192, 0.2)' : 'rgba(255, 99, 132, 0.2)'),
-                borderColor: data.map(d => d.value >= 0 ? 'rgba(75, 192, 192, 1)' : 'rgba(255, 99, 132, 1)'),
-                borderWidth: 1
-            }]
-        },
-        options: {
-            scales: {
-                y: {
-                    beginAtZero: true
-                }
-            }
-        }
-    });
-}
+// Monthly chart functionality removed per user request
