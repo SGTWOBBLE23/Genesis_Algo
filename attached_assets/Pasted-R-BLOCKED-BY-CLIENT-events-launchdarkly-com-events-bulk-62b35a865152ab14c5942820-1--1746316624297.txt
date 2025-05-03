@@ -1,0 +1,62 @@
+R_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1 
+            
+            
+           Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+beacon.js:1 
+            
+            
+           Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1 
+            
+            
+           Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1 
+            
+            
+           Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1 
+            
+            
+           Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1 
+            
+            
+           Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1 
+            
+            
+           Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1 
+            
+            
+           Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+lockdown-install.js:1 Removing unpermitted intrinsics
+lockdown-install.js:1 Removing unpermitted intrinsics
+Console.js:61 Fetching trades from: /api/trades?page=1&limit=20
+beacon.js:1 
+            
+            
+           Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+Console.js:61 API response status: 200
+Console.js:61 Received trade data: Object
+Console.js:61 Fetching trades from: /api/trades?page=1&limit=20
+Console.js:61 API response status: 200
+Console.js:61 Received trade data: Object
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1 
+            
+            
+           Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1 
+            
+            
+           Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+Console.js:61 Fetching trades from: /api/trades?page=1&limit=20
+Console.js:61 API response status: 200
+Console.js:61 Received trade data: Object
+Console.js:61 Fetching trades from: /api/trades?page=1&limit=20
+Console.js:61 API response status: 200
+Console.js:61 Received trade data: Object
+Console.js:61 Fetching trades from: /api/trades?page=1&limit=20
+Console.js:61 API response status: 200
+Console.js:61 Received trade data

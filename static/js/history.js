@@ -111,6 +111,7 @@ function loadTrades() {
  * Update the trades table with current data
  */
 function updateTradesTable() {
+    console.log('Starting updateTradesTable function');
     const tableBody = document.getElementById('trades-table-body');
     if (!tableBody) {
         console.error('Could not find trades-table-body element');
@@ -120,7 +121,10 @@ function updateTradesTable() {
     // Clear existing rows
     tableBody.innerHTML = '';
     
+    console.log('Trades array length:', trades.length);
+    
     if (trades.length === 0) {
+        console.log('No trades found, showing empty state message');
         // Show a more informative empty state with guidance
         const emptyRow = document.createElement('tr');
         emptyRow.innerHTML = `<td colspan="10" class="text-center">
@@ -141,15 +145,21 @@ function updateTradesTable() {
     }
     
     // Add each trade
-    trades.forEach(trade => {
+    console.log('Starting to add trades to the table');
+    trades.forEach((trade, index) => {
+        console.log(`Processing trade ${index + 1}:`, trade);
         const row = document.createElement('tr');
         
         // Format dates
         const openedDate = trade.opened_at ? new Date(trade.opened_at) : null;
         const closedDate = trade.closed_at ? new Date(trade.closed_at) : null;
+        console.log('Formatted dates:', { openedDate, closedDate });
         
         // Format P&L with color
-        const pnlClass = trade.pnl > 0 ? 'positive' : (trade.pnl < 0 ? 'negative' : '');
+        const pnlClass = trade.pnl > 0 ? 'text-success' : (trade.pnl < 0 ? 'text-danger' : '');
+        
+        const badgeClass = getBadgeClass(trade.status);
+        console.log('Badge and PNL classes:', { badgeClass, pnlClass });
         
         row.innerHTML = `
             <td>${trade.id}</td>
@@ -164,7 +174,7 @@ function updateTradesTable() {
             <td>${trade.exit !== null ? trade.exit.toFixed(5) : '--'}</td>
             <td class="${pnlClass}">${trade.pnl !== null ? trade.pnl.toFixed(2) : '--'}</td>
             <td>
-                <span class="badge ${getBadgeClass(trade.status)}">
+                <span class="badge ${badgeClass}">
                     ${trade.status}
                 </span>
             </td>
@@ -173,7 +183,9 @@ function updateTradesTable() {
         `;
         
         tableBody.appendChild(row);
+        console.log(`Added trade ${index + 1} to table`);
     });
+    console.log('Finished adding all trades to the table');
 }
 
 /**
