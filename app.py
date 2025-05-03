@@ -210,7 +210,7 @@ class Trade(db.Model):
     status = db.Column(db.Enum(TradeStatus), default=TradeStatus.OPEN)
     opened_at = db.Column(db.DateTime, nullable=True)
     closed_at = db.Column(db.DateTime, nullable=True)
-    context_json = db.Column(db.Text, nullable=True)  # Additional trade context
+    context = db.Column(db.Text, nullable=True)  # Additional trade context
     created_at = db.Column(db.DateTime, server_default=func.now())
     updated_at = db.Column(db.DateTime, onupdate=func.now())
 
