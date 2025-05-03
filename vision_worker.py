@@ -10,13 +10,17 @@ import requests
 logger = logging.getLogger(__name__)
 
 # Redis connection
-redis_client = redis.Redis(
-    host=os.environ.get('REDIS_HOST', 'localhost'),
-    port=int(os.environ.get('REDIS_PORT', 6379)),
-    db=int(os.environ.get('REDIS_DB', 0)),
-    password=os.environ.get('REDIS_PASSWORD', None),
-    decode_responses=True
-)
+try:
+    redis_client = redis.Redis(
+        host=os.environ.get('REDIS_HOST', 'localhost'),
+        port=int(os.environ.get('REDIS_PORT', 6379)),
+        db=int(os.environ.get('REDIS_DB', 0)),
+        password=os.environ.get('REDIS_PASSWORD', None),
+        decode_responses=True
+    )
+except Exception as e:
+    logger.warning(f"Could not connect to Redis: {e}")
+    redis_client = None
 
 # OpenAI API configuration
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
@@ -88,6 +92,10 @@ def analyze_image(image_s3: str) -> Dict[str, Any]:
 
 def process_vision_queue():
     """Process items from the vision_queue"""
+    if not redis_client:
+        logger.error("Redis client not available, cannot process vision queue")
+        return
+        
     while True:
         try:
             # Pop item from vision_queue
@@ -132,25 +140,30 @@ def process_vision_queue():
                 # Failed after retries
                 logger.error(f"Failed to analyze image for job {job_id} after {MAX_RETRIES} retries")
                 
-                # Send alert
-                alert_payload = {
-                    'type': 'error',
-                    'source': 'vision_worker',
-                    'message': f"Failed to analyze image for {symbol} (job {job_id})",
-                    'job_id': job_id,
-                    'symbol': symbol
-                }
-                redis_client.publish('alerts', json.dumps(alert_payload))
+                # Send alert if Redis is available
+                try:
+                    alert_payload = {
+                        'type': 'error',
+                        'source': 'vision_worker',
+                        'message': f"Failed to analyze image for {symbol} (job {job_id})",
+                        'job_id': job_id,
+                        'symbol': symbol
+                    }
+                    redis_client.publish('alerts', json.dumps(alert_payload))
+                except Exception as e:
+                    logger.error(f"Could not publish alert: {e}")
                 continue
             
             # Merge Vision result with original payload
             enriched_payload = payload.copy()
             enriched_payload['vision_result'] = vision_result
             
-            # Push to signal queue
-            redis_client.rpush('signal_queue', json.dumps(enriched_payload))
-            
-            logger.info(f"Processed vision job {job_id} for {symbol}, pushed to signal_queue")
+            # Push to signal queue if Redis is available
+            try:
+                redis_client.rpush('signal_queue', json.dumps(enriched_payload))
+                logger.info(f"Processed vision job {job_id} for {symbol}, pushed to signal_queue")
+            except Exception as e:
+                logger.error(f"Could not push to signal_queue: {e}")
             
         except Exception as e:
             logger.error(f"Error processing vision queue: {str(e)}")

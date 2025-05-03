@@ -13,13 +13,17 @@ from oanda_api import OandaAPI
 logger = logging.getLogger(__name__)
 
 # Redis connection
-redis_client = redis.Redis(
-    host=os.environ.get('REDIS_HOST', 'localhost'),
-    port=int(os.environ.get('REDIS_PORT', 6379)),
-    db=int(os.environ.get('REDIS_DB', 0)),
-    password=os.environ.get('REDIS_PASSWORD', None),
-    decode_responses=True
-)
+try:
+    redis_client = redis.Redis(
+        host=os.environ.get('REDIS_HOST', 'localhost'),
+        port=int(os.environ.get('REDIS_PORT', 6379)),
+        db=int(os.environ.get('REDIS_DB', 0)),
+        password=os.environ.get('REDIS_PASSWORD', None),
+        decode_responses=True
+    )
+except Exception as e:
+    logger.warning(f"Could not connect to Redis: {e}")
+    redis_client = None
 
 # S3 connection
 s3_client = boto3.client(
@@ -161,10 +165,15 @@ def run(symbol: str, timestamp: Optional[datetime] = None) -> Dict[str, Any]:
             "features": features
         }
         
-        # 5. Push to Redis queue
-        redis_client.rpush("vision_queue", json.dumps(payload))
-        
-        logger.info(f"Capture job completed for {symbol}, pushed to vision_queue")
+        # 5. Push to Redis queue if available
+        if redis_client:
+            try:
+                redis_client.rpush("vision_queue", json.dumps(payload))
+                logger.info(f"Capture job completed for {symbol}, pushed to vision_queue")
+            except Exception as e:
+                logger.warning(f"Could not push to Redis queue: {e}")
+        else:
+            logger.info(f"Capture job completed for {symbol}, Redis not available - data not queued")
         
         return payload
     except Exception as e:
