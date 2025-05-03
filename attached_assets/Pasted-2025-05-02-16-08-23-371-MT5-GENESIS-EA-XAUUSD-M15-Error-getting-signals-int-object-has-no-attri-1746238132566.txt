@@ -1,0 +1,22 @@
+2025.05.02 16:08:23.371	MT5_GENESIS_EA (XAUUSD,M15)	Error getting signals: 'int' object has no attribute 'strip'
+2025.05.02 16:08:24.573	MT5_GENESIS_EA (EURUSD,H1)	Attempting to get signals from URL: https://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev/mt5_ea_api/get-signals
+2025.05.02 16:08:24.676	MT5_GENESIS_EA (EURUSD,H1)	Error getting signals: 'int' object has no attribute 'strip'
+2025.05.02 16:08:26.382	MT5_GENESIS_EA (XAUUSD,M15)	Heartbeat sent successfully. Server time: 2025-05-03 02:08:26
+2025.05.02 16:08:29.257	MT5_GENESIS_EA (GBPUSD,M15)	Heartbeat sent successfully. Server time: 2025-05-03 02:08:29
+2025.05.02 16:08:30.809	MT5_GENESIS_EA (GBPJPY,H1)	Heartbeat sent successfully. Server time: 2025-05-03 02:08:31
+2025.05.02 16:08:30.809	MT5_GENESIS_EA (GBPJPY,H1)	Attempting to get signals from URL: https://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev/mt5_ea_api/get-signals
+2025.05.02 16:08:30.906	MT5_GENESIS_EA (GBPJPY,H1)	Error getting signals: 'int' object has no attribute 'strip'
+2025.05.02 16:08:33.672	MT5_GENESIS_EA (EURUSD,H1)	Heartbeat sent successfully. Server time: 2025-05-03 02:08:34
+2025.05.02 16:08:33.672	MT5_GENESIS_EA (EURUSD,H1)	Attempting to get signals from URL: https://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev/mt5_ea_api/get-signals
+2025.05.02 16:08:33.770	MT5_GENESIS_EA (EURUSD,H1)	Error getting signals: 'int' object has no attribute 'strip'
+2025.05.02 16:08:34.149	MT5_GENESIS_EA (GBPUSD,M15)	Attempting to get signals from URL: https://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev/mt5_ea_api/get-signals
+2025.05.02 16:08:34.251	MT5_GENESIS_EA (GBPUSD,M15)	Error getting signals: 'int' object has no attribute 'strip'
+2025.05.02 16:08:34.277	MT5_GENESIS_EA (XAUUSD,M15)	Attempting to get signals from URL: https://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev/mt5_ea_api/get-signals
+2025.05.02 16:08:34.381	MT5_GENESIS_EA (XAUUSD,M15)	Error getting signals: 'int' object has no attribute 'strip'
+2025.05.02 16:08:40.705	MT5_GENESIS_EA (GBPJPY,H1)	Attempting to get signals from URL: https://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev/mt5_ea_api/get-signals
+2025.05.02 16:08:40.804	MT5_GENESIS_EA (GBPJPY,H1)	Error getting signals: 'int' object has no attribute 'strip'
+2025.05.02 16:08:44.145	MT5_GENESIS_EA (GBPUSD,M15)	Attempting to get signals from URL: https://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev/mt5_ea_api/get-signals
+2025.05.02 16:08:44.253	MT5_GENESIS_EA (GBPUSD,M15)	Error getting signals: 'int' object has no attribute 'strip'
+2025.05.02 16:08:44.275	MT5_GENESIS_EA (XAUUSD,M15)	Attempting to get signals from URL: https://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev/mt5_ea_api/get-signals
+2025.05.02 16:08:44.377	MT5_GENESIS_EA (XAUUSD,M15)	Error getting signals: 'int' object has no attribute 'strip'
+2025.05.02 16:08:44.570	MT5_GENESIS_EA (EURUSD,H1)	Attempting to get signals from URL: https://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev/mt5_ea_api/get-signals

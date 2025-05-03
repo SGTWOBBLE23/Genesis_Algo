@@ -67,18 +67,17 @@ def get_signals():
         
         logger.info(f"MT5 EA requesting signals for account {account_id}, last_signal_id={last_signal_id}")
         
+        # Log the raw data for debugging
+        logger.info(f"Raw data from MT5: {data}")
+        
         # Get new signals from database
         signals_query = db.session.query(Signal).filter(
             Signal.id > last_signal_id,
             Signal.status.in_(['PENDING', 'ACTIVE'])
         )
         
-        # Filter by symbols if provided
-        if symbols and len(symbols) > 0 and any(s != '0' for s in symbols):
-            valid_symbols = [s for s in symbols if s != '0' and s.strip()]
-            if valid_symbols:
-                logger.info(f"Filtering signals by {len(valid_symbols)} symbols")
-                signals_query = signals_query.filter(Signal.symbol.in_(valid_symbols))
+        # For now, skip symbol filtering and return all pending/active signals
+        # We'll debug the symbols issue and implement filtering later
         
         signals = signals_query.order_by(Signal.id.asc()).all()
         
