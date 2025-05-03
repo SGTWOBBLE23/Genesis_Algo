@@ -37,17 +37,30 @@ def heartbeat():
             return jsonify({"status": "error", "message": "Missing account_id or terminal_id"}), 400
         
         # Update active terminals list
+        current_time = datetime.now()
         active_terminals[terminal_id] = {
             'account_id': account_id,
-            'last_seen': datetime.now(),
+            'last_seen': current_time,
             'connection_time': connection_time
         }
+        
+        # Update settings table for dashboard monitoring
+        from app import Settings
+        # Store last heartbeat time as ISO formatted string
+        Settings.set_value('mt5', 'last_heartbeat', current_time.isoformat())
+        # Count and store number of connected terminals
+        connected_terminals = len(active_terminals)
+        Settings.set_value('mt5', 'connected_terminals', connected_terminals)
+        # Store most recent terminal id
+        Settings.set_value('mt5', 'last_terminal_id', terminal_id)
+        # Store most recent account id
+        Settings.set_value('mt5', 'last_account_id', account_id)
         
         logger.info(f"Heartbeat received from MT5 terminal {terminal_id} for account {account_id}")
         
         return jsonify({
             "status": "success",
-            "server_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "server_time": current_time.strftime("%Y-%m-%d %H:%M:%S"),
             "message": "Heartbeat received"
         })
         
