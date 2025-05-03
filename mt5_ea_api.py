@@ -14,6 +14,12 @@ mt5_api = Blueprint('mt5_api', __name__, url_prefix='/mt5_ea_api')
 # Dictionary to store active MT5 terminal connections
 active_terminals = {}
 
+# Add a route for get-signals (with hyphen) since the MT5 EA is looking for that URL
+@mt5_api.route('/get-signals', methods=['POST'])
+def get_signals_hyphen():
+    """Redirects to get_signals, handles the hyphen vs underscore issue"""
+    return get_signals()
+
 @mt5_api.route('/heartbeat', methods=['POST'])
 def heartbeat():
     """Receive heartbeat from MT5 EA"""
@@ -76,8 +82,24 @@ def get_signals():
             Signal.status.in_(['PENDING', 'ACTIVE'])
         )
         
-        # For now, skip symbol filtering and return all pending/active signals
-        # We'll debug the symbols issue and implement filtering later
+        # Check if we received valid symbols array
+        valid_symbols = []
+        if symbols and isinstance(symbols, list):
+            # Convert integer symbols to strings if necessary
+            for symbol in symbols:
+                if symbol and not (isinstance(symbol, int) and symbol == 0):
+                    if isinstance(symbol, int):
+                        # Try to convert integer to string symbol name
+                        valid_symbols.append(str(symbol))
+                    else:
+                        valid_symbols.append(symbol)
+        
+        # If we have valid symbols, filter by them
+        if valid_symbols:
+            logger.info(f"Filtering signals for symbols: {valid_symbols}")
+            signals_query = signals_query.filter(Signal.symbol.in_(valid_symbols))
+        else:
+            logger.info("No valid symbols received, returning all pending/active signals")
         
         signals = signals_query.order_by(Signal.id.asc()).all()
         
