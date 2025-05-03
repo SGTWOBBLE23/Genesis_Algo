@@ -9,7 +9,7 @@ from app import db, Signal, Trade, SignalAction, TradeStatus, TradeSide, Setting
 logger = logging.getLogger(__name__)
 
 # Create a blueprint for the MT5 EA API
-mt5_api = Blueprint('mt5_api', __name__, url_prefix='/mt5_ea_api')
+mt5_api = Blueprint('mt5_api', __name__, url_prefix='/mt5')
 
 # Dictionary to store active MT5 terminal connections
 active_terminals = {}
