@@ -65,6 +65,8 @@ def get_signals():
         if not account_id:
             return jsonify({"status": "error", "message": "Missing account_id"}), 400
         
+        logger.info(f"MT5 EA requesting signals for account {account_id}, last_signal_id={last_signal_id}")
+        
         # Get new signals from database
         signals_query = db.session.query(Signal).filter(
             Signal.id > last_signal_id,
@@ -72,8 +74,11 @@ def get_signals():
         )
         
         # Filter by symbols if provided
-        if symbols and len(symbols) > 0:
-            signals_query = signals_query.filter(Signal.symbol.in_(symbols))
+        if symbols and len(symbols) > 0 and any(s != '0' for s in symbols):
+            valid_symbols = [s for s in symbols if s != '0' and s.strip()]
+            if valid_symbols:
+                logger.info(f"Filtering signals by {len(valid_symbols)} symbols")
+                signals_query = signals_query.filter(Signal.symbol.in_(valid_symbols))
         
         signals = signals_query.order_by(Signal.id.asc()).all()
         
