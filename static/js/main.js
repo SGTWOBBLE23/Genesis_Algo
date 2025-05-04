@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeDashboard() {
     // Fetch initial data
     fetchCurrentSignals();
-    fetchOpenTrades();
+    // fetchOpenTrades(); // Open trades section removed as requested
     checkConnectionStatus();
 }
 
@@ -53,7 +53,7 @@ function initializeDashboard() {
  */
 function refreshData() {
     fetchCurrentSignals();
-    fetchOpenTrades();
+    // fetchOpenTrades(); // Open trades section removed as requested
     // Only check connection status every 5 minutes
     if (Math.random() < 0.2) {
         checkConnectionStatus();
@@ -239,53 +239,15 @@ function updateSignalsDisplay() {
 
 /**
  * Update trades display - only if dashboard.js hasn't already done it
+ * This function has been modified to not display the trades section as requested
  */
 function updateTradesDisplay() {
-    const container = document.getElementById('trades-container');
-    const activeTradesBody = document.getElementById('active-trades-body');
+    // We still want to load the trade data for the system to function properly
+    // but we don't want to display it in the UI
+    console.log('Trades available but not displayed as requested.');
+    return;
     
-    // If active-trades-body exists, dashboard.js is handling it directly
-    if (activeTradesBody) {
-        console.log('Dashboard.js already handling trades display, skipping main.js implementation');
-        return;
-    }
-    
-    if (!container) return;
-    
-    if (tradesData.length === 0) {
-        container.innerHTML = '<p>No open trades.</p>';
-        return;
-    }
-    
-    let html = '<div class="table-responsive"><table class="table table-hover"><thead><tr>';
-    html += '<th>Symbol</th><th>Side</th><th>Lot</th><th>Entry</th><th>SL</th><th>TP</th><th>P&L</th><th>Status</th><th>Opened</th><th>Actions</th>';
-    html += '</tr></thead><tbody>';
-    
-    tradesData.forEach(trade => {
-        const pnlClass = trade.pnl > 0 ? 'text-success' : (trade.pnl < 0 ? 'text-danger' : '');
-        
-        html += `<tr data-id="${trade.id}">`;
-        html += `<td>${trade.symbol}</td>`;
-        html += `<td>${trade.side}</td>`;
-        html += `<td>${trade.lot}</td>`;
-        html += `<td>${trade.entry}</td>`;
-        html += `<td>${trade.sl || '-'}</td>`;
-        html += `<td>${trade.tp || '-'}</td>`;
-        html += `<td class="${pnlClass}">${trade.pnl > 0 ? '+' : ''}${trade.pnl}</td>`;
-        html += `<td><span class="badge bg-${trade.status === 'OPEN' ? 'success' : 'secondary'}">${trade.status}</span></td>`;
-        html += `<td>${formatDateTime(trade.opened_at)}</td>`;
-        html += `<td>`;
-        if (trade.status === 'OPEN') {
-            html += `<button class="btn btn-sm btn-warning" onclick="closeTrade(${trade.id})">Close</button>`;
-        } else {
-            html += `<span class="text-muted">No actions</span>`;
-        }
-        html += `</td>`;
-        html += '</tr>';
-    });
-    
-    html += '</tbody></table></div>';
-    container.innerHTML = html;
+    /* Original implementation removed to prevent trades section from showing */
 }
 
 
