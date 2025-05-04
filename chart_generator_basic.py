@@ -280,9 +280,10 @@ class ChartGenerator:
             axes[2].set_xticks(x_positions)
             axes[2].set_xticklabels(x_labels, rotation=45)
             
-            # Set x-axis ranges
+            # Set x-axis ranges with extra space on the right for future price movement
+            chart_padding = int(len(df) * 0.15)  # Add 15% padding to the right
             for ax in axes:
-                ax.set_xlim(0, len(df) - 1)
+                ax.set_xlim(0, len(df) + chart_padding)
             
             # Add spacing between subplots
             plt.tight_layout()
