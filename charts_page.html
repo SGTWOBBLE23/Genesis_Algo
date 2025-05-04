@@ -291,9 +291,22 @@
             const a = document.createElement('a');
             a.href = downloadUrl;
             a.download = `${values.symbol.replace('_', '')}_${values.timeframe}_chart.png`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            
+            // Safely append to body with checks
+            try {
+                if (document.body) {
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                } else {
+                    console.error('Document body not available for chart download');
+                    // Fallback - open in new window/tab
+                    window.open(downloadUrl, '_blank');
+                }
+            } catch (e) {
+                console.error('Error during chart download:', e);
+                window.open(downloadUrl, '_blank');
+            }
         });
         
         // Handle chart image load error
@@ -331,26 +344,34 @@
         // WebSocket connection for real-time updates
         let ws;
         function connectWebSocket() {
-            const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-            ws = new WebSocket(protocol + window.location.host + '/api/signals/ws');
-            
-            ws.onopen = function() {
-                console.log('WebSocket connected');
-            };
+            try {
+                const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+                ws = new WebSocket(protocol + window.location.host + '/api/signals/ws');
+                
+                ws.onopen = function() {
+                    console.log('WebSocket connected');
+                };
+            } catch (e) {
+                console.error('WebSocket connection error:', e);
+            }
             
             ws.onmessage = function(event) {
-                const data = JSON.parse(event.data);
-                console.log('WebSocket message:', data);
-                
-                // Handle different message types
-                if (data.type === 'status_update') {
-                    updateConnectionStatus(data.data);
-                } else if (data.type === 'new_signal') {
-                    handleNewSignal(data.data);
-                } else if (data.type === 'new_trade') {
-                    handleNewTrade(data.data);
-                } else if (data.type === 'trade_update') {
-                    handleTradeUpdate(data.data);
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log('WebSocket message:', data);
+                    
+                    // Handle different message types
+                    if (data.type === 'status_update') {
+                        updateConnectionStatus(data.data);
+                    } else if (data.type === 'new_signal' && typeof handleNewSignal === 'function') {
+                        handleNewSignal(data.data);
+                    } else if (data.type === 'new_trade' && typeof handleNewTrade === 'function') {
+                        handleNewTrade(data.data);
+                    } else if (data.type === 'trade_update' && typeof handleTradeUpdate === 'function') {
+                        handleTradeUpdate(data.data);
+                    }
+                } catch (e) {
+                    console.error('Error processing WebSocket message:', e);
                 }
             };
             
@@ -366,28 +387,23 @@
         }
         
         function updateConnectionStatus(status) {
-            if (status.oanda) {
-                document.getElementById('oanda-status').textContent = 'OANDA: Connected';
-                document.getElementById('oanda-status').className = 'badge text-bg-success';
-            } else {
-                document.getElementById('oanda-status').textContent = 'OANDA: Disconnected';
-                document.getElementById('oanda-status').className = 'badge text-bg-secondary';
-            }
-            
-            if (status.mt5) {
-                document.getElementById('mt5-status').textContent = 'MT5: Connected';
-                document.getElementById('mt5-status').className = 'badge text-bg-success';
-            } else {
-                document.getElementById('mt5-status').textContent = 'MT5: Disconnected';
-                document.getElementById('mt5-status').className = 'badge text-bg-secondary';
-            }
-            
-            if (status.vision) {
-                document.getElementById('vision-status').textContent = 'Vision AI: Connected';
-                document.getElementById('vision-status').className = 'badge text-bg-success';
-            } else {
-                document.getElementById('vision-status').textContent = 'Vision AI: Disconnected';
-                document.getElementById('vision-status').className = 'badge text-bg-secondary';
+            try {
+                // Helper function to update status badges safely
+                function updateBadge(id, isConnected, serviceName) {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.textContent = serviceName + (isConnected ? ': Connected' : ': Disconnected');
+                        element.className = 'badge ' + (isConnected ? 'text-bg-success' : 'text-bg-secondary');
+                    }
+                }
+                
+                if (status && typeof status === 'object') {
+                    updateBadge('oanda-status', status.oanda, 'OANDA');
+                    updateBadge('mt5-status', status.mt5, 'MT5');
+                    updateBadge('vision-status', status.vision, 'Vision AI');
+                }
+            } catch (e) {
+                console.error('Error updating connection status:', e);
             }
         }
         
