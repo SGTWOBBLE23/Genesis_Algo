@@ -286,27 +286,17 @@
             // Build the query string
             const queryString = buildQueryString();
             
-            // Create and click a temporary download link
+            // Create download URL
             const downloadUrl = `/api/charts/download/${values.symbol}?${queryString}`;
-            const a = document.createElement('a');
-            a.href = downloadUrl;
-            a.download = `${values.symbol.replace('_', '')}_${values.timeframe}_chart.png`;
+            const filename = `${values.symbol.replace('_', '')}_${values.timeframe}_chart.png`;
             
-            // Safely append to body with checks
-            try {
-                if (document.body) {
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                } else {
-                    console.error('Document body not available for chart download');
-                    // Fallback - open in new window/tab
-                    window.open(downloadUrl, '_blank');
-                }
-            } catch (e) {
-                console.error('Error during chart download:', e);
-                window.open(downloadUrl, '_blank');
-            }
+            // Use simpler window.open approach which is more reliable
+            console.log('Downloading chart from URL:', downloadUrl);
+            window.open(downloadUrl, '_blank');
+            
+            // Inform the user
+            console.log('Download initiated for file:', filename);
+            alert('Chart download started. If your browser blocked the popup, please check your download folder or try again.');
         });
         
         // Handle chart image load error
@@ -342,48 +332,64 @@
         });
         
         // WebSocket connection for real-time updates
-        let ws;
+        let ws = null;
         function connectWebSocket() {
-            try {
-                const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-                ws = new WebSocket(protocol + window.location.host + '/api/signals/ws');
-                
-                ws.onopen = function() {
-                    console.log('WebSocket connected');
-                };
-            } catch (e) {
-                console.error('WebSocket connection error:', e);
+            // Don't attempt to reconnect if we're already trying
+            if (ws && (ws.readyState === 0 || ws.readyState === 1)) {
+                console.log('WebSocket already connecting or connected');
+                return;
             }
             
-            ws.onmessage = function(event) {
-                try {
-                    const data = JSON.parse(event.data);
-                    console.log('WebSocket message:', data);
-                    
-                    // Handle different message types
-                    if (data.type === 'status_update') {
-                        updateConnectionStatus(data.data);
-                    } else if (data.type === 'new_signal' && typeof handleNewSignal === 'function') {
-                        handleNewSignal(data.data);
-                    } else if (data.type === 'new_trade' && typeof handleNewTrade === 'function') {
-                        handleNewTrade(data.data);
-                    } else if (data.type === 'trade_update' && typeof handleTradeUpdate === 'function') {
-                        handleTradeUpdate(data.data);
+            try {
+                const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+                console.log('Attempting WebSocket connection to: ' + protocol + window.location.host + '/api/signals/ws');
+                
+                // Create new WebSocket
+                ws = new WebSocket(protocol + window.location.host + '/api/signals/ws');
+                
+                // Set up event handlers
+                ws.onopen = function() {
+                    console.log('WebSocket connected successfully');
+                };
+                
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        console.log('WebSocket message received:', data);
+                        
+                        // Handle different message types
+                        if (data.type === 'status_update') {
+                            updateConnectionStatus(data.data);
+                        } else if (data.type === 'new_signal' && typeof handleNewSignal === 'function') {
+                            handleNewSignal(data.data);
+                        } else if (data.type === 'new_trade' && typeof handleNewTrade === 'function') {
+                            handleNewTrade(data.data);
+                        } else if (data.type === 'trade_update' && typeof handleTradeUpdate === 'function') {
+                            handleTradeUpdate(data.data);
+                        }
+                    } catch (e) {
+                        console.error('Error processing WebSocket message:', e);
                     }
-                } catch (e) {
-                    console.error('Error processing WebSocket message:', e);
-                }
-            };
-            
-            ws.onclose = function() {
-                console.log('WebSocket disconnected');
-                // Try to reconnect after 3 seconds
-                setTimeout(connectWebSocket, 3000);
-            };
-            
-            ws.onerror = function(error) {
-                console.error('WebSocket error:', error);
-            };
+                };
+                
+                ws.onclose = function(event) {
+                    console.log('WebSocket disconnected with code: ' + event.code);
+                    ws = null;
+                    
+                    // Try to reconnect after 5 seconds
+                    setTimeout(connectWebSocket, 5000);
+                };
+                
+                ws.onerror = function(error) {
+                    console.error('WebSocket error occurred:', error);
+                };
+            } catch (e) {
+                console.error('Error setting up WebSocket:', e);
+                ws = null;
+                
+                // Try again after 5 seconds
+                setTimeout(connectWebSocket, 5000);
+            }
         }
         
         function updateConnectionStatus(status) {
