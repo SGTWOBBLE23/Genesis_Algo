@@ -168,20 +168,28 @@ def get_signals():
                 Signal.status.in_(['PENDING', 'ACTIVE'])
             ).order_by(Signal.id.asc()).all()
         
-        # Filter by market hours if needed
-        if is_weekend:
-            # Filter out forex pairs but keep crypto and metals
-            filtered_by_market = []
-            for signal in new_signals:
-                # Keep crypto and precious metals
-                if any(asset in signal.symbol for asset in ['BTC', 'ETH', 'XAU', 'XAG']):
-                    filtered_by_market.append(signal)
-                # Filter out forex pairs during weekend
-                elif any(pair in signal.symbol for pair in ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'NZD']):
-                    logger.info(f"Filtering out forex signal for {signal.symbol} during weekend")
-                else:
-                    filtered_by_market.append(signal)
-            new_signals = filtered_by_market
+        # Filter by market hours and exclude crypto as requested
+        filtered_by_market = []
+        for signal in new_signals:
+            # Always filter out crypto signals per user request
+            if any(crypto in signal.symbol for crypto in ['BTC', 'ETH', 'LTC', 'XRP', 'DOG', 'SOL']):
+                logger.info(f"Filtering out crypto signal for {signal.symbol} as requested")
+                continue
+                
+            # Keep precious metals
+            if any(metal in signal.symbol for metal in ['XAU', 'XAG']):
+                filtered_by_market.append(signal)
+                continue
+                
+            # Filter out forex pairs during weekend
+            if is_weekend and any(pair in signal.symbol for pair in ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'NZD']):
+                logger.info(f"Filtering out forex signal for {signal.symbol} during weekend")
+                continue
+                
+            # Add all other signals
+            filtered_by_market.append(signal)
+            
+        new_signals = filtered_by_market
         
         # Check if we received valid symbols array
         valid_symbols = []
