@@ -195,11 +195,42 @@ def get_signals():
                     else:
                         valid_symbols.append(symbol)
         
-        # If we have valid symbols, filter the signals we already retrieved
+        # If we have valid symbols, filter the signals we already retrieved with smart mapping
         filtered_signals = []
         if valid_symbols:
             logger.info(f"Filtering signals for symbols: {valid_symbols}")
-            filtered_signals = [s for s in new_signals if s.symbol in valid_symbols]
+            # Create mappings for both directions
+            symbol_map = {
+                'BTC_USD': 'BTCUSD',
+                'ETH_USD': 'ETHUSD',
+                'XAU_USD': 'XAUUSD',
+                'XAG_USD': 'XAGUSD',
+                'EUR_USD': 'EURUSD',
+                'GBP_USD': 'GBPUSD',
+                'USD_JPY': 'USDJPY'
+            }
+            # Create reverse mapping (MT5 -> internal)
+            reverse_map = {v: k for k, v in symbol_map.items()}
+            
+            # Filter signals with smart symbol matching
+            for signal in new_signals:
+                # Direct match
+                if signal.symbol in valid_symbols:
+                    filtered_signals.append(signal)
+                    continue
+                    
+                # Check if the signal symbol has a mapped version that matches
+                if signal.symbol in symbol_map and symbol_map[signal.symbol] in valid_symbols:
+                    logger.info(f"Symbol mapping match: {signal.symbol} -> {symbol_map[signal.symbol]}")
+                    filtered_signals.append(signal)
+                    continue
+                    
+                # Check if any of the requested symbols have a reverse mapping that matches the signal
+                for req_symbol in valid_symbols:
+                    if req_symbol in reverse_map and reverse_map[req_symbol] == signal.symbol:
+                        logger.info(f"Reverse symbol mapping match: {req_symbol} -> {signal.symbol}")
+                        filtered_signals.append(signal)
+                        break
         else:
             logger.info("No valid symbols received, returning available signals")
             filtered_signals = new_signals
