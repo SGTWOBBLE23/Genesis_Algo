@@ -619,13 +619,24 @@ def signal_chart(signal_id):
                 # Set the index to Date for proper charting
                 df.set_index('Date', inplace=True)
                 
-                # Create folder if it doesn't exist
-                symbol_dir = os.path.join('static/charts', signal.symbol)
+                # Create folder if it doesn't exist - standardize naming format to use underscores
+                # Convert BTCUSD to BTC_USD format for directory consistency
+                if 'BTC' in signal.symbol and '_' not in signal.symbol:
+                    # Insert underscore before USD
+                    directory_symbol = signal.symbol.replace('USD', '_USD')
+                elif 'ETH' in signal.symbol and '_' not in signal.symbol:
+                    # Insert underscore before USD
+                    directory_symbol = signal.symbol.replace('USD', '_USD')
+                else:
+                    directory_symbol = signal.symbol
+                    
+                symbol_dir = os.path.join('static/charts', directory_symbol)
                 os.makedirs(symbol_dir, exist_ok=True)
                 
                 # Generate filename based on signal properties
                 timestamp = datetime.now().strftime("%Y-%m-%dT%H%MZ")
-                filename = f"{signal.symbol}_H1_{timestamp}_{result}.png"
+                # Use standardized naming for the file name too
+                filename = f"{directory_symbol}_H1_{timestamp}_{result}.png"
                 filepath = os.path.join(symbol_dir, filename)
                 
                 # Calculate indicators
