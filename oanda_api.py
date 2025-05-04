@@ -103,14 +103,22 @@ class OandaAPI:
         candles = []
         for candle in response.get("candles", []):
             if candle["complete"]:
-                candle_data = {
-                    "timestamp": candle["time"],
-                    "open": float(candle["mid"]["o"]),
-                    "high": float(candle["mid"]["h"]),
-                    "low": float(candle["mid"]["l"]),
-                    "close": float(candle["mid"]["c"]),
-                    "volume": candle["volume"]
-                }
+                # Parse ISO timestamp from OANDA (format: "2025-05-04T12:00:00.000000Z")
+                try:
+                    # Convert to datetime to ensure proper timestamp handling
+                    timestamp = datetime.fromisoformat(candle["time"].replace('Z', '+00:00'))
+                    
+                    candle_data = {
+                        "timestamp": timestamp,
+                        "open": float(candle["mid"]["o"]),
+                        "high": float(candle["mid"]["h"]),
+                        "low": float(candle["mid"]["l"]),
+                        "close": float(candle["mid"]["c"]),
+                        "volume": candle["volume"]
+                    }
+                except (ValueError, KeyError) as e:
+                    logger.error(f"Error parsing candle timestamp: {e}")
+                    continue
                 candles.append(candle_data)
                 
         return candles

@@ -685,12 +685,20 @@ def signal_chart(signal_id):
                 # In a real implementation, you would get this data from a crypto API
                 dates = [datetime.now() - timedelta(hours=i) for i in range(100, 0, -1)]
                 
-                # Generate somewhat realistic price data around the entry point
+                # Use the actual signal entry price or get recent price from MT5 trades
                 if signal.entry is not None:
                     base_price = float(signal.entry)
                 else:
-                    # If no entry specified, use a default price
-                    base_price = 96000.0 if 'BTC' in signal.symbol else 3000.0
+                    # Get the most recent trades for this symbol to find latest price
+                    recent_trades = db.session.query(Trade).filter_by(symbol=signal.symbol.replace('_', ''))\
+                                  .order_by(Trade.created_at.desc()).limit(1).all()
+                    if recent_trades and recent_trades[0].entry:
+                        base_price = float(recent_trades[0].entry)
+                    else:
+                        # Fallback to current approximate market prices
+                        base_price = 96000.0 if 'BTC' in signal.symbol else 3240.0 if 'XAU' in signal.symbol else 3000.0
+                    
+                    logger.info(f"Using base price for {signal.symbol}: {base_price}")
                 
                 # Generate random but somewhat realistic price movements
                 np.random.seed(42)  # For reproducibility
@@ -756,6 +764,9 @@ def signal_chart(signal_id):
                 axes[0].plot(df.index, df['ema20'], color='blue', linestyle='--', label='EMA 20')
                 axes[0].plot(df.index, df['ema50'], color='orange', linestyle='--', label='EMA 50')
                 
+                # Add current date to chart title
+                current_date = datetime.now().strftime("%Y-%m-%d")
+                
                 # Add entry point, stop loss, and take profit if available
                 if signal.entry is not None:
                     axes[0].axhline(y=signal.entry, color='green', linestyle='-', label='Entry')
@@ -769,8 +780,8 @@ def signal_chart(signal_id):
                 if signal.tp is not None:
                     axes[0].axhline(y=signal.tp, color='green', linestyle='--', label='Take Profit')
                 
-                # Configure main chart
-                axes[0].set_title(f"{signal.symbol} - {result.upper()} - Entry: {signal.entry}, SL: {signal.sl}, TP: {signal.tp}")
+                # Configure main chart with current date
+                axes[0].set_title(f"{signal.symbol} - {result.upper()} - {current_date}\nEntry: {signal.entry}, SL: {signal.sl}, TP: {signal.tp}")
                 axes[0].set_ylabel('Price')
                 axes[0].legend()
                 axes[0].grid(True)

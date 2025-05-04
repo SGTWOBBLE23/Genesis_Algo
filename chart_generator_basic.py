@@ -141,6 +141,12 @@ class ChartGenerator:
             'volume': 'Volume'
         })
         
+        # Add a log entry to verify data
+        if not df.empty:
+            latest_time = df['datetime'].iloc[-1] if 'datetime' in df else None
+            latest_price = df['Close'].iloc[-1] if 'Close' in df else None
+            logging.info(f"Latest candle data: time={latest_time}, close price={latest_price}")
+        
         # Set datetime as index (required by mplfinance)
         df = df.set_index('datetime')
         
@@ -299,11 +305,15 @@ class ChartGenerator:
             symbol_dir = os.path.join(self.output_dir, symbol)
             os.makedirs(symbol_dir, exist_ok=True)
             
-            # Generate ISO format timestamp for filename
-            now = datetime.now().strftime("%Y-%m-%dT%H%MZ")
+            # Generate ISO format timestamp for filename with current date
+            current_datetime = datetime.now()
+            now = current_datetime.strftime("%Y-%m-%dT%H%MZ")
             result_str = f"_{result.lower()}" if result else ""
             filename = f"{symbol}_{timeframe}_{now}{result_str}.png"
             filepath = os.path.join(symbol_dir, filename)
+            
+            # Update the chart title to include the current date
+            fig.suptitle(f"{title} - {current_datetime.strftime('%Y-%m-%d')}", color=self.colors['text'], fontsize=14)
             
             # Save the chart to file
             plt.savefig(filepath, dpi=self.dpi, bbox_inches='tight', facecolor=self.colors['bg'])
