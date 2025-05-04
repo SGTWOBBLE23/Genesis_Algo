@@ -3,7 +3,8 @@ import io
 import logging
 import pandas as pd
 import numpy as np
-import pandas_ta as ta
+# Using direct calculations instead of pandas_ta
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.patches import Rectangle, Arrow
@@ -56,6 +57,66 @@ class ChartGenerator:
         self.output_dir = os.path.join(os.getcwd(), 'static', 'charts')
         os.makedirs(self.output_dir, exist_ok=True)
     
+    # Helper methods for calculating indicators
+    def _ema(self, series, length):
+        """Calculate Exponential Moving Average"""
+        return series.ewm(span=length, adjust=False).mean()
+    
+    def _rsi(self, series, length=14):
+        """Calculate Relative Strength Index"""
+        # Calculate price changes
+        delta = series.diff()
+        
+        # Separate gains and losses
+        gain = delta.where(delta > 0, 0)
+        loss = -delta.where(delta < 0, 0)
+        
+        # Calculate average gain and loss
+        avg_gain = gain.rolling(window=length).mean()
+        avg_loss = loss.rolling(window=length).mean()
+        
+        # Calculate RS and RSI
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+        
+        return rsi
+    
+    def _macd(self, series, fast=12, slow=26, signal=9):
+        """Calculate MACD indicator"""
+        # Calculate EMAs
+        ema_fast = self._ema(series, fast)
+        ema_slow = self._ema(series, slow)
+        
+        # Calculate MACD line
+        macd_line = ema_fast - ema_slow
+        
+        # Calculate signal line
+        signal_line = self._ema(macd_line, signal)
+        
+        # Calculate histogram
+        histogram = macd_line - signal_line
+        
+        return pd.DataFrame({
+            'macd': macd_line,
+            'macd_signal': signal_line,
+            'macd_hist': histogram
+        })
+    
+    def _atr(self, high, low, close, length=14):
+        """Calculate Average True Range"""
+        # Calculate True Range
+        tr1 = high - low
+        tr2 = abs(high - close.shift())
+        tr3 = abs(low - close.shift())
+        
+        # Combine to get True Range
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        
+        # Calculate ATR
+        atr = tr.rolling(window=length).mean()
+        
+        return atr
+    
     def _prepare_data(self, candles: List[Dict], symbol: str, timeframe: str) -> pd.DataFrame:
         """Process candle data into a pandas DataFrame and add indicators
         
@@ -88,20 +149,20 @@ class ChartGenerator:
         
         # Calculate indicators
         # EMA 20 and 50
-        df['ema20'] = ta.ema(df['close'], length=20)
-        df['ema50'] = ta.ema(df['close'], length=50)
+        df['ema20'] = self._ema(df['close'], 20)
+        df['ema50'] = self._ema(df['close'], 50)
         
         # RSI-14
-        df['rsi'] = ta.rsi(df['close'], length=14)
+        df['rsi'] = self._rsi(df['close'], 14)
         
         # MACD (12, 26, 9)
-        macd = ta.macd(df['close'], fast=12, slow=26, signal=9)
-        df['macd'] = macd['MACD_12_26_9']
-        df['macd_signal'] = macd['MACDs_12_26_9']
-        df['macd_hist'] = macd['MACDh_12_26_9']
+        macd_data = self._macd(df['close'], 12, 26, 9)
+        df['macd'] = macd_data['macd']
+        df['macd_signal'] = macd_data['macd_signal']
+        df['macd_hist'] = macd_data['macd_hist']
         
         # ATR-14
-        df['atr'] = ta.atr(df['high'], df['low'], df['close'], length=14)
+        df['atr'] = self._atr(df['high'], df['low'], df['close'], 14)
         
         # Return the DataFrame with all indicators calculated
         return df
