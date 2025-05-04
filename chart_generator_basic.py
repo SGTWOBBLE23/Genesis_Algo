@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class ChartGenerator:
     """Class for generating technical analysis charts with indicators using mplfinance"""
     
-    def __init__(self):
+    def __init__(self, signal_action=None):
         # Configure matplotlib for non-interactive backend
         plt.switch_backend('agg')
         
@@ -27,6 +27,14 @@ class ChartGenerator:
         self.fig_width = 12.8
         self.fig_height = 7.2
         self.dpi = 100  # 1280x720 resolution
+        
+        # Store signal action for positioning marker appropriately
+        self.current_signal_action = signal_action
+        logger.info(f"Initializing chart generator with signal action: {signal_action}")
+        
+        # Output directory for saving charts
+        self.output_dir = os.path.join('static', 'charts')
+        os.makedirs(self.output_dir, exist_ok=True)
         
         # Dark theme colors for mplfinance
         self.colors = {
@@ -291,16 +299,39 @@ class ChartGenerator:
             # Add entry point marker if provided
             if entry_point is not None:
                 entry_time, entry_price = entry_point
-                # Find the nearest index to the entry time
-                if entry_time in df.index:
-                    entry_idx = df.index.get_loc(entry_time)
-                else:
-                    # Find closest time
-                    entry_idx = len(df) // 2  # Default to middle if not found
                 
-                # Plot marker for entry point
-                axes[0].scatter(entry_idx, entry_price, marker='^', s=120, 
-                             color=self.colors['entry'], zorder=5)
+                # For immediate signals (BUY_NOW/SELL_NOW), place entry at right edge
+                # otherwise try to find the actual time for anticipated signals
+                chart_right_edge = len(df) - 1  # Last candle index
+                
+                # Try to determine if this is a 'NOW' type signal from context
+                is_immediate_signal = False
+                if hasattr(self, 'current_signal_action'):
+                    is_immediate_signal = 'NOW' in self.current_signal_action
+                
+                if is_immediate_signal:
+                    # For immediate signals, place at right edge
+                    entry_idx = chart_right_edge
+                    logger.info(f"Placing immediate signal marker at right edge (index {entry_idx})")
+                elif entry_time in df.index:
+                    # For anticipated signals, place at the actual time if found
+                    entry_idx = df.index.get_loc(entry_time)
+                    logger.info(f"Placing anticipated signal marker at time {entry_time} (index {entry_idx})")
+                else:
+                    # If time not found, place it at last candle
+                    entry_idx = chart_right_edge
+                    logger.info(f"Time {entry_time} not found, placing marker at right edge (index {entry_idx})")
+                
+                # Plot arrow marker for entry point (different colors for buy/sell)
+                marker_color = self.colors['entry']  # Default green for buy
+                marker_type = '^'  # Default up arrow for buy
+                
+                if hasattr(self, 'current_signal_action') and 'SHORT' in self.current_signal_action or 'SELL' in self.current_signal_action:
+                    marker_color = 'red'  # Red for sell signals
+                    marker_type = 'v'  # Down arrow for sell signals
+                
+                axes[0].scatter(entry_idx, entry_price, marker=marker_type, s=150, 
+                             color=marker_color, zorder=5)
                     
             # Create symbol folder if it doesn't exist
             symbol_dir = os.path.join(self.output_dir, symbol)

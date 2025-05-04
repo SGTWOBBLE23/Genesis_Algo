@@ -813,13 +813,31 @@ def signal_chart(signal_id):
                 chart_path = filepath
             else:
                 # For regular forex pairs, use the existing chart generator
-                chart_path = generate_chart(
+                # Get signal action for proper chart display
+                signal_action = signal.action.value if hasattr(signal.action, 'value') else str(signal.action)
+                logger.info(f"Creating chart for signal {signal_id} with action {signal_action}")
+                
+                # Use the modified chart_utils that passes signal action
+                from chart_generator_basic import ChartGenerator
+                from chart_utils import fetch_candles
+                
+                # Fetch candles from OANDA
+                candles = fetch_candles(signal.symbol, timeframe="H1", count=100)
+                
+                if not candles or len(candles) < 10:
+                    return jsonify({"status": "error", "message": "Failed to fetch candle data from OANDA"}), 500
+                
+                # Create chart generator with signal action context
+                chart_gen = ChartGenerator(signal_action=signal_action)
+                
+                # Generate the chart with appropriate signal styling
+                chart_path = chart_gen.create_chart(
+                    candles=candles,
                     symbol=signal.symbol,
-                    timeframe="H1",  # Default to H1 timeframe
-                    count=100,      # Default to 100 candles
-                    entry_point=(entry_time, signal.entry) if signal.entry else None,
-                    stop_loss=signal.sl,
-                    take_profit=signal.tp,
+                    timeframe="H1",
+                    entry_point=(entry_time, float(signal.entry) if signal.entry else candles[-1]['close']),
+                    stop_loss=float(signal.sl) if signal.sl else None,
+                    take_profit=float(signal.tp) if signal.tp else None,
                     result=result
                 )
         except Exception as chart_error:
