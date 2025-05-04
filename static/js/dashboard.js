@@ -217,7 +217,7 @@ function updateTradesTable() {
     if (activeTrades.length === 0) {
         // Show no trades message
         const row = document.createElement('tr');
-        row.innerHTML = '<td colspan="7" class="text-center">No active trades</td>';
+        row.innerHTML = '<td colspan="8" class="text-center text-white">No active trades</td>';
         tableBody.appendChild(row);
         return;
     }
@@ -225,17 +225,20 @@ function updateTradesTable() {
     // Add trades to table
     activeTrades.forEach(trade => {
         const row = document.createElement('tr');
+        row.className = 'text-white'; // Ensure text is white
         
         // Format P&L with color
         const pnlClass = trade.pnl > 0 ? 'positive' : (trade.pnl < 0 ? 'negative' : '');
+        // Format side with color
+        const sideClass = trade.side === 'BUY' ? 'text-success' : 'text-danger';
         
         row.innerHTML = `
-            <td>${trade.symbol}</td>
-            <td>${trade.side}</td>
-            <td>${trade.lot}</td>
-            <td>${trade.entry}</td>
-            <td>${trade.sl || '--'}</td>
-            <td>${trade.tp || '--'}</td>
+            <td class="text-white">${trade.symbol}</td>
+            <td class="${sideClass} fw-bold">${trade.side}</td>
+            <td class="text-white">${trade.lot}</td>
+            <td class="text-white">${trade.entry}</td>
+            <td class="text-white">${trade.sl || '--'}</td>
+            <td class="text-white">${trade.tp || '--'}</td>
             <td class="${pnlClass}">${trade.pnl ? trade.pnl.toFixed(2) : '0.00'}</td>
             <td>
                 <button class="btn btn-sm btn-danger" onclick="closeTrade(${trade.id})">Close</button>
