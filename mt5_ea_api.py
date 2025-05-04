@@ -821,43 +821,17 @@ def signal_chart(signal_id):
                 from chart_generator_basic import ChartGenerator
                 from chart_utils import fetch_candles
                 
-                # Try to fetch candles from OANDA for forex pairs and commodities
+                # Try to fetch candles from OANDA
                 candles = fetch_candles(signal.symbol, timeframe="H1", count=100)
                 
-                # If we can't get data from OANDA, generate sample candles for visualization purposes only
+                # If we can't get data from OANDA, return an informative error
                 if not candles or len(candles) < 10:
-                    # Generate sample candles centered around signal entry point
-                    entry_price = float(signal.entry) if signal.entry else 100.0
-                    # Generate synthetic reference candles for chart visualization
-                    import random
-                    from datetime import datetime, timedelta
-                    
-                    # Generate 100 candles with reasonable volatility relative to entry price
-                    candles = []
-                    current_time = datetime.now() - timedelta(hours=100)
-                    price_volatility = entry_price * 0.005  # 0.5% volatility
-                    current_price = entry_price
-                    
-                    for i in range(100):
-                        # Generate a random candle with small movements
-                        high = current_price + (random.random() * price_volatility)
-                        low = current_price - (random.random() * price_volatility)
-                        open_price = low + (random.random() * (high - low))
-                        close_price = low + (random.random() * (high - low))
-                        
-                        candle = {
-                            "timestamp": current_time + timedelta(hours=i),
-                            "open": open_price,
-                            "high": high,
-                            "low": low,
-                            "close": close_price,
-                            "volume": int(random.random() * 1000)
-                        }
-                        candles.append(candle)
-                        current_price = close_price  # Use close as next candle's reference
-                    
-                    logger.info(f"Created synthetic chart visualization data for {signal.symbol}")
-                    
+                    logger.error(f"Cannot generate chart for {signal.symbol}: Insufficient candle data available")
+                    return jsonify({
+                        "status": "error", 
+                        "message": f"Unable to generate chart for {signal.symbol}. This symbol may not be available in OANDA."
+                    }), 404
+                
                 
                 # Create chart generator with signal action context
                 chart_gen = ChartGenerator(signal_action=signal_action)

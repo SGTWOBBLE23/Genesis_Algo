@@ -36,15 +36,15 @@ class ChartGenerator:
         self.output_dir = os.path.join('static', 'charts')
         os.makedirs(self.output_dir, exist_ok=True)
         
-        # Dark theme colors for mplfinance
+        # Dark theme colors for mplfinance with your color specifications
         self.colors = {
             'bg': '#121826',            # Background color
             'text': '#e0e0e0',          # Text color
             'grid': '#2a2e39',          # Grid color
             'candle_up': '#26a69a',     # Bullish candle color
             'candle_down': '#ef5350',   # Bearish candle color
-            'ema20': '#2962ff',         # Blue
-            'ema50': '#ff9800',         # Orange
+            'ema20': '#2962ff',         # Blue for EMA 20 - as requested
+            'ema50': '#ff9800',         # Orange for EMA 50 - as requested
             'volume': '#2a2e39',        # Volume bars base color
             'volume_up': '#26a69a',     # Up volume bar color
             'volume_down': '#ef5350',   # Down volume bar color
@@ -55,9 +55,10 @@ class ChartGenerator:
             'macd_signal': '#ff9800',   # Signal line color
             'macd_hist_up': '#26a69a',  # MACD histogram up color
             'macd_hist_down': '#ef5350',# MACD histogram down color
-            'entry': '#00ff00',         # Green arrow for entry point
-            'sl': '#ff0000',            # Red line (stop loss)
-            'tp': '#00ff00'             # Green line (take profit)
+            'buy_entry': '#00ff00',     # Green arrow for buy entry point
+            'sell_entry': '#ff0000',    # Red arrow for sell entry point
+            'sl': '#ff0000',            # Red line for stop loss
+            'tp': '#00ff00'             # Green line for take profit
         }
         
         # Directory to save charts
@@ -362,15 +363,22 @@ class ChartGenerator:
                     logger.info(f"Time {entry_time} not found, placing marker at right edge (index {entry_idx})")
                 
                 # Plot arrow marker for entry point (different colors for buy/sell)
-                marker_color = self.colors['entry']  # Default green for buy
-                marker_type = '^'  # Default up arrow for buy
+                marker_color = self.colors['buy_entry']  # Green arrow for buy signals
+                marker_type = '^'  # Up arrow for buy signals
                 
-                if hasattr(self, 'current_signal_action') and 'SHORT' in self.current_signal_action or 'SELL' in self.current_signal_action:
-                    marker_color = 'red'  # Red for sell signals
+                # Determine if this is a sell/short signal
+                is_sell_signal = False
+                if hasattr(self, 'current_signal_action') and self.current_signal_action:
+                    if 'SHORT' in self.current_signal_action or 'SELL' in self.current_signal_action:
+                        is_sell_signal = True
+                
+                if is_sell_signal:
+                    marker_color = self.colors['sell_entry']  # Red arrow for sell signals
                     marker_type = 'v'  # Down arrow for sell signals
                 
-                axes[0].scatter(entry_idx, entry_price, marker=marker_type, s=150, 
-                             color=marker_color, zorder=5)
+                # Make entry marker larger and more visible
+                axes[0].scatter(entry_idx, entry_price, marker=marker_type, s=200, 
+                             color=marker_color, zorder=5, linewidth=2, edgecolor='white')
                     
             # Create symbol folder if it doesn't exist
             symbol_dir = os.path.join(self.output_dir, symbol)
@@ -380,11 +388,21 @@ class ChartGenerator:
             current_datetime = datetime.now()
             now = current_datetime.strftime("%Y-%m-%dT%H%MZ")
             result_str = f"_{result.lower()}" if result else ""
+            # Format matches your requirement: SYMBOL_TIMEFRAME_TIMESTAMP_RESULT.png
             filename = f"{symbol}_{timeframe}_{now}{result_str}.png"
             filepath = os.path.join(symbol_dir, filename)
             
-            # Update the chart title to include the current date
-            fig.suptitle(f"{title} - {current_datetime.strftime('%Y-%m-%d')}", color=self.colors['text'], fontsize=14)
+            # Update the chart title to include symbol, timeframe, result and current date
+            display_symbol = symbol.replace("_", "/")
+            title_text = f"{display_symbol} ({timeframe})"
+            if result:
+                title_text += f" - {result.upper()}"
+            title_text += f" - {current_datetime.strftime('%Y-%m-%d')}"
+            # Add ATR value
+            latest_atr = df['atr'].iloc[-1] if not df['atr'].empty else 0
+            title_text += f" - ATR(14): {latest_atr:.5f}"
+            
+            fig.suptitle(title_text, color=self.colors['text'], fontsize=14)
             
             # Save the chart to file
             plt.savefig(filepath, dpi=self.dpi, bbox_inches='tight', facecolor=self.colors['bg'])
