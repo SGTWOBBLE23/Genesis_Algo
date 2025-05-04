@@ -216,22 +216,6 @@ class ChartGenerator:
         # Calculate latest ATR value for title
         latest_atr = df['atr'].iloc[-1] if not df['atr'].empty else 0
         
-        # Setup horizontal lines (for RSI overbought/oversold & stop loss/take profit)
-        hlines = [
-            # RSI lines
-            dict(y=30, panel=1, color=self.colors['rsi_os'], linestyle='--', alpha=0.5),  # Oversold
-            dict(y=70, panel=1, color=self.colors['rsi_ob'], linestyle='--', alpha=0.5),  # Overbought
-            # MACD zero line
-            dict(y=0, panel=2, color=self.colors['grid'], linestyle='-', alpha=0.3),  # MACD zero line
-        ]
-        
-        # Add price lines for stop loss and take profit if provided
-        if stop_loss is not None:
-            hlines.append(dict(y=stop_loss, color=self.colors['sl'], linestyle='--', alpha=0.7, linewidth=1.5))
-        
-        if take_profit is not None:
-            hlines.append(dict(y=take_profit, color=self.colors['tp'], linestyle='--', alpha=0.7, linewidth=1.5))
-        
         # Setup the title with symbol, timeframe, result (if any) and ATR
         title_suffix = f"ATR(14): {latest_atr:.5f}"
         if result:
@@ -247,13 +231,35 @@ class ChartGenerator:
             
             # RSI in panel 1
             mpf.make_addplot(df['rsi'], panel=1, color=self.colors['rsi'], width=1.5,
-                            ylabel='RSI (14)', ylim=(0, 100)),
+                            ylabel='RSI (14)', secondary_y=False),
                             
             # MACD and signal in panel 2
-            mpf.make_addplot(df['macd'], panel=2, color=self.colors['macd'], width=1.5),
-            mpf.make_addplot(df['macd_signal'], panel=2, color=self.colors['macd_signal'], width=1.5),
-            mpf.make_addplot(df['macd_hist'], panel=2, type='bar', color=self.colors['macd_hist_up'], width=0.5)
+            mpf.make_addplot(df['macd'], panel=2, color=self.colors['macd'], width=1.5,
+                           secondary_y=False),
+            mpf.make_addplot(df['macd_signal'], panel=2, color=self.colors['macd_signal'], width=1.5,
+                           secondary_y=False)
         ]
+        
+        # Add the MACD histogram with correct coloring (green for positive, red for negative)
+        macd_hist_colors = [self.colors['macd_hist_up'] if val > 0 else self.colors['macd_hist_down']
+                          for val in df['macd_hist']]
+        apds.append(mpf.make_addplot(df['macd_hist'], type='bar', panel=2, color=macd_hist_colors, alpha=0.5,
+                                  secondary_y=False))
+        
+        # Additional customizations through kwarg dict
+        plot_kwargs = {
+            'type': 'candle',
+            'style': self.style,
+            'title': title,
+            'figsize': (self.fig_width, self.fig_height),
+            'panel_ratios': (6, 2, 2),  # Main chart, RSI, MACD
+            'addplot': apds,
+            'volume': True,
+            'ylabel': f'Price ({display_symbol})',
+            'datetime_format': '%m-%d %H:%M',
+            'tight_layout': True,
+            'scale_padding': {'left': 0.1, 'right': 1.1, 'top': 0.8, 'bottom': 0.8}
+        }
         
         # Generate filename with timestamp
         now = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -264,23 +270,38 @@ class ChartGenerator:
         # Create folder if it doesn't exist
         os.makedirs(self.output_dir, exist_ok=True)
         
-        # Plot the chart using mplfinance
-        mpf.plot(
-            df,
-            type='candle',
-            style=self.style,
-            title=title,
-            figsize=(self.fig_width, self.fig_height),
-            panel_ratios=(6, 2, 2),  # Main chart, RSI, MACD
-            addplot=apds,
-            hlines=hlines,
-            volume=True,
-            savefig=filepath,
-            ylabel=f'Price ({display_symbol})',
-            datetime_format='%m-%d %H:%M',
-            tight_layout=True,
-            scale_padding={'left': 0.1, 'right': 1.1, 'top': 0.8, 'bottom': 0.8}
-        )
+        # Create the figure first manually
+        fig, axes = mpf.plot(df, **plot_kwargs, returnfig=True)
+        
+        # Get the axes objects
+        ax_main = axes[0]  # Main price chart
+        ax_rsi = axes[2]   # RSI panel 
+        ax_macd = axes[3]  # MACD panel
+        
+        # Manually add horizontal lines on RSI panel
+        ax_rsi.axhline(y=30, color=self.colors['rsi_os'], linestyle='--', alpha=0.5)
+        ax_rsi.axhline(y=70, color=self.colors['rsi_ob'], linestyle='--', alpha=0.5)
+        
+        # Add horizontal line at zero for MACD panel
+        ax_macd.axhline(y=0, color=self.colors['grid'], linestyle='-', alpha=0.3)
+        
+        # Add stop loss and take profit lines on main price chart if provided
+        if stop_loss is not None:
+            ax_main.axhline(y=stop_loss, color=self.colors['sl'], linestyle='--', 
+                         alpha=0.7, linewidth=1.5, label='Stop Loss')
+        
+        if take_profit is not None:
+            ax_main.axhline(y=take_profit, color=self.colors['tp'], linestyle='--', 
+                         alpha=0.7, linewidth=1.5, label='Take Profit')
+        
+        # Add legend for price chart
+        handles, labels = ax_main.get_legend_handles_labels()
+        if handles:
+            ax_main.legend(loc='upper left', framealpha=0.5)
+        
+        # Save the figure to file
+        fig.savefig(filepath, dpi=self.dpi, bbox_inches='tight')
+        plt.close(fig)  # Close the figure to free memory
         
         logger.info(f"Chart saved to {filepath}")
         return filepath
@@ -303,22 +324,6 @@ class ChartGenerator:
         # Calculate latest ATR value for title
         latest_atr = df['atr'].iloc[-1] if not df['atr'].empty else 0
         
-        # Setup horizontal lines (for RSI overbought/oversold & stop loss/take profit)
-        hlines = [
-            # RSI lines
-            dict(y=30, panel=1, color=self.colors['rsi_os'], linestyle='--', alpha=0.5),  # Oversold
-            dict(y=70, panel=1, color=self.colors['rsi_ob'], linestyle='--', alpha=0.5),  # Overbought
-            # MACD zero line
-            dict(y=0, panel=2, color=self.colors['grid'], linestyle='-', alpha=0.3),  # MACD zero line
-        ]
-        
-        # Add price lines for stop loss and take profit if provided
-        if stop_loss is not None:
-            hlines.append(dict(y=stop_loss, color=self.colors['sl'], linestyle='--', alpha=0.7, linewidth=1.5))
-        
-        if take_profit is not None:
-            hlines.append(dict(y=take_profit, color=self.colors['tp'], linestyle='--', alpha=0.7, linewidth=1.5))
-        
         # Setup the title with symbol, timeframe, result (if any) and ATR
         title_suffix = f"ATR(14): {latest_atr:.5f}"
         if result:
@@ -334,34 +339,71 @@ class ChartGenerator:
             
             # RSI in panel 1
             mpf.make_addplot(df['rsi'], panel=1, color=self.colors['rsi'], width=1.5,
-                            ylabel='RSI (14)', ylim=(0, 100)),
+                            ylabel='RSI (14)', secondary_y=False),
                             
             # MACD and signal in panel 2
-            mpf.make_addplot(df['macd'], panel=2, color=self.colors['macd'], width=1.5),
-            mpf.make_addplot(df['macd_signal'], panel=2, color=self.colors['macd_signal'], width=1.5),
-            mpf.make_addplot(df['macd_hist'], panel=2, type='bar', color=self.colors['macd_hist_up'], width=0.5)
+            mpf.make_addplot(df['macd'], panel=2, color=self.colors['macd'], width=1.5,
+                           secondary_y=False),
+            mpf.make_addplot(df['macd_signal'], panel=2, color=self.colors['macd_signal'], width=1.5,
+                           secondary_y=False)
         ]
+        
+        # Add the MACD histogram with correct coloring (green for positive, red for negative)
+        macd_hist_colors = [self.colors['macd_hist_up'] if val > 0 else self.colors['macd_hist_down']
+                          for val in df['macd_hist']]
+        apds.append(mpf.make_addplot(df['macd_hist'], type='bar', panel=2, color=macd_hist_colors, alpha=0.5,
+                                  secondary_y=False))
+        
+        # Additional customizations through kwarg dict
+        plot_kwargs = {
+            'type': 'candle',
+            'style': self.style,
+            'title': title,
+            'figsize': (self.fig_width, self.fig_height),
+            'panel_ratios': (6, 2, 2),  # Main chart, RSI, MACD
+            'addplot': apds,
+            'volume': True,
+            'ylabel': f'Price ({display_symbol})',
+            'datetime_format': '%m-%d %H:%M',
+            'tight_layout': True,
+            'scale_padding': {'left': 0.1, 'right': 1.1, 'top': 0.8, 'bottom': 0.8}
+        }
         
         # Create a BytesIO object to save the chart to
         buf = io.BytesIO()
         
-        # Plot the chart using mplfinance and save to BytesIO
-        mpf.plot(
-            df,
-            type='candle',
-            style=self.style,
-            title=title,
-            figsize=(self.fig_width, self.fig_height),
-            panel_ratios=(6, 2, 2),  # Main chart, RSI, MACD
-            addplot=apds,
-            hlines=hlines,
-            volume=True,
-            savefig=dict(fname=buf, dpi=self.dpi, bbox_inches='tight'),
-            ylabel=f'Price ({display_symbol})',
-            datetime_format='%m-%d %H:%M',
-            tight_layout=True,
-            scale_padding={'left': 0.1, 'right': 1.1, 'top': 0.8, 'bottom': 0.8}
-        )
+        # Create the figure first manually
+        fig, axes = mpf.plot(df, **plot_kwargs, returnfig=True)
+        
+        # Get the axes objects
+        ax_main = axes[0]  # Main price chart
+        ax_rsi = axes[2]   # RSI panel 
+        ax_macd = axes[3]  # MACD panel
+        
+        # Manually add horizontal lines on RSI panel
+        ax_rsi.axhline(y=30, color=self.colors['rsi_os'], linestyle='--', alpha=0.5)
+        ax_rsi.axhline(y=70, color=self.colors['rsi_ob'], linestyle='--', alpha=0.5)
+        
+        # Add horizontal line at zero for MACD panel
+        ax_macd.axhline(y=0, color=self.colors['grid'], linestyle='-', alpha=0.3)
+        
+        # Add stop loss and take profit lines on main price chart if provided
+        if stop_loss is not None:
+            ax_main.axhline(y=stop_loss, color=self.colors['sl'], linestyle='--', 
+                         alpha=0.7, linewidth=1.5, label='Stop Loss')
+        
+        if take_profit is not None:
+            ax_main.axhline(y=take_profit, color=self.colors['tp'], linestyle='--', 
+                         alpha=0.7, linewidth=1.5, label='Take Profit')
+        
+        # Add legend for price chart
+        handles, labels = ax_main.get_legend_handles_labels()
+        if handles:
+            ax_main.legend(loc='upper left', framealpha=0.5)
+        
+        # Save the figure to BytesIO buffer
+        fig.savefig(buf, format='png', dpi=self.dpi, bbox_inches='tight')
+        plt.close(fig)  # Close the figure to free memory
         
         # Reset buffer position and return bytes
         buf.seek(0)
