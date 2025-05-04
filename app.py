@@ -774,16 +774,11 @@ def get_trades_stats():
         
         closed_trades = query.all()
         
-        # Filter out trades without proper timestamps or duplicates by ticket
+        # Filter out duplicates by ticket, but keep all trades even with missing timestamps
         filtered_trades = []
         seen_tickets = set()
         
         for trade in closed_trades:
-            # Skip trades without opened_at timestamp
-            if trade.opened_at is None:
-                logger.warning(f"Skipping trade with missing opened_at timestamp: {trade.id} - {trade.ticket}")
-                continue
-                
             # Ensure we only count each unique ticket once
             if trade.ticket:
                 if trade.ticket in seen_tickets:
