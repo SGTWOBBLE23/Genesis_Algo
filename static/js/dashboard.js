@@ -206,47 +206,15 @@ function loadActiveTrades() {
 
 /**
  * Update the active trades table in the UI
+ * This function has been modified to not display trades as requested
  */
 function updateTradesTable() {
-    const tableBody = document.getElementById('active-trades-body');
-    if (!tableBody) return;
+    // Trade section UI has been removed as requested
+    // We just log that trades data is being processed but not displayed
+    console.log('Trade data processed but UI display removed as requested');
+    return;
     
-    // Clear existing rows
-    tableBody.innerHTML = '';
-    
-    if (activeTrades.length === 0) {
-        // Show no trades message
-        const row = document.createElement('tr');
-        row.innerHTML = '<td colspan="8" class="text-center" style="color: white !important; font-weight: bold;">No active trades</td>';
-        tableBody.appendChild(row);
-        return;
-    }
-    
-    // Add trades to table
-    activeTrades.forEach(trade => {
-        const row = document.createElement('tr');
-        row.className = 'text-white'; // Ensure text is white
-        
-        // Format P&L with color
-        const pnlClass = trade.pnl > 0 ? 'positive' : (trade.pnl < 0 ? 'negative' : '');
-        // Format side with color
-        const sideClass = trade.side === 'BUY' ? 'text-success' : 'text-danger';
-        
-        row.innerHTML = `
-            <td style="color: white !important;">${trade.symbol}</td>
-            <td class="${sideClass} fw-bold" style="font-weight: bold;">${trade.side}</td>
-            <td style="color: white !important;">${trade.lot}</td>
-            <td style="color: white !important;">${trade.entry}</td>
-            <td style="color: white !important;">${trade.sl || '--'}</td>
-            <td style="color: white !important;">${trade.tp || '--'}</td>
-            <td class="${pnlClass}" style="font-weight: bold;">${trade.pnl ? trade.pnl.toFixed(2) : '0.00'}</td>
-            <td>
-                <button class="btn btn-sm btn-danger" onclick="closeTrade(${trade.id})">Close</button>
-            </td>
-        `;
-        
-        tableBody.appendChild(row);
-    });
+    /* Original implementation hidden to prevent trades display */
 }
 
 /**
