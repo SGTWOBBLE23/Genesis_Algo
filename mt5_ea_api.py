@@ -202,9 +202,20 @@ def get_signals():
             action = signal.action.value if hasattr(signal.action, 'value') else str(signal.action)
             
             # Format signal data for MT5 EA, matching expected format
+            # Check if we need to map the symbol to MT5 format
+            mt5_symbol = signal.symbol
+            try:
+                # Try to get the MT5 symbol from our mapping table
+                mapping = db.session.query(SymbolMapping).filter_by(internal_symbol=signal.symbol).first()
+                if mapping:
+                    mt5_symbol = mapping.mt5_symbol
+                    logger.info(f"Mapped {signal.symbol} to MT5 symbol: {mt5_symbol}")
+            except Exception as e:
+                logger.warning(f"Error checking symbol mapping: {e}")
+            
             formatted_signal = {
                 "id": signal.id,
-                "symbol": signal.symbol,  # Direct symbol without nesting in asset
+                "symbol": mt5_symbol,  # Use the mapped symbol if available
                 "action": action,
                 "entry_price": float(signal.entry) if signal.entry else 0.0,
                 "stop_loss": float(signal.sl) if signal.sl else 0.0,
