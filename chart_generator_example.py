@@ -13,9 +13,9 @@ import os
 from chart_generator_basic import ChartGenerator
 from chart_utils import fetch_candles, generate_chart
 
-def demo_bitcoin_chart():
+def demo_forex_chart():
     """
-    Generate a Bitcoin example chart to demonstrate the charting capabilities
+    Generate a forex example chart to demonstrate the charting capabilities
     with Japanese candlesticks, EMA 20, EMA 50, RSI, MACD, and ATR indicators.
     
     The chart will include:
@@ -28,7 +28,7 @@ def demo_bitcoin_chart():
     - Stop-loss level marked with a red line
     - Take-profit level marked with a green line
     """
-    symbol = "BTC_USD"  # Using underscore format for internal system
+    symbol = "XAU_USD"  # Using underscore format for internal system (Gold)
     timeframe = "H1"  # 1-hour chart
     
     # Fetch the candle data from OANDA
@@ -44,15 +44,11 @@ def demo_bitcoin_chart():
     last_timestamp = candles[-1]['timestamp']
     entry_price = candles[-1]['close']
     entry_point = (last_timestamp, entry_price)
-    # Set more realistic TP/SL levels based on the instrument type
-    if "USD" in symbol:
-        # For forex and gold, use smaller percentages (0.5-1%)
-        sl_price = entry_point[1] * 0.995  # 0.5% below entry for stop-loss
-        tp_price = entry_point[1] * 1.01   # 1% above entry for take-profit
-    else:
-        # For other instruments, use slightly larger percentages (1-2%)
-        sl_price = entry_point[1] * 0.99   # 1% below entry for stop-loss
-        tp_price = entry_point[1] * 1.02   # 2% above entry for take-profit
+    
+    # For gold (XAU/USD), use appropriate percentages for TP/SL
+    # Gold typically moves 0.2-0.5% in normal trading conditions
+    sl_price = entry_price * 0.998  # 0.2% below entry for stop-loss
+    tp_price = entry_price * 1.004  # 0.4% above entry for take-profit
     
     # Generate the chart with all indicators and annotations
     print("Generating chart with indicators and annotations...")
@@ -75,10 +71,10 @@ def demo_bitcoin_chart():
 
 def generate_anticipated_chart():
     """
-    Generate an anticipated trade signal chart for Bitcoin
+    Generate an anticipated trade signal chart for GBPJPY
     showing potential entry, stop-loss, and take-profit levels
     """
-    symbol = "BTC_USD"  # Using underscore format for internal system
+    symbol = "GBP_JPY"  # Using underscore format for internal system
     timeframe = "H1"  # 1-hour chart
     
     # Fetch the candle data from OANDA
@@ -94,9 +90,10 @@ def generate_anticipated_chart():
     entry_timestamp = candles[entry_index]['timestamp']
     entry_price = candles[entry_index]['close']
     
-    # Define anticipated levels
-    stop_loss = entry_price * 0.98  # 2% below entry
-    take_profit = entry_price * 1.03  # 3% above entry
+    # For forex pairs, use appropriate percentages for TP/SL
+    # GBP/JPY typically moves 0.3-0.7% in normal trading conditions
+    stop_loss = entry_price * 0.997  # 0.3% below entry for stop-loss
+    take_profit = entry_price * 1.006  # 0.6% above entry for take-profit
     
     # Generate the anticipated trade chart with signal action type
     chart_path = generate_chart(
@@ -120,7 +117,7 @@ def generate_closed_trade_chart():
     """
     Generate a chart showing a closed trade with result (win/loss)
     """
-    symbol = "BTC_USD"  # Using underscore format for internal system
+    symbol = "EUR_USD"  # Using underscore format for internal system
     timeframe = "H1"  # 1-hour chart
     
     # Fetch the candle data from OANDA
@@ -143,9 +140,10 @@ def generate_closed_trade_chart():
     # Determine if the trade was a win or loss (for a BUY trade)
     result = "win" if exit_price > entry_price else "loss"
     
-    # Set up stop-loss and take-profit based on entry price
-    stop_loss = entry_price * 0.97  # 3% below entry
-    take_profit = entry_price * 1.05  # 5% above entry
+    # For EUR/USD, use appropriate percentages for TP/SL
+    # EUR/USD typically moves 0.1-0.3% in normal trading conditions
+    stop_loss = entry_price * 0.998  # 0.2% below entry for stop-loss
+    take_profit = entry_price * 1.003  # 0.3% above entry for take-profit
     
     # Generate the closed trade chart with result and signal action
     chart_path = generate_chart(
@@ -177,13 +175,13 @@ def generate_closed_trade_chart():
 
 if __name__ == "__main__":
     print("Chart Generator Examples")
-    print("1. Generating Bitcoin current price chart...")
-    demo_bitcoin_chart()
+    print("1. Generating XAUUSD (Gold) current price chart...")
+    demo_forex_chart()
     
-    print("\n2. Generating anticipated trade chart...")
+    print("\n2. Generating GBPJPY anticipated trade chart...")
     generate_anticipated_chart()
     
-    print("\n3. Generating closed trade chart with result...")
+    print("\n3. Generating EURUSD closed trade chart with result...")
     generate_closed_trade_chart()
     
     print("\nAll example charts generated successfully!")
