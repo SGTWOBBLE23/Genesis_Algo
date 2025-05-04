@@ -6,7 +6,6 @@
 // Global variables
 let signalsData = [];
 let tradesData = [];
-let accountData = {};
 let connectionStatus = {};
 
 // Document ready function
@@ -25,7 +24,6 @@ function initializeDashboard() {
     // Fetch initial data
     fetchCurrentSignals();
     fetchOpenTrades();
-    fetchAccountInfo();
     checkConnectionStatus();
 }
 
@@ -35,7 +33,6 @@ function initializeDashboard() {
 function refreshData() {
     fetchCurrentSignals();
     fetchOpenTrades();
-    fetchAccountInfo();
     // Only check connection status every 5 minutes
     if (Math.random() < 0.2) {
         checkConnectionStatus();
