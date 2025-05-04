@@ -185,11 +185,19 @@ function checkConnectionStatus() {
 }
 
 /**
- * Update signals display
+ * Update signals display - only if dashboard.js hasn't initialized it yet
  */
 function updateSignalsDisplay() {
     const container = document.getElementById('signals-container');
     if (!container) return;
+    
+    // Check if dashboard.js has already set up the signals container with its own structure
+    if (container.querySelector('.signals-list-header') || 
+        container.querySelector('.signals-container') ||
+        container.querySelector('.signal-card')) {
+        console.log('Dashboard.js already handling signals display, skipping main.js implementation');
+        return;
+    }
     
     if (signalsData.length === 0) {
         container.innerHTML = '<p>No active signals.</p>';
@@ -230,10 +238,18 @@ function updateSignalsDisplay() {
 }
 
 /**
- * Update trades display
+ * Update trades display - only if dashboard.js hasn't already done it
  */
 function updateTradesDisplay() {
     const container = document.getElementById('trades-container');
+    const activeTradesBody = document.getElementById('active-trades-body');
+    
+    // If active-trades-body exists, dashboard.js is handling it directly
+    if (activeTradesBody) {
+        console.log('Dashboard.js already handling trades display, skipping main.js implementation');
+        return;
+    }
+    
     if (!container) return;
     
     if (tradesData.length === 0) {
@@ -332,6 +348,14 @@ function closeTrade(tradeId) {
     // In production, replace with actual API call
     console.log(`Closing trade ${tradeId}`);
     alert(`Trade #${tradeId} has been closed`);
+}
+
+/**
+ * View chart for a signal
+ * @param {number} signalId - Signal ID
+ */
+function viewSignalChart(signalId) {
+    window.open(`/api/signals/${signalId}/chart`, '_blank');
 }
 
 /**

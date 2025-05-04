@@ -295,6 +295,29 @@ class ChartGenerator:
             chart_padding = int(len(df) * 0.15)  # Add 15% padding to the right
             for ax in axes:
                 ax.set_xlim(0, len(df) + chart_padding)
+                
+            # Adjust y-axis in main chart to better show SL and TP levels
+            if stop_loss is not None or take_profit is not None:
+                current_price = df['Close'].iloc[-1] if not df.empty else None
+                if current_price:
+                    # Get current y-limits
+                    ymin, ymax = axes[0].get_ylim()
+                    price_range = ymax - ymin
+                    
+                    # Determine required y range to show TP/SL properly
+                    required_ymin = ymin
+                    required_ymax = ymax
+                    
+                    if stop_loss is not None:
+                        required_ymin = min(required_ymin, stop_loss - (price_range * 0.1))
+                        required_ymax = max(required_ymax, stop_loss + (price_range * 0.1))
+                    
+                    if take_profit is not None:
+                        required_ymin = min(required_ymin, take_profit - (price_range * 0.1))
+                        required_ymax = max(required_ymax, take_profit + (price_range * 0.1))
+                    
+                    # Set new y-limits with a bit of padding
+                    axes[0].set_ylim(required_ymin, required_ymax)
             
             # Add spacing between subplots
             plt.tight_layout()
