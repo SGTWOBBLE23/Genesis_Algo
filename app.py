@@ -569,6 +569,20 @@ def settings():
 def downloads():
     return render_template('downloads.html', title='Downloads')
 
+@app.route('/downloads/MT5_GENESIS_EA_fixed_v10.mq5')
+def download_mt5_ea():
+    try:
+        return send_file('MT5_GENESIS_EA_fixed_v10.mq5', as_attachment=True)
+    except Exception as e:
+        return str(e), 404
+        
+@app.route('/downloads/MT5_GENESIS_EA_INSTRUCTIONS.md')
+def download_mt5_instructions():
+    try:
+        return send_file('MT5_GENESIS_EA_INSTRUCTIONS.md', as_attachment=True)
+    except Exception as e:
+        return str(e), 404
+
 # API Routes
 @app.route('/api/trades', methods=['GET'])
 def get_trades():
