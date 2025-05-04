@@ -98,13 +98,13 @@ body {
 }
 
 /* P&L colors */
-.positive {
-    color: #198754;
+.positive, .text-success {
+    color: #198754 !important;
     font-weight: 500;
 }
 
-.negative {
-    color: #dc3545;
+.negative, .text-danger {
+    color: #dc3545 !important;
     font-weight: 500;
 }
 
