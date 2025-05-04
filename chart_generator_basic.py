@@ -295,11 +295,15 @@ class ChartGenerator:
                 axes[0].scatter(entry_idx, entry_price, marker='^', s=120, 
                              color=self.colors['entry'], zorder=5)
                     
-            # Generate filename with timestamp
-            now = datetime.now().strftime("%Y%m%d_%H%M%S")
-            result_str = f"_{result.upper()}" if result else ""
+            # Create symbol folder if it doesn't exist
+            symbol_dir = os.path.join(self.output_dir, symbol)
+            os.makedirs(symbol_dir, exist_ok=True)
+            
+            # Generate ISO format timestamp for filename
+            now = datetime.now().strftime("%Y-%m-%dT%H%MZ")
+            result_str = f"_{result.lower()}" if result else ""
             filename = f"{symbol}_{timeframe}_{now}{result_str}.png"
-            filepath = os.path.join(self.output_dir, filename)
+            filepath = os.path.join(symbol_dir, filename)
             
             # Save the chart to file
             plt.savefig(filepath, dpi=self.dpi, bbox_inches='tight', facecolor=self.colors['bg'])

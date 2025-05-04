@@ -1027,8 +1027,9 @@ def download_chart(symbol):
     if not chart_path:
         return jsonify({"error": "Failed to generate chart"}), 500
     
-    # Return the file for download
-    return send_file(chart_path, as_attachment=True)
+    # Return the file for download with the exact filename from the chart path
+    filename = os.path.basename(chart_path)
+    return send_file(chart_path, as_attachment=True, download_name=filename)
 
 @app.route('/charts')
 def charts_page():
