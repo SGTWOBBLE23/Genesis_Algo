@@ -6,6 +6,7 @@
 let activeCharts = {};
 let activeTrades = [];
 let priceData = {};
+let accountData = null;
 
 // Initialize Dashboard when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
@@ -15,11 +16,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load active trades
     loadActiveTrades();
     
+    // Load account data
+    fetchAccountData();
+    
     // Connect to WebSocket for real-time updates
     connectWebSocket();
     
     // Set up interval updates
     setInterval(updateTradePnL, 5000); // Update P&L every 5 seconds
+    setInterval(fetchAccountData, 10000); // Update account data every 10 seconds
 });
 
 /**
@@ -327,6 +332,100 @@ function showAlert(message, type = 'info') {
         alert.classList.remove('show');
         setTimeout(() => alert.remove(), 150);
     }, 5000);
+}
+
+/**
+ * Fetch account data from the server and update the UI
+ */
+function fetchAccountData() {
+    // Try to get MT5 account data first
+    fetch('/api/mt5/account')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('MT5 account data not available');
+            }
+            return response.json();
+        })
+        .then(data => {
+            accountData = data;
+            updateAccountDisplay(data, 'MT5');
+        })
+        .catch(error => {
+            console.log('MT5 account data not available, trying OANDA:', error);
+            
+            // Fall back to OANDA account data if MT5 is not available
+            fetch('/api/oanda/account')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('OANDA account data not available');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    accountData = data;
+                    updateAccountDisplay(data, 'OANDA');
+                })
+                .catch(error => {
+                    console.error('Error fetching account data:', error);
+                });
+        });
+}
+
+/**
+ * Update the account summary display in the UI
+ * @param {Object} data - Account data
+ * @param {string} source - Source of the data (MT5 or OANDA)
+ */
+function updateAccountDisplay(data, source) {
+    // Update account number/ID
+    const accountIdEl = document.getElementById('account-id');
+    if (accountIdEl && data.account_id) {
+        accountIdEl.textContent = data.account_id;
+    }
+    
+    // Update account type/source
+    const accountTypeEl = document.getElementById('account-type');
+    if (accountTypeEl) {
+        accountTypeEl.textContent = source;
+    }
+    
+    // Update balance
+    const balanceEl = document.getElementById('account-balance');
+    if (balanceEl && data.balance !== undefined) {
+        balanceEl.textContent = `$${parseFloat(data.balance).toFixed(2)}`;
+    }
+    
+    // Update equity
+    const equityEl = document.getElementById('account-equity');
+    if (equityEl && data.equity !== undefined) {
+        equityEl.textContent = `$${parseFloat(data.equity).toFixed(2)}`;
+    }
+    
+    // Update margin
+    const marginEl = document.getElementById('account-margin');
+    if (marginEl && data.margin !== undefined) {
+        marginEl.textContent = `$${parseFloat(data.margin).toFixed(2)}`;
+    }
+    
+    // Update free margin
+    const freeMarginEl = document.getElementById('account-free-margin');
+    if (freeMarginEl && data.free_margin !== undefined) {
+        freeMarginEl.textContent = `$${parseFloat(data.free_margin).toFixed(2)}`;
+    }
+    
+    // Update margin level if available
+    const marginLevelEl = document.getElementById('account-margin-level');
+    if (marginLevelEl) {
+        if (data.margin_level !== undefined) {
+            marginLevelEl.textContent = `${parseFloat(data.margin_level).toFixed(2)}%`;
+        } else if (data.margin > 0) {
+            // Calculate margin level if not provided but margin is greater than zero
+            const marginLevel = (data.equity / data.margin) * 100;
+            marginLevelEl.textContent = `${marginLevel.toFixed(2)}%`;
+        } else {
+            marginLevelEl.textContent = 'N/A';
+        }
+    }
 }
 
 /**
