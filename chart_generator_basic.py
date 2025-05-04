@@ -281,6 +281,20 @@ class ChartGenerator:
             # Add spacing between subplots
             plt.tight_layout()
             
+            # Add entry point marker if provided
+            if entry_point is not None:
+                entry_time, entry_price = entry_point
+                # Find the nearest index to the entry time
+                if entry_time in df.index:
+                    entry_idx = df.index.get_loc(entry_time)
+                else:
+                    # Find closest time
+                    entry_idx = len(df) // 2  # Default to middle if not found
+                
+                # Plot marker for entry point
+                axes[0].scatter(entry_idx, entry_price, marker='^', s=120, 
+                             color=self.colors['entry'], zorder=5)
+                    
             # Generate filename with timestamp
             now = datetime.now().strftime("%Y%m%d_%H%M%S")
             result_str = f"_{result.upper()}" if result else ""
