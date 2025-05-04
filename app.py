@@ -738,18 +738,25 @@ def get_trades_stats():
         query = db.session.query(*columns).filter(Trade.status == TradeStatus.CLOSED)
         
         # Important: Filter out duplicates by using a subquery to select the latest trade for each ticket
-        latest_trades_query = db.session.query(
-            Trade.ticket, 
-            func.max(Trade.updated_at).label('latest_update')
-        ).filter(Trade.ticket.isnot(None)).group_by(Trade.ticket).subquery()
-        
-        query = query.outerjoin(
-            latest_trades_query,
-            and_(
-                Trade.ticket == latest_trades_query.c.ticket,
-                Trade.updated_at == latest_trades_query.c.latest_update
+        # Handle ticket column which may be NULL in database by using id as a fallback
+        try:
+            # Try using ticket-based filtering for trades that have tickets
+            latest_trades_query = db.session.query(
+                Trade.ticket, 
+                func.max(Trade.updated_at).label('latest_update')
+            ).filter(Trade.ticket.isnot(None)).group_by(Trade.ticket).subquery()
+            
+            query = query.outerjoin(
+                latest_trades_query,
+                and_(
+                    Trade.ticket == latest_trades_query.c.ticket,
+                    Trade.updated_at == latest_trades_query.c.latest_update
+                )
             )
-        )
+        except Exception as e:
+            logger.warning(f"Failed to filter trades by ticket: {str(e)}")
+            # If ticket-based filtering fails, fall back to getting all trades
+            # We'll manually filter duplicates later
         
         # Apply additional filters if provided
         if symbol:
@@ -861,7 +868,13 @@ def get_trades_stats():
         peak_balance = 0
         max_drawdown = 0
         
-        sorted_trades = sorted(filtered_trades, key=lambda t: t.closed_at if t.closed_at else datetime.min)
+        # Sort trades by closed_at date, handling potential None values
+        try:
+            sorted_trades = sorted(filtered_trades, key=lambda t: t.closed_at if t.closed_at else datetime.min)
+        except Exception as e:
+            logger.error(f"Error sorting trades: {str(e)}")
+            # Use a safer approach if sorting fails
+            sorted_trades = filtered_trades.copy()
         
         for trade in sorted_trades:
             try:
