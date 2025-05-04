@@ -1,9 +1,11 @@
 import json
 import time
 import logging
+import os
 from datetime import datetime, timedelta
-from flask import Blueprint, request, jsonify
-from app import db, Signal, Trade, SignalAction, TradeStatus, TradeSide, Settings
+from flask import Blueprint, request, jsonify, send_file
+from app import db, Signal, Trade, SignalAction, TradeStatus, TradeSide, Settings, SignalStatus
+from chart_utils import generate_chart
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -555,6 +557,48 @@ def update_trades():
         
     except Exception as e:
         logger.error(f"Error updating trades: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@mt5_api.route('/signal_chart/<int:signal_id>', methods=['GET'])
+def signal_chart(signal_id):
+    """Generate a chart for a specific signal ID"""
+    try:
+        # Find the signal
+        signal = db.session.query(Signal).filter_by(id=signal_id).first()
+        
+        if not signal:
+            return jsonify({"status": "error", "message": f"Signal with ID {signal_id} not found"}), 404
+        
+        # Determine result type based on signal status
+        result = "anticipated"
+        if signal.status == SignalStatus.TRIGGERED:
+            result = "win" if signal.context and signal.context.get("pnl", 0) > 0 else "loss"
+        elif signal.status == SignalStatus.ACTIVE:
+            result = "active"
+        elif signal.status == SignalStatus.PENDING:
+            result = "pending"
+        
+        # Get current datetime for entry point (or use signal created_at)
+        entry_time = datetime.now()
+        
+        # Generate the chart
+        chart_path = generate_chart(
+            symbol=signal.symbol,
+            timeframe="H1",  # Default to H1 timeframe
+            count=100,      # Default to 100 candles
+            entry_point=(entry_time, signal.entry) if signal.entry else None,
+            stop_loss=signal.sl,
+            take_profit=signal.tp,
+            result=result
+        )
+        
+        if not chart_path or not os.path.exists(chart_path):
+            return jsonify({"status": "error", "message": "Failed to generate chart"}), 500
+        
+        return send_file(chart_path, mimetype='image/png')
+        
+    except Exception as e:
+        logger.error(f"Error generating signal chart: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @mt5_api.route('/account_status', methods=['POST'])
