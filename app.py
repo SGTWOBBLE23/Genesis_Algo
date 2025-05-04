@@ -719,84 +719,44 @@ def get_trades():
 def get_trades_stats():
     """Get trading statistics for closed trades"""
     try:
-        # Query filters - can add filters later like date range, symbols, etc.
+        # Optional query parameters
         symbol = request.args.get('symbol')
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
         
-        # Define the columns we want to select (avoiding any that might not exist in the DB)
-        columns = [
-            Trade.id,
-            Trade.symbol, 
-            Trade.side,
-            Trade.pnl,
-            Trade.status,
-            Trade.closed_at
-        ]
+        # Get all closed trades
+        trades = db.session.query(Trade).filter(Trade.status == TradeStatus.CLOSED).all()
         
-        # Get closed trades for statistics
-        query = db.session.query(*columns).filter(Trade.status == TradeStatus.CLOSED)
-        
-        # Important: Filter out duplicates by using a subquery to select the latest trade for each ticket
-        # Handle ticket column which may be NULL in database by using id as a fallback
-        try:
-            # Try using ticket-based filtering for trades that have tickets
-            latest_trades_query = db.session.query(
-                Trade.ticket, 
-                func.max(Trade.updated_at).label('latest_update')
-            ).filter(Trade.ticket.isnot(None)).group_by(Trade.ticket).subquery()
-            
-            query = query.outerjoin(
-                latest_trades_query,
-                and_(
-                    Trade.ticket == latest_trades_query.c.ticket,
-                    Trade.updated_at == latest_trades_query.c.latest_update
-                )
-            )
-        except Exception as e:
-            logger.warning(f"Failed to filter trades by ticket: {str(e)}")
-            # If ticket-based filtering fails, fall back to getting all trades
-            # We'll manually filter duplicates later
-        
-        # Apply additional filters if provided
+        # Additional filtering
         if symbol:
-            query = query.filter(Trade.symbol == symbol)
+            trades = [t for t in trades if t.symbol == symbol]
             
-        # Apply date filters if provided
         if start_date:
             try:
                 start_date_obj = datetime.fromisoformat(start_date)
-                query = query.filter(Trade.closed_at >= start_date_obj)
+                trades = [t for t in trades if t.closed_at and t.closed_at >= start_date_obj]
             except (ValueError, TypeError):
-                # Invalid date format, ignore
-                pass
+                pass  # Invalid date format, ignore
                 
         if end_date:
             try:
                 end_date_obj = datetime.fromisoformat(end_date)
-                query = query.filter(Trade.closed_at <= end_date_obj)
+                trades = [t for t in trades if t.closed_at and t.closed_at <= end_date_obj]
             except (ValueError, TypeError):
-                # Invalid date format, ignore
-                pass
+                pass  # Invalid date format, ignore
         
-        closed_trades = query.all()
-        
-        # Filter out duplicates by ticket, but keep all trades even with missing timestamps
+        # Filter out duplicates by id, not relying on ticket
+        seen_ids = set()
         filtered_trades = []
-        seen_tickets = set()
         
-        for trade in closed_trades:
-            # Ensure we only count each unique ticket once
-            # Use trade.id if ticket is not available
-            ticket = trade.ticket or f"id_{trade.id}"
-            if ticket in seen_tickets:
-                logger.warning(f"Skipping duplicate trade: {ticket}")
+        for trade in trades:
+            if trade.id in seen_ids:
                 continue
-            seen_tickets.add(ticket)
-            
-            filtered_trades.append(trade)
                 
-        # Calculate statistics with the filtered trades
+            seen_ids.add(trade.id)
+            filtered_trades.append(trade)            
+                
+        # Initial statistics
         stats = {
             'total_trades': len(filtered_trades),
             'win_count': 0,
@@ -809,78 +769,73 @@ def get_trades_stats():
             'max_drawdown': 0.0
         }
         
-        # No trades, return default stats
+        # Exit early if no trades
         if not filtered_trades:
             return jsonify(stats)
         
-        # Calculate win/loss counts and profit/loss
+        # Calculate win/loss and profit
         total_profit = 0.0
         winning_trades = []
         losing_trades = []
         
         for trade in filtered_trades:
+            # Safely access PnL, skipping trades with no profit/loss data
             try:
-                # Debug trade information
-                logger.debug(f"Processing trade for stats: ID={trade.id}, PnL={trade.pnl}")
-                
                 if trade.pnl is None:
-                    # Skip trades with no P&L info
-                    logger.warning(f"Skipping trade with no PnL: ID={trade.id}")
+                    logger.warning(f"Trade ID {trade.id} has no PnL value")
                     continue
-            except Exception as e:
-                logger.error(f"Error processing trade for stats: {str(e)}")
-                continue
+                    
+                pnl = float(trade.pnl)
+                total_profit += pnl
                 
-            total_profit += trade.pnl
-            
-            if trade.pnl > 0:
-                stats['win_count'] += 1
-                winning_trades.append(trade.pnl)
-            elif trade.pnl < 0:
-                stats['loss_count'] += 1
-                losing_trades.append(trade.pnl)
+                if pnl > 0:
+                    stats['win_count'] += 1
+                    winning_trades.append(pnl)
+                elif pnl < 0:
+                    stats['loss_count'] += 1
+                    losing_trades.append(pnl)
+                    
+            except Exception as e:
+                logger.error(f"Error processing trade {trade.id}: {str(e)}")
+                continue
         
         # Update stats
-        stats['total_profit'] = total_profit
+        stats['total_profit'] = round(total_profit, 2)
         
         # Calculate win rate
-        if stats['total_trades'] > 0 and (stats['win_count'] + stats['loss_count']) > 0:
-            stats['win_rate'] = (stats['win_count'] / (stats['win_count'] + stats['loss_count'])) * 100
+        total_evaluated = stats['win_count'] + stats['loss_count'] 
+        if total_evaluated > 0:
+            stats['win_rate'] = round((stats['win_count'] / total_evaluated) * 100, 2)
         
         # Calculate average win/loss
         if winning_trades:
-            stats['avg_win'] = sum(winning_trades) / len(winning_trades)
+            stats['avg_win'] = round(sum(winning_trades) / len(winning_trades), 2)
         
         if losing_trades:
-            stats['avg_loss'] = sum(losing_trades) / len(losing_trades)
+            stats['avg_loss'] = round(sum(losing_trades) / len(losing_trades), 2)
         
         # Calculate profit factor
         total_wins = sum(winning_trades) if winning_trades else 0
         total_losses = abs(sum(losing_trades)) if losing_trades else 0
         
         if total_losses > 0:
-            stats['profit_factor'] = total_wins / total_losses
+            stats['profit_factor'] = round(total_wins / total_losses, 2)
         elif total_wins > 0:
             stats['profit_factor'] = float('inf')  # No losses but has wins
         
-        # Calculate drawdown (simplified version)
-        running_balance = 0
-        peak_balance = 0
-        max_drawdown = 0
-        
-        # Sort trades by closed_at date, handling potential None values
+        # Calculate drawdown
         try:
-            sorted_trades = sorted(filtered_trades, key=lambda t: t.closed_at if t.closed_at else datetime.min)
-        except Exception as e:
-            logger.error(f"Error sorting trades: {str(e)}")
-            # Use a safer approach if sorting fails
-            sorted_trades = filtered_trades.copy()
-        
-        for trade in sorted_trades:
-            try:
-                if trade.pnl is None:
-                    continue
-                    
+            # Sort trades by closed_at date, handling potential None values
+            sorted_trades = sorted(
+                [t for t in filtered_trades if t.pnl is not None and t.closed_at is not None],
+                key=lambda t: t.closed_at
+            )
+            
+            running_balance = 0
+            peak_balance = 0
+            max_drawdown = 0
+            
+            for trade in sorted_trades:
                 running_balance += trade.pnl
                 
                 if running_balance > peak_balance:
@@ -889,16 +844,16 @@ def get_trades_stats():
                 drawdown = peak_balance - running_balance
                 if drawdown > max_drawdown:
                     max_drawdown = drawdown
-            except Exception as e:
-                logger.error(f"Error calculating drawdown for trade: {str(e)}")
-                continue
-        
-        stats['max_drawdown'] = max_drawdown
+                    
+            stats['max_drawdown'] = round(max_drawdown, 2)
+        except Exception as e:
+            logger.error(f"Error calculating drawdown: {str(e)}")
+            stats['max_drawdown'] = 0.0
         
         return jsonify(stats)
     except Exception as e:
-        # Log error and return default stats
-        print(f"Error calculating trade stats: {str(e)}")
+        # Log error and return default stats with error info
+        logger.error(f"Error calculating trade stats: {str(e)}")
         return jsonify({
             'total_trades': 0,
             'win_count': 0,
