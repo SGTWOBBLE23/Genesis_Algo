@@ -431,6 +431,7 @@ function updateSignalsTable(signals) {
 function viewSignalChart(signalId) {
     // Open signal chart in a modal or new window
     window.open(`/mt5/signal_chart/${signalId}`, '_blank');
+    console.log(`Viewing chart for signal ${signalId}`);
 }
 
 /**

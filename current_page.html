@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }} - GENESIS Trading Platform</title>
+    <title>Dashboard - GENESIS Trading Platform</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <link href="/static/css/style.css" rel="stylesheet">
@@ -32,9 +32,9 @@
     </nav>
     
     <div class="system-status-bar">
-        <div class="status-indicator {% if mt5_connected %}connected{% else %}disconnected{% endif %}">
+        <div class="status-indicator disconnected">
             <span class="status-label">MT5:</span> 
-            <span class="status-value">{% if mt5_connected %}Connected{% else %}Disconnected{% endif %}</span>
+            <span class="status-value">Disconnected</span>
         </div>
         <div class="status-indicator connected">
             <span class="status-label">OANDA:</span> 
@@ -50,17 +50,17 @@
         </div>
     </div>
 
-    <div class="container-fluid mt-4">
+    <div class="container mt-4">
         <h1>Dashboard</h1>
         <div class="row">
-            <div class="col-12">
-                <div class="card bg-dark text-white">
-                    <div class="card-header d-flex justify-content-between align-items-center bg-dark border-secondary">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
                         <div class="d-flex align-items-center">
-                            <i class="bi bi-graph-up-arrow me-2 text-light"></i>
+                            <i class="bi bi-graph-up me-2"></i>
                             <h5 class="card-title mb-0">Latest Signals</h5>
                         </div>
-                        <a href="#" class="btn btn-sm btn-outline-light">View All</a>
+                        <a href="#" class="btn btn-sm btn-outline-primary">View All</a>
                     </div>
                     <div class="card-body p-0">
                         <div id="signals-container" class="signals-list">
@@ -87,10 +87,33 @@
                     </div>
                 </div>
                 
-                
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="card-title">Open Trades</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="trades-container">
+                            <p>No open trades.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
             
-<!-- Statistics box removed as requested -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Statistics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="stats-info">
+                            <p><strong>Win Rate:</strong> <span id="win-rate">0%</span></p>
+                            <p><strong>Total Profit:</strong> <span id="total-profit">$0.00</span></p>
+                            <p><strong>Avg. Win:</strong> <span id="avg-win">$0.00</span></p>
+                            <p><strong>Avg. Loss:</strong> <span id="avg-loss">$0.00</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
