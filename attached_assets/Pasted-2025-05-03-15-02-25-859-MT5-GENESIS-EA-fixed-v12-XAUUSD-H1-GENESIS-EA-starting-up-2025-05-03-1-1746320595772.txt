@@ -1,0 +1,25 @@
+2025.05.03 15:02:25.859	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	GENESIS EA starting up...
+2025.05.03 15:02:25.859	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	Found 248 active symbols in Market Watch
+2025.05.03 15:02:26.339	MT5_GENESIS_EA_fixed_v9 (BTCUSD,H1)	Attempting to get signals from URL: https://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev/mt5/get_signals
+2025.05.03 15:02:26.939	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	Heartbeat sent successfully. Server time: 2025-05-04 01:02:26
+2025.05.03 15:02:26.941	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	Deleted all signal arrows from chart
+2025.05.03 15:02:27.806	MT5_GENESIS_EA_fixed_v9 (BTCUSD,H1)	Received 0 new signals
+2025.05.03 15:02:28.908	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	Trade updates sent successfully
+2025.05.03 15:02:29.520	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	Heartbeat sent successfully. Server time: 2025-05-04 01:02:29
+2025.05.03 15:02:29.520	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	Attempting to get signals from URL: https://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev/mt5/get_signals
+2025.05.03 15:02:29.795	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	Received 1 new signals
+2025.05.03 15:02:29.795	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	Processing signal 1 of 1:
+2025.05.03 15:02:29.795	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	  ID: 3
+2025.05.03 15:02:29.795	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	  Symbol: 
+2025.05.03 15:02:29.795	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	  Action: ANTICIPATED_LONG
+2025.05.03 15:02:29.795	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	  Entry: 3240.95
+2025.05.03 15:02:29.795	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	  Stop Loss: 3220.00
+2025.05.03 15:02:29.795	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	  Take Profit: 3280.00
+2025.05.03 15:02:29.795	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	ProcessTradeSignal called: ID=3 Symbol= Direction=ANTICIPATED_LONG Entry=3240.95 SL=3220.0 TP=3280.0 Lot=0.1 Anticipated=true
+2025.05.03 15:02:29.795	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	Drew signal arrow on chart: GENESIS_Arrow_3 at 3240.90
+2025.05.03 15:02:29.795	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	Placing pending order: ORDER_TYPE_BUY_LIMIT for  at 3240.95 with SL: 3220.00 TP: 3280.00 Lot: 0.10
+2025.05.03 15:02:29.795	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	CTrade::OrderSend: buy limit 0.10  at 3240.95 sl: 3220.00 tp: 3280.00 [invalid request]
+2025.05.03 15:02:29.795	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	Failed to place pending order. Error: 4756 - Unknown error (4756)
+2025.05.03 15:02:29.896	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	WebRequest failed. URL: https://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev/mt5/trade_report Error: 5040 - Unknown error (5040)
+2025.05.03 15:02:29.896	MT5_GENESIS_EA_fixed_v12 (XAUUSD,H1)	Failed to send trade report for signal #3
+2025.05.03 15:02:32.173	MT5_GENESIS_EA_fixed_v9 (GBPUSD,M15)	Attempting to get signals from URL: https://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev/mt5/get_signals
