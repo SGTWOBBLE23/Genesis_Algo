@@ -32,6 +32,35 @@ body {
     background-color: #f8f9fa;
 }
 
+/* System Status Bar */
+.system-status-bar {
+    display: flex;
+    background-color: #1e2430;
+    color: white;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    justify-content: flex-end;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    margin-left: 1.5rem;
+}
+
+.status-indicator.connected .status-value {
+    color: #10b981;
+}
+
+.status-indicator.disconnected .status-value {
+    color: #ef4444;
+}
+
+.status-label {
+    font-weight: 600;
+    margin-right: 0.3rem;
+}
+
 /* Status Badges */
 .badge {
     padding: 0.5em 0.8em;
@@ -119,6 +148,71 @@ body {
 
 .status-cancelled {
     color: #dc3545;
+}
+
+/* Signal Action Badges */
+.action-badge {
+    display: inline-block;
+    padding: 0.35em 0.65em;
+    font-size: 0.75em;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 0.25rem;
+    color: #fff;
+}
+
+.action-buy-now {
+    background-color: #198754;
+}
+
+.action-sell-now {
+    background-color: #dc3545;
+}
+
+.action-anticipated-long {
+    background-color: #0d6efd;
+}
+
+.action-anticipated-short {
+    background-color: #fd7e14;
+}
+
+/* Signals List */
+.signals-list {
+    border-radius: 0.25rem;
+    overflow: hidden;
+}
+
+.signals-list .table {
+    margin-bottom: 0;
+}
+
+.signals-list th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    border-top: none;
+    padding: 0.75rem 0.5rem;
+}
+
+.signals-list td {
+    padding: 0.75rem 0.5rem;
+    vertical-align: middle;
+}
+
+.chart-link-btn {
+    color: #0d6efd;
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+}
+
+.chart-link-btn:hover {
+    color: #0a58ca;
 }
 
 /* Signal confidence levels */

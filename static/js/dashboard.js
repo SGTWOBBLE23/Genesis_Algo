@@ -15,12 +15,18 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load active trades
     loadActiveTrades();
     
+    // Load current signals
+    loadCurrentSignals();
+    
+    // Load trade statistics
+    loadTradeStats();
     
     // Connect to WebSocket for real-time updates
     connectWebSocket();
     
     // Set up interval updates
     setInterval(updateTradePnL, 5000); // Update P&L every 5 seconds
+    setInterval(loadCurrentSignals, 60000); // Update signals every minute
 });
 
 /**
@@ -333,8 +339,123 @@ function showAlert(message, type = 'info') {
 
 
 /**
- * Connect to WebSocket for real-time updates
+ * Load current signals from the API
  */
+function loadCurrentSignals() {
+    fetch('/api/signals/current')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(signals => {
+            updateSignalsTable(signals);
+        })
+        .catch(error => {
+            console.error('Error fetching signals:', error);
+        });
+}
+
+/**
+ * Update the signals table in the UI
+ * @param {Array} signals - List of signal objects
+ */
+function updateSignalsTable(signals) {
+    const tableBody = document.getElementById('signals-list');
+    if (!tableBody) return;
+    
+    // Clear existing rows
+    tableBody.innerHTML = '';
+    
+    if (signals.length === 0) {
+        // Show no signals message
+        const row = document.createElement('tr');
+        row.innerHTML = '<td colspan="8" class="text-center">No active signals</td>';
+        tableBody.appendChild(row);
+        return;
+    }
+    
+    // Sort signals by created_at in descending order (newest first)
+    signals.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    
+    // Add signals to table
+    signals.forEach(signal => {
+        const row = document.createElement('tr');
+        
+        // Format action badge
+        let actionClass = '';
+        switch (signal.action) {
+            case 'BUY_NOW':
+                actionClass = 'action-buy-now';
+                break;
+            case 'SELL_NOW':
+                actionClass = 'action-sell-now';
+                break;
+            case 'ANTICIPATED_LONG':
+                actionClass = 'action-anticipated-long';
+                break;
+            case 'ANTICIPATED_SHORT':
+                actionClass = 'action-anticipated-short';
+                break;
+        }
+        
+        // Format date
+        const date = new Date(signal.created_at);
+        const dateStr = `${date.getMonth()+1}/${date.getDate()}/${date.getFullYear()}, ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')} ${date.getHours() >= 12 ? 'PM' : 'AM'}`;
+        
+        // Build row content
+        row.innerHTML = `
+            <td>${signal.symbol.replace('_', '')}</td>
+            <td><span class="action-badge ${actionClass}">${signal.action.replace('_', ' ')}</span></td>
+            <td>${signal.entry || '--'}</td>
+            <td>${signal.sl || '--'}</td>
+            <td>${signal.tp || '--'}</td>
+            <td>${Math.round(signal.confidence * 100)}%</td>
+            <td>${dateStr}</td>
+            <td>
+                <button class="chart-link-btn" onclick="viewSignalChart(${signal.id})" title="View Chart">
+                    <i class="bi bi-bar-chart-fill"></i>
+                </button>
+            </td>
+        `;
+        
+        tableBody.appendChild(row);
+    });
+}
+
+/**
+ * View chart for a specific signal
+ * @param {number} signalId - The signal ID
+ */
+function viewSignalChart(signalId) {
+    // Open signal chart in a modal or new window
+    window.open(`/mt5/signal_chart/${signalId}`, '_blank');
+}
+
+/**
+ * Load trading statistics
+ */
+function loadTradeStats() {
+    fetch('/api/trades/stats')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(stats => {
+            // Update stats in UI
+            document.getElementById('win-rate').textContent = `${(stats.win_rate * 100).toFixed(1)}%`;
+            document.getElementById('total-profit').textContent = `$${stats.total_profit.toFixed(2)}`;
+            document.getElementById('avg-win').textContent = `$${stats.avg_win.toFixed(2)}`;
+            document.getElementById('avg-loss').textContent = `$${stats.avg_loss.toFixed(2)}`;
+        })
+        .catch(error => {
+            console.error('Error fetching trade stats:', error);
+        });
+}
+
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/api/signals/ws`;
@@ -362,53 +483,11 @@ function connectWebSocket() {
             document.getElementById(`${symbol}-ask`).textContent = data.data.ask.toFixed(5);
             
         } else if (data.type === 'new_signal') {
-            // Add new signal
-            const signalData = data.data;
-            const signalElement = document.getElementById(`signals-${signalData.symbol}`);
+            // Reload all signals
+            loadCurrentSignals();
             
-            if (signalElement) {
-                let badgeClass;
-                let icon;
-                
-                switch (signalData.action) {
-                    case 'BUY_NOW':
-                        badgeClass = 'buy';
-                        icon = 'arrow-up';
-                        break;
-                    case 'SELL_NOW':
-                        badgeClass = 'sell';
-                        icon = 'arrow-down';
-                        break;
-                    case 'ANTICIPATED_LONG':
-                        badgeClass = 'anticipated-long';
-                        icon = 'clock';
-                        break;
-                    case 'ANTICIPATED_SHORT':
-                        badgeClass = 'anticipated-short';
-                        icon = 'clock';
-                        break;
-                    default:
-                        badgeClass = '';
-                        icon = 'info';
-                }
-                
-                const badge = document.createElement('div');
-                badge.className = `signal-badge ${badgeClass}`;
-                badge.innerHTML = `
-                    <i class="feather icon-${icon}"></i>
-                    <div>
-                        <strong>${signalData.action}</strong>
-                        <div>Confidence: ${(signalData.confidence * 100).toFixed(1)}%</div>
-                    </div>
-                `;
-                
-                // Clear "waiting for signals" message
-                signalElement.innerHTML = '';
-                signalElement.appendChild(badge);
-                
-                // Show alert
-                showAlert(`New signal for ${signalData.symbol}: ${signalData.action}`, 'info');
-            }
+            // Show alert
+            showAlert(`New signal for ${data.data.symbol}: ${data.data.action}`, 'info');
             
         } else if (data.type === 'new_trade') {
             // Add new trade
