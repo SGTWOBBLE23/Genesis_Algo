@@ -358,32 +358,45 @@ function loadCurrentSignals() {
 }
 
 /**
- * Update the signals table in the UI
+ * Update the signals display in the UI with a card layout
  * @param {Array} signals - List of signal objects
  */
 function updateSignalsTable(signals) {
-    const tableBody = document.getElementById('signals-list');
-    if (!tableBody) return;
+    const container = document.getElementById('signals-container');
+    if (!container) return;
     
-    // Clear existing rows
-    tableBody.innerHTML = '';
+    // Clear existing content
+    container.innerHTML = '';
+    
+    // Create header
+    const header = document.createElement('div');
+    header.className = 'signals-list-header';
+    header.innerHTML = `
+        <h5 class="m-0">Latest Signals</h5>
+        <a href="/signals" class="text-white">View All</a>
+    `;
+    container.appendChild(header);
+    
+    // Create signals container
+    const signalsContainer = document.createElement('div');
+    signalsContainer.className = 'signals-container';
+    container.appendChild(signalsContainer);
     
     if (signals.length === 0) {
         // Show no signals message
-        const row = document.createElement('tr');
-        row.innerHTML = '<td colspan="8" class="text-center">No active signals</td>';
-        tableBody.appendChild(row);
+        const emptyMessage = document.createElement('div');
+        emptyMessage.className = 'p-3 text-center';
+        emptyMessage.textContent = 'No active signals';
+        signalsContainer.appendChild(emptyMessage);
         return;
     }
     
     // Sort signals by created_at in descending order (newest first)
     signals.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     
-    // Add signals to table
+    // Add signals as cards
     signals.forEach(signal => {
-        const row = document.createElement('tr');
-        
-        // Format action badge
+        // Format action badge class
         let actionClass = '';
         switch (signal.action) {
             case 'BUY_NOW':
@@ -402,25 +415,34 @@ function updateSignalsTable(signals) {
         
         // Format date
         const date = new Date(signal.created_at);
-        const dateStr = `${date.getMonth()+1}/${date.getDate()}/${date.getFullYear()}, ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')} ${date.getHours() >= 12 ? 'PM' : 'AM'}`;
+        const dateStr = `${date.getMonth()+1}/${date.getDate()}/${date.getFullYear()}, ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')} ${date.getHours() >= 12 ? 'AM' : 'PM'}`;
         
-        // Build row content
-        row.innerHTML = `
-            <td>${signal.symbol.replace('_', '')}</td>
-            <td><span class="action-badge ${actionClass}">${signal.action.replace('_', ' ')}</span></td>
-            <td>${signal.entry || '--'}</td>
-            <td>${signal.sl || '--'}</td>
-            <td>${signal.tp || '--'}</td>
-            <td>${Math.round(signal.confidence * 100)}%</td>
-            <td>${dateStr}</td>
-            <td>
-                <button class="chart-link-btn" onclick="viewSignalChart(${signal.id})" title="View Chart">
-                    <i class="bi bi-bar-chart-fill"></i>
-                </button>
-            </td>
+        // Format confidence class
+        const confidenceClass = signal.confidence > 0.8 ? 'confidence-high' : 
+                              signal.confidence > 0.6 ? 'confidence-medium' : 'confidence-low';
+        
+        // Create signal card
+        const card = document.createElement('div');
+        card.className = 'signal-card';
+        card.innerHTML = `
+            <div class="signal-symbol">${signal.symbol.replace('_', '')}</div>
+            <div class="signal-action"><span class="action-badge ${actionClass}">${signal.action.replace('_', ' ')}</span></div>
+            <div class="signal-details">${signal.entry || '--'}</div>
+            <div class="signal-details">${signal.sl || '--'}</div>
+            <div class="signal-details">${signal.tp || '--'}</div>
+            <div class="signal-details"><span class="${confidenceClass}">${Math.round(signal.confidence * 100)}%</span></div>
+            <div class="signal-timestamp">${dateStr}</div>
         `;
         
-        tableBody.appendChild(row);
+        // Add click handler to view chart
+        card.addEventListener('click', function() {
+            viewSignalChart(signal.id);
+        });
+        
+        // Make the card appear clickable
+        card.style.cursor = 'pointer';
+        
+        signalsContainer.appendChild(card);
     });
 }
 
