@@ -269,7 +269,9 @@ def get_signals():
             
             formatted_signal = {
                 "id": signal.id,
-                "symbol": mt5_symbol,  # Use the mapped symbol if available
+                "asset": {
+                    "symbol": mt5_symbol  # Use the mapped symbol if available
+                },
                 "action": action,
                 "entry_price": float(signal.entry) if signal.entry else 0.0,
                 "stop_loss": float(signal.sl) if signal.sl else 0.0,
@@ -294,7 +296,7 @@ def get_signals():
                         mt5_symbol = signal_context['mt5_symbol']
                         logger.info(f"Using MT5 symbol from context_json: {mt5_symbol}")
                         # Update the formatted signal with the context-provided symbol
-                        formatted_signal['symbol'] = mt5_symbol
+                        formatted_signal['asset']['symbol'] = mt5_symbol
                 except Exception as e:
                     logger.error(f"Error parsing context_json: {e}")
                     
