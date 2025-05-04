@@ -16,8 +16,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load active trades
     loadActiveTrades();
     
-    // Load account data
-    fetchAccountData();
     
     // Connect to WebSocket for real-time updates
     connectWebSocket();
