@@ -679,9 +679,13 @@ def signal_chart(signal_id):
     try:
         # Find the signal
         signal = db.session.query(Signal).filter_by(id=signal_id).first()
+        logger.info(f"Signal chart request for signal ID {signal_id}")
         
         if not signal:
+            logger.error(f"Signal with ID {signal_id} not found")
             return jsonify({"status": "error", "message": f"Signal with ID {signal_id} not found"}), 404
+        
+        logger.info(f"Found signal: {signal.symbol}, action: {signal.action}, status: {signal.status}")
             
         # Check if this is a crypto signal - exclude as requested
         if any(crypto in signal.symbol for crypto in ['BTC', 'ETH', 'LTC', 'XRP', 'DOG', 'SOL']):
@@ -700,8 +704,10 @@ def signal_chart(signal_id):
         elif signal.status == SignalStatus.PENDING:
             result = "pending"
         
+        logger.info(f"Signal chart result type: {result}")
+        
         # Get current datetime for entry point (or use signal created_at)
-        entry_time = datetime.now()
+        entry_time = signal.created_at if hasattr(signal, 'created_at') else datetime.now()
         
         # Generate the chart
         try:
@@ -713,60 +719,79 @@ def signal_chart(signal_id):
             from chart_generator_basic import ChartGenerator
             from chart_utils import fetch_candles
             
+            # Format symbol for OANDA
+            oanda_symbol = signal.symbol
+            # If symbol doesn't have underscore but should (like EURUSD), add it (EUR_USD)
+            if '_' not in oanda_symbol and len(oanda_symbol) == 6:
+                oanda_symbol = oanda_symbol[:3] + '_' + oanda_symbol[3:]
+                logger.info(f"Reformatted symbol for OANDA: {signal.symbol} -> {oanda_symbol}")
+            
             # Try to fetch candles from OANDA
-            candles = fetch_candles(signal.symbol, timeframe="H1", count=100)
+            logger.info(f"Fetching candles for {oanda_symbol}")
+            candles = fetch_candles(oanda_symbol, timeframe="H1", count=100)
             
             # If we can't get data from OANDA, return an informative error
             if not candles or len(candles) < 10:
-                logger.error(f"Cannot generate chart for {signal.symbol}: Insufficient candle data available")
+                logger.error(f"Cannot generate chart for {oanda_symbol}: Insufficient candle data available")
                 return jsonify({
                     "status": "error", 
-                    "message": f"Unable to generate chart for {signal.symbol}. This symbol may not be available in OANDA."
+                    "message": f"Unable to generate chart for {oanda_symbol}. This symbol may not be available in OANDA."
                 }), 404
             
+            logger.info(f"Successfully fetched {len(candles)} candles for {oanda_symbol}")
+            
             # Create a standardized chart directory structure
-            if '_' not in signal.symbol:
-                # Add underscore at logical currency pair boundary 
-                if len(signal.symbol) == 6:
-                    directory_symbol = signal.symbol[:3] + '_' + signal.symbol[3:]
-                else:
-                    directory_symbol = signal.symbol
-            else:
-                directory_symbol = signal.symbol
+            directory_symbol = oanda_symbol.replace('_', '')
                 
             symbol_dir = os.path.join('static/charts', directory_symbol)
             os.makedirs(symbol_dir, exist_ok=True)
             
             # Generate filename based on signal properties
-            timestamp = datetime.now().strftime("%Y-%m-%dT%H%MZ")
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"{directory_symbol}_H1_{timestamp}_{result}.png"
             filepath = os.path.join(symbol_dir, filename)
+            
+            logger.info(f"Chart will be saved to: {filepath}")
             
             # Create chart generator with signal action context
             chart_gen = ChartGenerator(signal_action=signal_action)
             
+            entry_price = float(signal.entry) if signal.entry else candles[-1]['close']
+            sl_price = float(signal.sl) if signal.sl else None
+            tp_price = float(signal.tp) if signal.tp else None
+            
+            logger.info(f"Chart params: symbol={oanda_symbol}, entry={entry_price}, SL={sl_price}, TP={tp_price}")
+            
             # Generate the chart with appropriate signal styling
             chart_path = chart_gen.create_chart(
                 candles=candles,
-                symbol=signal.symbol,
+                symbol=oanda_symbol,
                 timeframe="H1",
-                entry_point=(entry_time, float(signal.entry) if signal.entry else candles[-1]['close']),
-                stop_loss=float(signal.sl) if signal.sl else None,
-                take_profit=float(signal.tp) if signal.tp else None,
+                entry_point=(entry_time, entry_price),
+                stop_loss=sl_price,
+                take_profit=tp_price,
                 result=result
             )
+            
+            logger.info(f"Chart generated successfully at path: {chart_path}")
         except Exception as chart_error:
             logger.error(f"Error generating chart for {signal.symbol}: {str(chart_error)}")
-            raise
+            import traceback
+            logger.error(traceback.format_exc())
+            return jsonify({"status": "error", "message": f"Error generating chart: {str(chart_error)}"}), 500
         
         if not chart_path or not os.path.exists(chart_path):
-            return jsonify({"status": "error", "message": "Failed to generate chart"}), 500
+            logger.error(f"Chart path is invalid or file does not exist: {chart_path}")
+            return jsonify({"status": "error", "message": "Failed to generate chart. Chart path is invalid."}), 500
         
+        logger.info(f"Sending chart file: {chart_path}")
         return send_file(chart_path, mimetype='image/png')
         
     except Exception as e:
         logger.error(f"Error generating signal chart: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        import traceback
+        logger.error(traceback.format_exc())
+        return jsonify({"status": "error", "message": f"General error: {str(e)}"}), 500
 
 @mt5_api.route('/account_status', methods=['POST'])
 def account_status():
