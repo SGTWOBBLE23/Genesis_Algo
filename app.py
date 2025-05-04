@@ -9,6 +9,7 @@ from flask import Flask, render_template, request, jsonify, Response, redirect, 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.sql import func
+from sqlalchemy import and_
 
 # Configure logging
 logging.basicConfig(
@@ -735,6 +736,20 @@ def get_trades_stats():
         
         # Get closed trades for statistics
         query = db.session.query(*columns).filter(Trade.status == TradeStatus.CLOSED)
+        
+        # Important: Filter out duplicates by using a subquery to select the latest trade for each ticket
+        latest_trades_query = db.session.query(
+            Trade.ticket, 
+            func.max(Trade.updated_at).label('latest_update')
+        ).filter(Trade.ticket.isnot(None)).group_by(Trade.ticket).subquery()
+        
+        query = query.outerjoin(
+            latest_trades_query,
+            and_(
+                Trade.ticket == latest_trades_query.c.ticket,
+                Trade.updated_at == latest_trades_query.c.latest_update
+            )
+        )
         
         # Apply additional filters if provided
         if symbol:
