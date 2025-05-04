@@ -167,22 +167,25 @@ body {
     vertical-align: baseline;
     border-radius: 0.25rem;
     color: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .action-badge.action-buy-now {
-    background-color: #198754; /* Green for BUY NOW */
+    background-color: #00c851; /* Brighter Green for BUY NOW */
 }
 
 .action-badge.action-sell-now {
-    background-color: #dc3545; /* Red for SELL NOW */
+    background-color: #ff3547; /* Brighter Red for SELL NOW */
 }
 
 .action-badge.action-anticipated-long {
-    background-color: #0d6efd; /* Blue for ANTICIPATED LONG */
+    background-color: #33b5e5; /* Brighter Blue for ANTICIPATED LONG */
 }
 
 .action-badge.action-anticipated-short {
-    background-color: #fd7e14; /* Orange for ANTICIPATED SHORT */
+    background-color: #ff9800; /* Brighter Orange for ANTICIPATED SHORT */
 }
 
 /* Signals List */
@@ -236,19 +239,27 @@ body {
 
 /* Color the left border based on action */
 .signal-card[data-action="BUY_NOW"] {
-    border-left-color: #198754;
+    border-left-color: #00c851;
+    border-width: 6px;
+    background-color: rgba(0, 200, 81, 0.1);
 }
 
 .signal-card[data-action="SELL_NOW"] {
-    border-left-color: #dc3545;
+    border-left-color: #ff3547;
+    border-width: 6px;
+    background-color: rgba(255, 53, 71, 0.1);
 }
 
 .signal-card[data-action="ANTICIPATED_LONG"] {
-    border-left-color: #0d6efd;
+    border-left-color: #33b5e5;
+    border-width: 6px;
+    background-color: rgba(51, 181, 229, 0.1);
 }
 
 .signal-card[data-action="ANTICIPATED_SHORT"] {
-    border-left-color: #fd7e14;
+    border-left-color: #ff9800;
+    border-width: 6px;
+    background-color: rgba(255, 152, 0, 0.1);
 }
 
 .signal-header {
@@ -303,17 +314,22 @@ body {
 }
 
 .signal-chart-button {
-    background-color: #354056;
+    background-color: #007bff;
     color: white;
     border: none;
     border-radius: 4px;
-    padding: 5px 10px;
+    padding: 6px 12px;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: all 0.2s;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    letter-spacing: 0.5px;
 }
 
 .signal-chart-button:hover {
-    background-color: #4a5568;
+    background-color: #0069d9;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .signal-chart-btn {
