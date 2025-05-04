@@ -196,36 +196,75 @@ function updateSignalsDisplay() {
         return;
     }
     
-    let html = '<div class="table-responsive"><table class="table table-hover"><thead><tr>';
-    html += '<th>Symbol</th><th>Action</th><th>Entry</th><th>SL</th><th>TP</th><th>Confidence</th><th>Status</th><th>Created</th><th>Actions</th>';
-    html += '</tr></thead><tbody>';
+    // Create header
+    const header = document.createElement('div');
+    header.className = 'signals-list-header';
+    header.innerHTML = `
+        <h5 class="m-0">Latest Signals</h5>
+        <a href="/signals" class="text-white">View All</a>
+    `;
+    container.innerHTML = '';
+    container.appendChild(header);
     
+    // Create signals container
+    const signalsContainer = document.createElement('div');
+    signalsContainer.className = 'signals-container';
+    container.appendChild(signalsContainer);
+    
+    // Sort signals by created_at in descending order (newest first)
+    signalsData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    
+    // Add signals as cards
     signalsData.forEach(signal => {
-        const confidenceClass = signal.confidence > 0.8 ? 'confidence-high' : 
-                               signal.confidence > 0.6 ? 'confidence-medium' : 'confidence-low';
-        
-        html += `<tr data-id="${signal.id}">`;
-        html += `<td>${signal.symbol}</td>`;
-        html += `<td>${formatAction(signal.action)}</td>`;
-        html += `<td>${signal.entry}</td>`;
-        html += `<td>${signal.sl}</td>`;
-        html += `<td>${signal.tp}</td>`;
-        html += `<td><span class="${confidenceClass}">${Math.round(signal.confidence * 100)}%</span></td>`;
-        html += `<td><span class="badge bg-${signal.status === 'ACTIVE' ? 'success' : 'warning'}">${signal.status}</span></td>`;
-        html += `<td>${formatDateTime(signal.created_at)}</td>`;
-        html += `<td>`;
-        if (signal.status === 'PENDING' || signal.status === 'ACTIVE') {
-            html += `<button class="btn btn-sm btn-primary me-1" onclick="executeTrade(${signal.id})">Execute</button>`;
-            html += `<button class="btn btn-sm btn-danger" onclick="cancelSignal(${signal.id})">Cancel</button>`;
-        } else {
-            html += `<span class="text-muted">No actions</span>`;
+        // Format action badge class
+        let actionClass = '';
+        switch (signal.action) {
+            case 'BUY_NOW':
+                actionClass = 'action-buy-now';
+                break;
+            case 'SELL_NOW':
+                actionClass = 'action-sell-now';
+                break;
+            case 'ANTICIPATED_LONG':
+                actionClass = 'action-anticipated-long';
+                break;
+            case 'ANTICIPATED_SHORT':
+                actionClass = 'action-anticipated-short';
+                break;
         }
-        html += `</td>`;
-        html += '</tr>';
+        
+        // Format date
+        const date = new Date(signal.created_at);
+        const dateStr = `${date.getMonth()+1}/${date.getDate()}/${date.getFullYear()}, ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')} ${date.getHours() >= 12 ? 'PM' : 'AM'}`;
+        
+        // Format confidence class
+        const confidenceClass = signal.confidence > 0.8 ? 'confidence-high' : 
+                              signal.confidence > 0.6 ? 'confidence-medium' : 'confidence-low';
+        
+        // Create signal card
+        const card = document.createElement('div');
+        card.className = 'signal-card';
+        card.innerHTML = `
+            <div class="signal-symbol">${signal.symbol.replace('_', '')}</div>
+            <div class="signal-action"><span class="action-badge ${actionClass}">${signal.action.replace('_', ' ')}</span></div>
+            <div class="signal-details">${signal.entry || '--'}</div>
+            <div class="signal-details">${signal.sl || '--'}</div>
+            <div class="signal-details">${signal.tp || '--'}</div>
+            <div class="signal-details"><span class="${confidenceClass}">${Math.round(signal.confidence * 100)}%</span></div>
+            <div class="signal-timestamp">${dateStr}</div>
+        `;
+        
+        // Add click handler to view chart
+        card.addEventListener('click', function() {
+            window.open(`/mt5/signal_chart/${signal.id}`, '_blank');
+            console.log(`Viewing chart for signal ${signal.id}`);
+        });
+        
+        // Make the card appear clickable
+        card.style.cursor = 'pointer';
+        
+        signalsContainer.appendChild(card);
     });
-    
-    html += '</tbody></table></div>';
-    container.innerHTML = html;
 }
 
 /**
