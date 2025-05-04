@@ -347,17 +347,6 @@ function loadCurrentSignals() {
             return response.json();
         })
         .then(signals => {
-            // For testing purposes, if there are no signals, add some sample ones
-            if (signals.length === 0) {
-                signals = [
-                    { id: 1, symbol: 'GBPUSD', action: 'ANTICIPATED_LONG', entry: 1.33, sl: 1.32, tp: 1.33, confidence: 0.80, status: 'ACTIVE', created_at: new Date().toISOString() },
-                    { id: 2, symbol: 'EURUSD', action: 'SELL_NOW', entry: 1.13, sl: 1.13, tp: 1.13, confidence: 0.80, status: 'ACTIVE', created_at: new Date().toISOString() },
-                    { id: 3, symbol: 'XAUUSD', action: 'ANTICIPATED_LONG', entry: 3241.00, sl: 3250.00, tp: 3235.00, confidence: 0.70, status: 'ACTIVE', created_at: new Date().toISOString() },
-                    { id: 4, symbol: 'GBPUSD', action: 'SELL_NOW', entry: 1.33, sl: 1.32, tp: 1.33, confidence: 0.80, status: 'ACTIVE', created_at: new Date().toISOString() },
-                    { id: 5, symbol: 'XAUUSD', action: 'ANTICIPATED_SHORT', entry: 3241.00, sl: 3225.00, tp: 3250.00, confidence: 0.70, status: 'ACTIVE', created_at: new Date().toISOString() },
-                    { id: 6, symbol: 'GBPUSD', action: 'ANTICIPATED_SHORT', entry: 1.33, sl: 1.32, tp: 1.33, confidence: 0.75, status: 'ACTIVE', created_at: new Date().toISOString() }
-                ];
-            }
             updateSignalsTable(signals);
         })
         .catch(error => {
@@ -366,7 +355,7 @@ function loadCurrentSignals() {
 }
 
 /**
- * Update the signals display in the UI with a card layout
+ * Update the signals display in the UI with a rectangular box layout
  * @param {Array} signals - List of signal objects
  */
 function updateSignalsTable(signals) {
@@ -393,7 +382,7 @@ function updateSignalsTable(signals) {
     if (signals.length === 0) {
         // Show no signals message
         const emptyMessage = document.createElement('div');
-        emptyMessage.className = 'p-3 text-center';
+        emptyMessage.className = 'p-3 text-center w-100';
         emptyMessage.textContent = 'No active signals';
         signalsContainer.appendChild(emptyMessage);
         return;
@@ -402,7 +391,7 @@ function updateSignalsTable(signals) {
     // Sort signals by created_at in descending order (newest first)
     signals.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     
-    // Add signals as cards
+    // Add signals as rectangular boxes
     signals.forEach(signal => {
         // Format action badge class
         let actionClass = '';
@@ -432,23 +421,39 @@ function updateSignalsTable(signals) {
         // Create signal card
         const card = document.createElement('div');
         card.className = 'signal-card';
+        card.setAttribute('data-action', signal.action);
+        
         card.innerHTML = `
-            <div class="signal-symbol">${signal.symbol.replace('_', '')}</div>
-            <div class="signal-action"><span class="action-badge ${actionClass}">${signal.action.replace('_', ' ')}</span></div>
-            <div class="signal-details">${signal.entry || '--'}</div>
-            <div class="signal-details">${signal.sl || '--'}</div>
-            <div class="signal-details">${signal.tp || '--'}</div>
-            <div class="signal-details"><span class="${confidenceClass}">${Math.round(signal.confidence * 100)}%</span></div>
-            <div class="signal-timestamp">${dateStr}</div>
+            <div class="signal-header">
+                <div class="signal-symbol">${signal.symbol.replace('_', '')}</div>
+                <span class="action-badge ${actionClass}">${signal.action.replace('_', ' ')}</span>
+            </div>
+            
+            <div class="signal-details-grid">
+                <div class="signal-detail-item">
+                    <div class="signal-detail-label">Entry</div>
+                    <div class="signal-detail-value">${signal.entry || '--'}</div>
+                </div>
+                <div class="signal-detail-item">
+                    <div class="signal-detail-label">Stop Loss</div>
+                    <div class="signal-detail-value">${signal.sl || '--'}</div>
+                </div>
+                <div class="signal-detail-item">
+                    <div class="signal-detail-label">Take Profit</div>
+                    <div class="signal-detail-value">${signal.tp || '--'}</div>
+                </div>
+            </div>
+            
+            <div class="signal-detail-item" style="margin-bottom: 8px;">
+                <div class="signal-detail-label">Confidence</div>
+                <div class="signal-detail-value ${confidenceClass}">${Math.round(signal.confidence * 100)}%</div>
+            </div>
+            
+            <div class="signal-footer">
+                <div class="signal-timestamp">${dateStr}</div>
+                <button class="signal-chart-button" onclick="viewSignalChart(${signal.id});">View Chart</button>
+            </div>
         `;
-        
-        // Add click handler to view chart
-        card.addEventListener('click', function() {
-            viewSignalChart(signal.id);
-        });
-        
-        // Make the card appear clickable
-        card.style.cursor = 'pointer';
         
         signalsContainer.appendChild(card);
     });
