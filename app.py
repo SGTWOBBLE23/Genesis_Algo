@@ -1063,8 +1063,9 @@ def get_mt5_account():
     return jsonify(account_info)
 
 # Register the MT5 API blueprint
-from mt5_ea_api import mt5_api
+from mt5_ea_api import mt5_api, api_routes
 app.register_blueprint(mt5_api)
+app.register_blueprint(api_routes)
 
 # Endpoints for capture and analysis jobs
 @app.route('/api/capture/manual', methods=['POST'])
