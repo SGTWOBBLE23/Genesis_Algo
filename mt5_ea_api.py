@@ -215,12 +215,28 @@ def get_signals():
             }
             
             # Get additional context from signal if available
+            # Try to get context from either context or context_json
+            signal_context = None
             if hasattr(signal, 'context') and signal.context:
-                # Include any additional context data MT5 might need
-                if isinstance(signal.context, dict) and 'position_size' in signal.context:
-                    formatted_signal["position_size"] = float(signal.context['position_size'])
-                if isinstance(signal.context, dict) and 'force_execution' in signal.context:
-                    formatted_signal["force_execution"] = bool(signal.context['force_execution'])
+                signal_context = signal.context
+            elif hasattr(signal, 'context_json') and signal.context_json:
+                try:
+                    signal_context = json.loads(signal.context_json)
+                    logger.info(f"Loaded context from context_json: {signal_context}")
+                except Exception as e:
+                    logger.error(f"Error parsing context_json: {e}")
+                    
+            # Include any additional context data MT5 might need
+            if isinstance(signal_context, dict):
+                if 'position_size' in signal_context:
+                    formatted_signal["position_size"] = float(signal_context['position_size'])
+                    logger.info(f"Using position_size from context: {formatted_signal['position_size']}")
+                if 'force_execution' in signal_context:
+                    formatted_signal["force_execution"] = bool(signal_context['force_execution'])
+                    logger.info(f"Using force_execution from context: {formatted_signal['force_execution']}")
+                if 'timeframe' in signal_context:
+                    formatted_signal["timeframe"] = signal_context['timeframe']
+                    logger.info(f"Using timeframe from context: {formatted_signal['timeframe']}")
             
             formatted_signals.append(formatted_signal)
             
