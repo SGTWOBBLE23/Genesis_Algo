@@ -3,22 +3,22 @@ import io
 import logging
 import pandas as pd
 import numpy as np
-# Using direct calculations instead of pandas_ta
-import numpy as np
+from datetime import datetime
+from typing import Dict, List, Any, Optional, Tuple, Union
+
+# Import mplfinance for candlestick charts
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from matplotlib.patches import Rectangle, Arrow
-from matplotlib.lines import Line2D
+import mplfinance as mpf
+from matplotlib.patches import Rectangle
 from PIL import Image
-from typing import Dict, List, Any, Optional, Tuple, Union
-from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class ChartGenerator:
-    """Class for generating technical analysis charts with indicators"""
+    """Class for generating technical analysis charts with indicators using mplfinance"""
     
     def __init__(self):
         # Configure matplotlib for non-interactive backend
@@ -29,29 +29,54 @@ class ChartGenerator:
         self.fig_height = 7.2
         self.dpi = 100  # 1280x720 resolution
         
-        # Default colors
+        # Dark theme colors for mplfinance
         self.colors = {
-            'bg': '#121826',
-            'text': '#e0e0e0',
-            'grid': '#2a2e39',
-            'candle_up': '#26a69a',
-            'candle_down': '#ef5350',
-            'ema20': '#2962ff',  # blue
-            'ema50': '#ff9800',  # orange
-            'volume': '#2a2e39',
-            'volume_up': '#26a69a',
-            'volume_down': '#ef5350',
-            'rsi': '#2962ff',
-            'rsi_ob': '#ef5350',  # overbought
-            'rsi_os': '#26a69a',  # oversold
-            'macd': '#2962ff',
-            'macd_signal': '#ff9800',
-            'macd_hist_up': '#26a69a',
-            'macd_hist_down': '#ef5350',
-            'entry': '#00ff00',  # green arrow
-            'sl': '#ff0000',     # red line (stop loss)
-            'tp': '#00ff00'      # green line (take profit)
+            'bg': '#121826',            # Background color
+            'text': '#e0e0e0',          # Text color
+            'grid': '#2a2e39',          # Grid color
+            'candle_up': '#26a69a',     # Bullish candle color
+            'candle_down': '#ef5350',   # Bearish candle color
+            'ema20': '#2962ff',         # Blue
+            'ema50': '#ff9800',         # Orange
+            'volume': '#2a2e39',        # Volume bars base color
+            'volume_up': '#26a69a',     # Up volume bar color
+            'volume_down': '#ef5350',   # Down volume bar color
+            'rsi': '#2962ff',           # RSI line color
+            'rsi_ob': '#ef5350',        # Overbought line color
+            'rsi_os': '#26a69a',        # Oversold line color
+            'macd': '#2962ff',          # MACD line color
+            'macd_signal': '#ff9800',   # Signal line color
+            'macd_hist_up': '#26a69a',  # MACD histogram up color
+            'macd_hist_down': '#ef5350',# MACD histogram down color
+            'entry': '#00ff00',         # Green arrow for entry point
+            'sl': '#ff0000',            # Red line (stop loss)
+            'tp': '#00ff00'             # Green line (take profit)
         }
+        
+        # Default style setup for mplfinance
+        self.style = mpf.make_mpf_style(
+            base_mpf_style='charles',
+            figcolor=self.colors['bg'],
+            facecolor=self.colors['bg'],
+            edgecolor=self.colors['text'],
+            gridcolor=self.colors['grid'],
+            gridstyle='--',
+            gridaxis='both',
+            y_on_right=False,
+            marketcolors={
+                'candle': {'up': self.colors['candle_up'], 'down': self.colors['candle_down']},
+                'edge': {'up': self.colors['candle_up'], 'down': self.colors['candle_down']},
+                'wick': {'up': self.colors['candle_up'], 'down': self.colors['candle_down']},
+                'ohlc': {'up': self.colors['candle_up'], 'down': self.colors['candle_down']},
+                'volume': {'up': self.colors['volume_up'], 'down': self.colors['volume_down']},
+            },
+            rc={'axes.labelcolor': self.colors['text'],
+                'axes.edgecolor': self.colors['text'],
+                'xtick.color': self.colors['text'],
+                'ytick.color': self.colors['text'],
+                'figure.titlesize': 'x-large',
+                'figure.titleweight': 'bold'}
+        )
         
         # Directory to save charts
         self.output_dir = os.path.join(os.getcwd(), 'static', 'charts')
@@ -268,12 +293,59 @@ class ChartGenerator:
             label.set_rotation(45)
             label.set_ha('right')
     
+    def _prepare_data(self, candles: List[Dict]) -> pd.DataFrame:
+        """Process candle data from OANDA API into pandas DataFrame
+        
+        Args:
+            candles: List of candle dictionaries from OANDA API
+            
+        Returns:
+            DataFrame in mplfinance format (OHLCV)
+        """
+        # Create DataFrame from candles list
+        df = pd.DataFrame(candles)
+        
+        # Convert timestamp to datetime
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        
+        # Rename columns to mplfinance standard format
+        df = df.rename(columns={
+            'timestamp': 'datetime',
+            'open': 'Open',   # MPLFinance uses capitalized column names
+            'high': 'High',
+            'low': 'Low',
+            'close': 'Close',
+            'volume': 'Volume'
+        })
+        
+        # Set datetime as index (required by mplfinance)
+        df = df.set_index('datetime')
+        
+        # Add indicators
+        # EMA 20 and 50
+        df['ema20'] = self._ema(df['Close'], 20)
+        df['ema50'] = self._ema(df['Close'], 50)
+        
+        # RSI-14
+        df['rsi'] = self._rsi(df['Close'], 14)
+        
+        # MACD (12, 26, 9)
+        macd_data = self._macd(df['Close'], 12, 26, 9)
+        df['macd'] = macd_data['macd']
+        df['macd_signal'] = macd_data['macd_signal']
+        df['macd_hist'] = macd_data['macd_hist']
+        
+        # ATR-14
+        df['atr'] = self._atr(df['High'], df['Low'], df['Close'], 14)
+        
+        return df
+        
     def create_chart(self, candles: List[Dict], symbol: str, timeframe: str,
                      entry_point: Optional[Tuple[datetime, float]] = None,
                      stop_loss: Optional[float] = None,
                      take_profit: Optional[float] = None,
                      result: Optional[str] = None) -> str:
-        """Create a complete technical analysis chart with annotations
+        """Create a complete technical analysis chart with annotations using mplfinance
         
         Args:
             candles: List of candle dictionaries from OANDA API
@@ -291,62 +363,125 @@ class ChartGenerator:
         display_symbol = symbol.replace("_", "/")
         
         # Prepare the data for plotting
-        df = self._prepare_data(candles, display_symbol, timeframe)
+        df = self._prepare_data(candles)
         
-        # Create figure and subplots with specific heights
-        fig = plt.figure(figsize=(self.fig_width, self.fig_height), dpi=self.dpi,
-                         facecolor=self.colors['bg'])
+        # Calculate latest ATR value for title
+        latest_atr = df['atr'].iloc[-1] if not df['atr'].empty else 0
         
-        # Create subplots with specific height ratios
-        gs = fig.add_gridspec(3, 1, height_ratios=[6, 2, 2], hspace=0.1)
+        # Create plot annotations
+        annotations = []
+        extra_plot_lines = []
+        title_suffix = f"ATR(14): {latest_atr:.5f}"
         
-        # Create axess for each subplot
-        ax_candles = fig.add_subplot(gs[0])
-        ax_rsi = fig.add_subplot(gs[1])
-        ax_macd = fig.add_subplot(gs[2])
-        
-        # Set the facecolor for all axes
-        for ax in [ax_candles, ax_rsi, ax_macd]:
-            ax.set_facecolor(self.colors['bg'])
-            
-            # Set tick colors
-            ax.tick_params(colors=self.colors['text'], which='both')
-            ax.spines['bottom'].set_color(self.colors['grid'])
-            ax.spines['top'].set_color(self.colors['grid'])
-            ax.spines['left'].set_color(self.colors['grid'])
-            ax.spines['right'].set_color(self.colors['grid'])
-            
-            # Set tick label color
-            for label in ax.get_xticklabels() + ax.get_yticklabels():
-                label.set_color(self.colors['text'])
-        
-        # Plot main chart with candlesticks and EMAs
-        self._plot_candlestick_chart(df, ax_candles, display_symbol, timeframe, show_ema=True)
-        
-        # Plot RSI panel
-        self._plot_rsi(df, ax_rsi)
-        
-        # Plot MACD panel
-        self._plot_macd(df, ax_macd)
-        
-        # Add result label if provided
+        # Setup for result (win/loss) indicator
+        title = f"{display_symbol} ({timeframe}) - {title_suffix}"
         if result:
-            if result.lower() == 'win':
-                label_color = self.colors['candle_up']  # green
-            else:
-                label_color = self.colors['candle_down']  # red
-                
-            plt.figtext(0.01, 0.98, result.upper(), fontsize=14, color=label_color, 
-                        bbox=dict(facecolor=self.colors['bg'], alpha=0.6, edgecolor=label_color))
+            title = f"{display_symbol} ({timeframe}) - {result.upper()} - {title_suffix}"
         
-        # Add annotations if provided
+        # Add entry point annotation
         if entry_point is not None:
             entry_time, entry_price = entry_point
-            # Find the nearest candle to the entry time
             if isinstance(entry_time, str):
                 entry_time = pd.to_datetime(entry_time)
                 
-            # Check if the entry time is in the index
+            # Check if the entry time falls within our chart
+            if entry_time in df.index or (df.index[0] <= entry_time <= df.index[-1]):
+                # Create arrow annotation for entry
+                annotations.append(
+                    dict(
+                        x=entry_time,
+                        y=entry_price,
+                        text='ENTRY',
+                        showarrow=True,
+                        arrowhead=2,
+                        arrowsize=1,
+                        arrowwidth=2,
+                        arrowcolor=self.colors['entry']
+                    )
+                )
+        
+        # Add horizontal lines for stop loss and take profit
+        if stop_loss is not None:
+            extra_plot_lines.append(
+                dict(
+                    y=stop_loss,
+                    color=self.colors['sl'],
+                    width=1.5,
+                    alpha=0.7,
+                    linestyle='dashed',
+                    label='SL'
+                )
+            )
+            
+        if take_profit is not None:
+            extra_plot_lines.append(
+                dict(
+                    y=take_profit,
+                    color=self.colors['tp'],
+                    width=1.5,
+                    alpha=0.7,
+                    linestyle='dashed',
+                    label='TP'
+                )
+            )
+        
+        # Define EMAs to add to the plot
+        emas = [
+            mpf.make_addplot(df['ema20'], color=self.colors['ema20'], width=1.5, label='EMA 20'),
+            mpf.make_addplot(df['ema50'], color=self.colors['ema50'], width=1.5, label='EMA 50')
+        ]
+        
+        # Define RSI and MACD plots to add below the main chart
+        add_plots = [
+            # EMAs on price chart
+            *emas,
+            
+            # RSI in panel 1
+            mpf.make_addplot(df['rsi'], panel=1, color=self.colors['rsi'], width=1.5,
+                             ylabel='RSI (14)', ylim=(0, 100)),
+                             
+            # MACD and signal lines in panel 2
+            mpf.make_addplot(df['macd'], panel=2, color=self.colors['macd'], width=1.5, label='MACD'),
+            mpf.make_addplot(df['macd_signal'], panel=2, color=self.colors['macd_signal'], width=1.5, label='Signal'),
+        ]
+        
+        # Setup horizontal lines for RSI
+        hlines = [
+            dict(y=30, panel=1, color=self.colors['rsi_os'], linestyle='--', alpha=0.5),  # Oversold
+            dict(y=70, panel=1, color=self.colors['rsi_ob'], linestyle='--', alpha=0.5),  # Overbought
+        ]
+        
+        # Generate filename with timestamp
+        now = datetime.now().strftime("%Y%m%d_%H%M%S")
+        result_str = f"_{result.upper()}" if result else ""
+        filename = f"{symbol}_{timeframe}_{now}{result_str}.png"
+        filepath = os.path.join(self.output_dir, filename)
+        
+        # Create folder if it doesn't exist
+        os.makedirs(self.output_dir, exist_ok=True)
+        
+        # Create the chart with mplfinance
+        mpf.plot(
+            df,
+            type='candle',
+            style=self.style,
+            figsize=(self.fig_width, self.fig_height),
+            title=title,
+            addplot=add_plots,
+            panel_ratios=(6, 2, 2),  # Main, RSI, MACD
+            savefig=filepath,
+            hlines=hlines,
+            mav=(20, 50),  # Moving averages (just for the legend)
+            volume=True,
+            ylabel=f'Price ({display_symbol})',
+            tight_layout=True,
+            figratio=(16, 9),  # 16:9 aspect ratio (standard HD)
+            figscale=1.5,     # Scale up for better quality
+            warn_too_much_data=10000,  # Avoid warning for large datasets
+        )
+        
+        logger.info(f"Chart saved to {filepath}")
+        return filepath
             if entry_time in df.index:
                 # Add entry arrow
                 ax_candles.annotate('', xy=(entry_time, entry_price),
