@@ -8,6 +8,17 @@ import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, send_file
 from app import db, Signal, Trade, SignalAction, TradeStatus, TradeSide, Settings, SignalStatus
+
+# Define Symbol Mapping model for local use in this module
+class SymbolMapping(db.Model):
+    """Mapping between internal symbols and MT5 symbols"""
+    __tablename__ = "symbol_mappings"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    internal_symbol = db.Column(db.String(30), nullable=False)
+    mt5_symbol = db.Column(db.String(30), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
 from chart_utils import generate_chart
 
 # Set up logging
@@ -202,16 +213,28 @@ def get_signals():
             action = signal.action.value if hasattr(signal.action, 'value') else str(signal.action)
             
             # Format signal data for MT5 EA, matching expected format
-            # Check if we need to map the symbol to MT5 format
+            # Simple symbol mapping without using db query
             mt5_symbol = signal.symbol
-            try:
-                # Try to get the MT5 symbol from our mapping table
-                mapping = db.session.query(SymbolMapping).filter_by(internal_symbol=signal.symbol).first()
-                if mapping:
-                    mt5_symbol = mapping.mt5_symbol
-                    logger.info(f"Mapped {signal.symbol} to MT5 symbol: {mt5_symbol}")
-            except Exception as e:
-                logger.warning(f"Error checking symbol mapping: {e}")
+            
+            # Basic symbol format conversion from internal (with underscore) to MT5 (no underscore)
+            if '_' in mt5_symbol:
+                mt5_symbol = mt5_symbol.replace('_', '')
+                logger.info(f"Basic symbol mapping: {signal.symbol} -> {mt5_symbol}")
+                
+            # Manual mapping for any special cases
+            symbol_map = {
+                'BTC_USD': 'BTCUSD',
+                'ETH_USD': 'ETHUSD',
+                'XAU_USD': 'XAUUSD',
+                'XAG_USD': 'XAGUSD',
+                'EUR_USD': 'EURUSD',
+                'GBP_USD': 'GBPUSD',
+                'USD_JPY': 'USDJPY'
+            }
+            
+            if signal.symbol in symbol_map:
+                mt5_symbol = symbol_map[signal.symbol]
+                logger.info(f"Using map dictionary: {signal.symbol} -> {mt5_symbol}")
             
             formatted_signal = {
                 "id": signal.id,
@@ -234,6 +257,13 @@ def get_signals():
                 try:
                     signal_context = json.loads(signal.context_json)
                     logger.info(f"Loaded context from context_json: {signal_context}")
+                    
+                    # Check if context contains MT5 symbol - override the mapping if it does
+                    if isinstance(signal_context, dict) and 'mt5_symbol' in signal_context:
+                        mt5_symbol = signal_context['mt5_symbol']
+                        logger.info(f"Using MT5 symbol from context_json: {mt5_symbol}")
+                        # Update the formatted signal with the context-provided symbol
+                        formatted_signal['symbol'] = mt5_symbol
                 except Exception as e:
                     logger.error(f"Error parsing context_json: {e}")
                     
