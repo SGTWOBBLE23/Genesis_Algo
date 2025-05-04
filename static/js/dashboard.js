@@ -12,8 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize the charts
     initializeCharts();
     
-    // Load active trades
-    loadActiveTrades();
+    // Open trades section removed as requested
     
     // Load current signals
     loadCurrentSignals();
@@ -22,7 +21,6 @@ document.addEventListener('DOMContentLoaded', function() {
     connectWebSocket();
     
     // Set up interval updates
-    setInterval(updateTradePnL, 5000); // Update P&L every 5 seconds
     setInterval(loadCurrentSignals, 60000); // Update signals every minute
 });
 
