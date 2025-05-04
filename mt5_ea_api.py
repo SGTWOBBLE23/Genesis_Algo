@@ -27,6 +27,9 @@ logger = logging.getLogger(__name__)
 # Create a blueprint for the MT5 EA API
 mt5_api = Blueprint('mt5_api', __name__, url_prefix='/mt5')
 
+# API routes for frontend (non-EA) communication
+api_routes = Blueprint('api', __name__, url_prefix='/api')
+
 # Dictionary to store active MT5 terminal connections
 active_terminals = {}
 
@@ -672,6 +675,49 @@ def update_trades():
     except Exception as e:
         logger.error(f"Error updating trades: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+# API endpoints for frontend (non-EA) calls
+@api_routes.route('/signals/<int:signal_id>/execute', methods=['POST'])
+def execute_signal(signal_id):
+    """Execute a signal, sending it to MT5 for trade execution"""
+    try:
+        # Find the signal in the database
+        signal = db.session.query(Signal).filter(Signal.id == signal_id).first()
+        
+        if not signal:
+            logger.error(f"Signal with ID {signal_id} not found")
+            return jsonify({"status": "error", "message": f"Signal with ID {signal_id} not found"}), 404
+        
+        # Check if any MT5 terminals are connected
+        if not active_terminals:
+            logger.warning("No MT5 terminals connected")
+            return jsonify({"status": "error", "message": "No MT5 terminals connected"}), 503
+        
+        # Get the first available terminal
+        terminal_id, terminal_info = next(iter(active_terminals.items()))
+        account_id = terminal_info.get('account_id')
+        
+        # Log the execution request
+        logger.info(f"Executing signal {signal_id} for {signal.symbol} ({signal.action}) via terminal {terminal_id} (account {account_id})")
+        
+        # Change the signal status to ACTIVE if it's PENDING
+        if signal.status.name == 'PENDING':
+            signal.status = SignalStatus.ACTIVE
+            db.session.commit()
+            logger.info(f"Updated signal {signal_id} status to ACTIVE")
+        
+        # Return success response
+        return jsonify({
+            "status": "success", 
+            "message": "Signal executed successfully",
+            "signal_id": signal_id,
+            "terminal_id": terminal_id,
+            "account_id": account_id
+        })
+        
+    except Exception as e:
+        logger.error(f"Error executing signal: {str(e)}")
+        return jsonify({"status": "error", "message": f"Error executing signal: {str(e)}"}), 500
 
 @mt5_api.route('/signal_chart/<int:signal_id>', methods=['GET'])
 def signal_chart(signal_id):
