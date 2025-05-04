@@ -59,18 +59,8 @@ def demo_bitcoin_chart():
     
     if chart_path:
         print(f"Chart generated successfully at: {chart_path}")
-        # Create the destination directory if it doesn't exist
-        symbol_folder = f"static/charts/{symbol}"
-        os.makedirs(symbol_folder, exist_ok=True)
-        
-        # Save with standardized naming convention
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        standardized_path = f"{symbol_folder}/{symbol}_{timeframe}_{timestamp}.png"
-        
-        # Copy the file to the standardized path
-        import shutil
-        shutil.copy(chart_path, standardized_path)
-        print(f"Chart copied to standardized path: {standardized_path}")
+        # The ChartGenerator class already saves the chart in the correct folder structure
+        # (static/charts/SYMBOL_NAME/SYMBOL_TIMEFRAME_TIMESTAMP.png) so no need to copy
     else:
         print("Failed to generate chart.")
 
@@ -111,17 +101,8 @@ def generate_anticipated_chart():
     
     if chart_path:
         print(f"Anticipated chart generated at: {chart_path}")
-        
-        # Save with standardized naming convention
-        symbol_folder = f"static/charts/{symbol}"
-        os.makedirs(symbol_folder, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        standardized_path = f"{symbol_folder}/{symbol}_{timeframe}_{timestamp}_ANTICIPATED.png"
-        
-        # Copy the file to the standardized path
-        import shutil
-        shutil.copy(chart_path, standardized_path)
-        print(f"Chart copied to standardized path: {standardized_path}")
+        # The ChartGenerator class already saves the chart in the correct folder structure
+        # (static/charts/SYMBOL_NAME/SYMBOL_TIMEFRAME_TIMESTAMP.png) so no need to copy
     else:
         print("Failed to generate anticipated chart.")
 
