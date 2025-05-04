@@ -8,13 +8,34 @@ let signalsData = [];
 let tradesData = [];
 let connectionStatus = {};
 
+// Define accountData for history page use only
+let accountData = {
+    type: 'UNKNOWN',
+    balance: 0,
+    equity: 0,
+    margin: 0,
+    free_margin: 0,
+    open_positions: 0,
+    account_id: 'MT5 Account'
+};
+
 // Document ready function
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize the dashboard
     initializeDashboard();
     
+    // If on history page, fetch account data
+    if (window.location.pathname.includes('/history')) {
+        fetchHistoryPageAccountData();
+    }
+    
     // Refresh data every 60 seconds
     setInterval(refreshData, 60000);
+    
+    // If on history page, also refresh account data every 60 seconds
+    if (window.location.pathname.includes('/history')) {
+        setInterval(fetchHistoryPageAccountData, 60000);
+    }
 });
 
 /**
@@ -122,83 +143,7 @@ function fetchOpenTrades() {
         });
 }
 
-/**
- * Fetch account information
- */
-function fetchAccountInfo() {
-    let cacheBuster = Date.now();
-    // First try to get MT5 account info
-    fetch('/api/mt5/account?t=' + cacheBuster)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`MT5 API returned ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            // Check if we have valid data
-            if (data && data.balance !== undefined) {
-                // Format the MT5 account data
-                accountData = {
-                    type: 'MT5',
-                    balance: parseFloat(data.balance),
-                    equity: parseFloat(data.equity || data.balance),
-                    margin: parseFloat(data.margin || 0),
-                    free_margin: parseFloat(data.free_margin || 0),
-                    leverage: data.leverage || 1,
-                    open_positions: data.open_positions || 0,
-                    account_id: data.account_id || 'MT5 Account',
-                    last_update: data.last_update,
-                    connected: data.connected || false
-                };
-                updateAccountDisplay();
-                updateConnectionStatus('mt5', data.connected);
-                return; // Successfully got MT5 data, no need to try OANDA
-            } else {
-                throw new Error('Invalid MT5 account data');
-            }
-        })
-        .catch(error => {
-            console.log('MT5 account data not available, trying OANDA:', error);
-            // Fall back to OANDA if MT5 fails
-            return fetch('/api/oanda/account?t=' + cacheBuster)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`OANDA API returned ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    // Format the OANDA account data
-                    if (data && data.account) {
-                        accountData = {
-                            type: 'OANDA',
-                            balance: parseFloat(data.account.balance),
-                            open_positions: data.account.openTradeCount || 0,
-                            daily_pnl: parseFloat(data.account.unrealizedPL || 0),
-                            currency: data.account.currency,
-                            name: data.account.alias || data.account.id
-                        };
-                        updateAccountDisplay();
-                        updateConnectionStatus('oanda', true);
-                    } else {
-                        throw new Error('Invalid OANDA account data');
-                    }
-                });
-        })
-        .catch(error => {
-            console.error('Error fetching account data:', error);
-            // Set minimal data structure but don't use any mock values
-            accountData = {
-                type: 'UNKNOWN',
-                balance: 0,
-                open_positions: 0
-            };
-            updateAccountDisplay();
-            updateConnectionStatus('mt5', false);
-            updateConnectionStatus('oanda', false);
-        });
-}
+
 
 /**
  * Check connection status of integrated services
@@ -326,65 +271,7 @@ function updateTradesDisplay() {
     container.innerHTML = html;
 }
 
-/**
- * Update account information display
- */
-function updateAccountDisplay() {
-    const container = document.getElementById('account-info');
-    if (!container) return;
-    
-    // Calculate various account metrics based on data source
-    let balance = 0;
-    let openPositions = 0;
-    let pnl = 0;
-    let accountName = "Demo Account";
-    
-    // Get data from whichever source is available (MT5 preferred, then OANDA, then defaults)
-    if (accountData.type === 'MT5') {
-        balance = accountData.balance;
-        openPositions = accountData.open_positions || 0;
-        pnl = accountData.equity - accountData.balance;  // Floating P&L in MT5
-        accountName = accountData.account_id;
-    } else if (accountData.type === 'OANDA') {
-        balance = accountData.balance;
-        openPositions = accountData.open_positions || 0;
-        pnl = accountData.daily_pnl || 0;
-        accountName = accountData.name;
-    } else if (accountData.balance) {
-        // Use whatever data we have
-        balance = accountData.balance;
-        openPositions = accountData.open_positions || 0;
-        pnl = accountData.daily_pnl || 0;
-    }
-    
-    // Calculate P&L percentage (same for both data sources)
-    const pnlPercentage = balance > 0 ? (pnl / balance) * 100 : 0;
-    const pnlClass = pnl > 0 ? 'text-success' : (pnl < 0 ? 'text-danger' : '');
-    
-    // Create the display using the original format
-    let html = `<p>Balance: $${balance.toFixed(2)}</p>`;
-    html += `<p>Open Positions: ${openPositions}</p>`;
-    html += `<p>P&L Today: <span class="${pnlClass}">${pnl > 0 ? '+' : ''}$${pnl.toFixed(2)}</span></p>`;
-    html += `<p>P&L %: <span class="${pnlClass}">${pnlPercentage > 0 ? '+' : ''}${pnlPercentage.toFixed(2)}%</span></p>`;
-    
-    // Add MT5 specific information to the history page only if on history page and using MT5 data
-    const isHistoryPage = window.location.pathname.includes('/history');
-    if (isHistoryPage && accountData.type === 'MT5') {
-        const historyDetailsContainer = document.getElementById('account-details');
-        if (historyDetailsContainer) {
-            let detailsHtml = `<h5>MT5 Account Details</h5>`;
-            detailsHtml += `<p><strong>Account ID:</strong> ${accountData.account_id}</p>`;
-            detailsHtml += `<p><strong>Balance:</strong> $${accountData.balance.toFixed(2)}</p>`;
-            detailsHtml += `<p><strong>Equity:</strong> $${accountData.equity.toFixed(2)}</p>`;
-            detailsHtml += `<p><strong>Margin:</strong> $${accountData.margin.toFixed(2)}</p>`;
-            detailsHtml += `<p><strong>Free Margin:</strong> $${accountData.free_margin.toFixed(2)}</p>`;
-            detailsHtml += `<p><strong>Leverage:</strong> ${accountData.leverage}:1</p>`;
-            historyDetailsContainer.innerHTML = detailsHtml;
-        }
-    }
-    
-    container.innerHTML = html;
-}
+
 
 /**
  * Update system status display
@@ -469,4 +356,59 @@ function formatDateTime(dateTimeString) {
     } else {
         return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
     }
+}
+
+/**
+ * Fetch account data for history page
+ * This function is only used on the history page to populate account summary
+ */
+function fetchHistoryPageAccountData() {
+    // Only run on history page
+    if (!window.location.pathname.includes('/history')) return;
+    
+    let cacheBuster = Date.now();
+    fetch('/api/mt5/account?t=' + cacheBuster)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`MT5 API returned ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Check if we have valid data
+            if (data && data.balance !== undefined) {
+                // Update accountData for history page
+                accountData = {
+                    type: 'MT5',
+                    balance: parseFloat(data.balance),
+                    equity: parseFloat(data.equity || data.balance),
+                    margin: parseFloat(data.margin || 0),
+                    free_margin: parseFloat(data.free_margin || 0),
+                    leverage: data.leverage || 1,
+                    open_positions: data.open_positions || 0,
+                    account_id: data.account_id || 'MT5 Account',
+                    last_update: data.last_update
+                };
+                
+                // Update the account details on history page
+                const historyDetailsContainer = document.getElementById('account-details');
+                if (historyDetailsContainer) {
+                    let detailsHtml = `<h5>MT5 Account Details</h5>`;
+                    detailsHtml += `<p><strong>Account ID:</strong> ${accountData.account_id}</p>`;
+                    detailsHtml += `<p><strong>Balance:</strong> $${accountData.balance.toFixed(2)}</p>`;
+                    detailsHtml += `<p><strong>Equity:</strong> $${accountData.equity.toFixed(2)}</p>`;
+                    detailsHtml += `<p><strong>Margin:</strong> $${accountData.margin.toFixed(2)}</p>`;
+                    detailsHtml += `<p><strong>Free Margin:</strong> $${accountData.free_margin.toFixed(2)}</p>`;
+                    detailsHtml += `<p><strong>Leverage:</strong> ${accountData.leverage}:1</p>`;
+                    historyDetailsContainer.innerHTML = detailsHtml;
+                }
+                
+                updateConnectionStatus('mt5', true);
+            }
+        })
+        .catch(error => {
+            console.log('Error fetching account data for history page:', error);
+            // Update connection status
+            updateConnectionStatus('mt5', false);
+        });
 }
