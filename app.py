@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 from typing import Dict, Any, Optional, List, Union
 
-from flask import Flask, render_template, request, jsonify, Response, redirect, url_for, send_file
+from flask import Flask, render_template, request, jsonify, Response, redirect, url_for, send_file, make_response
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.sql import func
@@ -950,6 +950,90 @@ def get_mt5_heartbeat():
         "last_heartbeat": last_heartbeat,
         "connected_terminals": connected_terminals
     })
+
+# ---- Chart API Routes ----
+@app.route('/api/charts/<symbol>', methods=['GET'])
+def get_chart(symbol):
+    """Generate and return a technical chart for a symbol"""
+    from chart_utils import generate_chart_bytes
+    
+    # Get parameters from query string
+    timeframe = request.args.get('timeframe', 'H1')
+    count = request.args.get('count', 100, type=int)
+    
+    # Optional trade annotation parameters
+    entry_time = request.args.get('entry_time')
+    entry_price = request.args.get('entry_price', type=float)
+    stop_loss = request.args.get('sl', type=float)
+    take_profit = request.args.get('tp', type=float)
+    result = request.args.get('result')  # 'win' or 'loss'
+    
+    # Set entry point if both time and price are provided
+    entry_point = None
+    if entry_time and entry_price:
+        entry_point = (entry_time, entry_price)
+    
+    # Generate chart as bytes
+    chart_bytes = generate_chart_bytes(
+        symbol=symbol,
+        timeframe=timeframe,
+        count=count,
+        entry_point=entry_point,
+        stop_loss=stop_loss,
+        take_profit=take_profit,
+        result=result
+    )
+    
+    if not chart_bytes:
+        return jsonify({"error": "Failed to generate chart"}), 500
+    
+    # Create response with chart image
+    response = make_response(chart_bytes)
+    response.headers.set('Content-Type', 'image/png')
+    return response
+
+@app.route('/api/charts/download/<symbol>', methods=['GET'])
+def download_chart(symbol):
+    """Generate and download a technical chart for a symbol"""
+    from chart_utils import generate_chart
+    
+    # Get parameters from query string
+    timeframe = request.args.get('timeframe', 'H1')
+    count = request.args.get('count', 100, type=int)
+    
+    # Optional trade annotation parameters
+    entry_time = request.args.get('entry_time')
+    entry_price = request.args.get('entry_price', type=float)
+    stop_loss = request.args.get('sl', type=float)
+    take_profit = request.args.get('tp', type=float)
+    result = request.args.get('result')  # 'win' or 'loss'
+    
+    # Set entry point if both time and price are provided
+    entry_point = None
+    if entry_time and entry_price:
+        entry_point = (entry_time, entry_price)
+    
+    # Generate and save chart
+    chart_path = generate_chart(
+        symbol=symbol,
+        timeframe=timeframe,
+        count=count,
+        entry_point=entry_point,
+        stop_loss=stop_loss,
+        take_profit=take_profit,
+        result=result
+    )
+    
+    if not chart_path:
+        return jsonify({"error": "Failed to generate chart"}), 500
+    
+    # Return the file for download
+    return send_file(chart_path, as_attachment=True)
+
+@app.route('/charts')
+def charts_page():
+    """Charts page for generating technical analysis charts"""
+    return render_template('charts.html')
 
 @app.route('/api/mt5/account', methods=['GET'])
 def get_mt5_account():
