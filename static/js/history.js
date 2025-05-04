@@ -17,6 +17,56 @@ let activeFilters = {
     endDate: ''
 };
 
+/**
+ * Filter out duplicate trades and sort by date
+ * @param {Array} tradeData - Array of trade objects from the API
+ * @returns {Array} Filtered and sorted trades array
+ */
+function filterAndSortTrades(tradeData) {
+    console.log('Filtering and sorting', tradeData.length, 'trades');
+    
+    // First, remove duplicate tickets by creating a map with ticket as key
+    const uniqueTradesMap = new Map();
+    
+    tradeData.forEach(trade => {
+        // Use the ticket as the unique identifier
+        const key = trade.ticket;
+        
+        // If the ticket is already in the map, only keep the latest version
+        // based on updated_at timestamp
+        if (key && uniqueTradesMap.has(key)) {
+            const existingTrade = uniqueTradesMap.get(key);
+            const existingUpdated = new Date(existingTrade.updated_at || 0);
+            const newUpdated = new Date(trade.updated_at || 0);
+            
+            // Replace only if this trade is newer
+            if (newUpdated > existingUpdated) {
+                uniqueTradesMap.set(key, trade);
+            }
+        } else if (key) {
+            // Add the trade to the map if it's not already there
+            uniqueTradesMap.set(key, trade);
+        } else {
+            // If no ticket, use the ID as fallback
+            uniqueTradesMap.set(`id-${trade.id}`, trade);
+        }
+    });
+    
+    // Convert the Map back to an array
+    let uniqueTrades = Array.from(uniqueTradesMap.values());
+    console.log('After filtering duplicates:', uniqueTrades.length, 'trades');
+    
+    // Sort trades by opened_at date (most recent first)
+    uniqueTrades.sort((a, b) => {
+        const dateA = a.opened_at ? new Date(a.opened_at) : new Date(0);
+        const dateB = b.opened_at ? new Date(b.opened_at) : new Date(0);
+        return dateB - dateA; // Latest first
+    });
+    
+    console.log('Completed filtering and sorting trades');
+    return uniqueTrades;
+}
+
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     // Load initial trades
@@ -88,10 +138,12 @@ function loadTrades() {
         })
         .then(data => {
             console.log('Received trade data:', data);
-            trades = data.data;
-            totalTrades = data.total;
-            totalPages = data.pages;
-            currentPage = data.page;
+            
+            // Filter out duplicate tickets and sort by date
+            trades = filterAndSortTrades(data.data);
+            totalTrades = trades.length;
+            totalPages = Math.ceil(totalTrades / pageSize);
+            currentPage = Math.min(currentPage, totalPages || 1);
             
             // Update UI
             updateTradesTable();
