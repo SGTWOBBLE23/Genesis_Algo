@@ -422,7 +422,10 @@ function updateSignalsTable(signals) {
             
             <div class="signal-footer">
                 <div class="signal-timestamp">${dateStr}</div>
-                <button class="signal-chart-button" onclick="viewSignalChart(${signal.id});">View Chart</button>
+                <div class="signal-actions">
+                    <button class="signal-execute-button" onclick="executeSignal(${signal.id});">Execute</button>
+                    <button class="signal-chart-button" onclick="viewSignalChart(${signal.id});">View Chart</button>
+                </div>
             </div>
         `;
         
@@ -438,6 +441,61 @@ function viewSignalChart(signalId) {
     // Open signal chart in a modal or new window
     window.open(`/mt5/signal_chart/${signalId}`, '_blank');
     console.log(`Viewing chart for signal ${signalId}`);
+}
+
+/**
+ * Execute a signal, sending it to MT5 for trade execution
+ * @param {number} signalId - The signal ID to execute
+ */
+function executeSignal(signalId) {
+    // Show confirmation dialog
+    if (!confirm('Are you sure you want to execute this signal? This will send the trade to your connected MT5 terminal for execution.')) {
+        return;
+    }
+    
+    // Show loading state by changing the button text and style
+    const button = document.querySelector(`button[onclick="executeSignal(${signalId});"]`);
+    const originalText = button.textContent;
+    button.textContent = 'Sending...';
+    button.disabled = true;
+    button.style.opacity = '0.7';
+    
+    // Send request to execute the signal
+    fetch(`/api/signals/${signalId}/execute`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Reset button
+        button.disabled = false;
+        button.style.opacity = '1';
+        
+        if (data.status === 'success') {
+            // Show success message
+            showAlert(`Signal ${signalId} executed successfully. Trade sent to MT5.`, 'success');
+            button.textContent = 'Executed ✓';
+            button.classList.remove('signal-execute-button');
+            button.classList.add('signal-executed-button');
+            button.disabled = true;
+            
+            // Reload trades after a short delay
+            setTimeout(loadActiveTrades, 2000);
+        } else {
+            // Show error message
+            showAlert(`Error executing signal: ${data.message}`, 'danger');
+            button.textContent = originalText;
+        }
+    })
+    .catch(error => {
+        // Show error message
+        showAlert(`Error executing signal: ${error.message}`, 'danger');
+        button.textContent = originalText;
+        button.disabled = false;
+        button.style.opacity = '1';
+    });
 }
 
 
