@@ -6,7 +6,7 @@
 let activeCharts = {};
 let activeTrades = [];
 let priceData = {};
-let accountData = null;
+let mt5AccountData = null;
 
 // Initialize Dashboard when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
@@ -347,7 +347,7 @@ function fetchAccountData() {
             return response.json();
         })
         .then(data => {
-            accountData = data;
+            mt5AccountData = data;
             updateAccountDisplay(data, 'MT5');
         })
         .catch(error => {
@@ -362,7 +362,7 @@ function fetchAccountData() {
                     return response.json();
                 })
                 .then(data => {
-                    accountData = data;
+                    mt5AccountData = data;
                     updateAccountDisplay(data, 'OANDA');
                 })
                 .catch(error => {
@@ -425,6 +425,13 @@ function updateAccountDisplay(data, source) {
         } else {
             marginLevelEl.textContent = 'N/A';
         }
+    }
+    
+    // Update last updated timestamp
+    const lastUpdateEl = document.getElementById('account-last-update');
+    if (lastUpdateEl && data.last_update) {
+        const date = new Date(data.last_update);
+        lastUpdateEl.textContent = date.toLocaleString();
     }
 }
 
