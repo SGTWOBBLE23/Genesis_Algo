@@ -407,6 +407,14 @@ def trade_report():
         
         # Create a trade record if status is success
         if status == 'success' and ticket:
+            # Check if this is a crypto symbol - exclude as requested
+            if any(crypto in symbol for crypto in ['BTC', 'ETH', 'LTC', 'XRP', 'DOG', 'SOL']):
+                logger.info(f"Filtering out crypto trade for {symbol} as requested")
+                return jsonify({
+                    "status": "error", 
+                    "message": f"Crypto trades are not supported at this time. Please use forex or metals signals only."
+                }), 400
+                
             # Determine trade side from action
             side = TradeSide.BUY
             if 'SELL' in action or 'SHORT' in action:
@@ -535,6 +543,11 @@ def update_trades():
                         except Exception as e:
                             logger.warning(f"Failed to parse closed_at: {e}")
                     
+                    # Check if this is a crypto symbol - exclude as requested
+                    if any(crypto in symbol for crypto in ['BTC', 'ETH', 'LTC', 'XRP', 'DOG', 'SOL']):
+                        logger.info(f"Filtering out crypto trade for {symbol} as requested")
+                        continue
+                        
                     # Create new trade object
                     trade = Trade(
                         ticket=ticket,
@@ -669,6 +682,14 @@ def signal_chart(signal_id):
         
         if not signal:
             return jsonify({"status": "error", "message": f"Signal with ID {signal_id} not found"}), 404
+            
+        # Check if this is a crypto signal - exclude as requested
+        if any(crypto in signal.symbol for crypto in ['BTC', 'ETH', 'LTC', 'XRP', 'DOG', 'SOL']):
+            logger.info(f"Filtering out crypto signal chart for {signal.symbol} as requested")
+            return jsonify({
+                "status": "error", 
+                "message": f"Crypto signals are not supported at this time. Please use forex or metals signals only."
+            }), 400
         
         # Determine result type based on signal status
         result = "anticipated"
@@ -684,176 +705,56 @@ def signal_chart(signal_id):
         
         # Generate the chart
         try:
-            # For cryptocurrencies, we need to handle differently since OANDA doesn't support them
-            if 'BTC' in signal.symbol or 'ETH' in signal.symbol:
-                # Use a direct approach for cryptocurrencies
-                # (All imports moved to the top of the file)
-                
-                # Create a sample dataframe with fake data just for visualization
-                # In a real implementation, you would get this data from a crypto API
-                dates = [datetime.now() - timedelta(hours=i) for i in range(100, 0, -1)]
-                
-                # Use the actual signal entry price or get recent price from MT5 trades
-                if signal.entry is not None:
-                    base_price = float(signal.entry)
-                else:
-                    # Get the most recent trades for this symbol to find latest price
-                    recent_trades = db.session.query(Trade).filter_by(symbol=signal.symbol.replace('_', ''))\
-                                  .order_by(Trade.created_at.desc()).limit(1).all()
-                    if recent_trades and recent_trades[0].entry:
-                        base_price = float(recent_trades[0].entry)
-                    else:
-                        # Fallback to current approximate market prices
-                        base_price = 96000.0 if 'BTC' in signal.symbol else 3240.0 if 'XAU' in signal.symbol else 3000.0
-                    
-                    logger.info(f"Using base price for {signal.symbol}: {base_price}")
-                
-                # Generate random but somewhat realistic price movements
-                np.random.seed(42)  # For reproducibility
-                price_movements = np.cumsum(np.random.normal(0, base_price * 0.01, 100)) + base_price
-                
-                # Create a DataFrame for charting
-                df = pd.DataFrame({
-                    'Date': dates,
-                    'Open': price_movements,
-                    'High': price_movements * (1 + np.random.random(100) * 0.005),
-                    'Low': price_movements * (1 - np.random.random(100) * 0.005),
-                    'Close': price_movements * (1 + np.random.normal(0, 0.003, 100)),
-                    'Volume': np.random.randint(10, 100, 100)
-                })
-                
-                # Set the index to Date for proper charting
-                df.set_index('Date', inplace=True)
-                
-                # Create folder if it doesn't exist - standardize naming format to use underscores
-                # Convert BTCUSD to BTC_USD format for directory consistency
-                if 'BTC' in signal.symbol and '_' not in signal.symbol:
-                    # Insert underscore before USD
-                    directory_symbol = signal.symbol.replace('USD', '_USD')
-                elif 'ETH' in signal.symbol and '_' not in signal.symbol:
-                    # Insert underscore before USD
-                    directory_symbol = signal.symbol.replace('USD', '_USD')
+            # Get signal action for proper chart display
+            signal_action = signal.action.value if hasattr(signal.action, 'value') else str(signal.action)
+            logger.info(f"Creating chart for signal {signal_id} with action {signal_action}")
+            
+            # Use the modified chart_utils that passes signal action
+            from chart_generator_basic import ChartGenerator
+            from chart_utils import fetch_candles
+            
+            # Try to fetch candles from OANDA
+            candles = fetch_candles(signal.symbol, timeframe="H1", count=100)
+            
+            # If we can't get data from OANDA, return an informative error
+            if not candles or len(candles) < 10:
+                logger.error(f"Cannot generate chart for {signal.symbol}: Insufficient candle data available")
+                return jsonify({
+                    "status": "error", 
+                    "message": f"Unable to generate chart for {signal.symbol}. This symbol may not be available in OANDA."
+                }), 404
+            
+            # Create a standardized chart directory structure
+            if '_' not in signal.symbol:
+                # Add underscore at logical currency pair boundary 
+                if len(signal.symbol) == 6:
+                    directory_symbol = signal.symbol[:3] + '_' + signal.symbol[3:]
                 else:
                     directory_symbol = signal.symbol
-                    
-                symbol_dir = os.path.join('static/charts', directory_symbol)
-                os.makedirs(symbol_dir, exist_ok=True)
-                
-                # Generate filename based on signal properties
-                timestamp = datetime.now().strftime("%Y-%m-%dT%H%MZ")
-                # Use standardized naming for the file name too
-                filename = f"{directory_symbol}_H1_{timestamp}_{result}.png"
-                filepath = os.path.join(symbol_dir, filename)
-                
-                # Calculate indicators
-                df['ema20'] = df['Close'].ewm(span=20, adjust=False).mean()
-                df['ema50'] = df['Close'].ewm(span=50, adjust=False).mean()
-                
-                # RSI calculation
-                delta = df['Close'].diff()
-                gain = delta.where(delta > 0, 0)
-                loss = -delta.where(delta < 0, 0)
-                avg_gain = gain.rolling(window=14).mean()
-                avg_loss = loss.rolling(window=14).mean()
-                rs = avg_gain / avg_loss
-                df['rsi'] = 100 - (100 / (1 + rs))
-                
-                # MACD calculation
-                ema12 = df['Close'].ewm(span=12, adjust=False).mean()
-                ema26 = df['Close'].ewm(span=26, adjust=False).mean()
-                df['macd'] = ema12 - ema26
-                df['macd_signal'] = df['macd'].ewm(span=9, adjust=False).mean()
-                
-                # Create a figure with subplots
-                fig, axes = plt.subplots(3, 1, figsize=(12, 9), gridspec_kw={'height_ratios': [6, 2, 2]})
-                
-                # Plot candlesticks on main chart
-                axes[0].plot(df.index, df['Close'], color='blue')
-                axes[0].plot(df.index, df['ema20'], color='blue', linestyle='--', label='EMA 20')
-                axes[0].plot(df.index, df['ema50'], color='orange', linestyle='--', label='EMA 50')
-                
-                # Add current date to chart title
-                current_date = datetime.now().strftime("%Y-%m-%d")
-                
-                # Add entry point, stop loss, and take profit if available
-                if signal.entry is not None:
-                    axes[0].axhline(y=signal.entry, color='green', linestyle='-', label='Entry')
-                    # Add a marker for the entry point
-                    entry_idx = len(df) - 10  # Place marker near the end
-                    axes[0].scatter(df.index[entry_idx], signal.entry, color='green', marker='^', s=100, zorder=5)
-                
-                if signal.sl is not None:
-                    axes[0].axhline(y=signal.sl, color='red', linestyle='--', label='Stop Loss')
-                
-                if signal.tp is not None:
-                    axes[0].axhline(y=signal.tp, color='green', linestyle='--', label='Take Profit')
-                
-                # Configure main chart with current date
-                axes[0].set_title(f"{signal.symbol} - {result.upper()} - {current_date}\nEntry: {signal.entry}, SL: {signal.sl}, TP: {signal.tp}")
-                axes[0].set_ylabel('Price')
-                axes[0].legend()
-                axes[0].grid(True)
-                
-                # Plot RSI
-                axes[1].plot(df.index, df['rsi'], color='purple')
-                axes[1].axhline(y=30, color='red', linestyle='--')
-                axes[1].axhline(y=70, color='red', linestyle='--')
-                axes[1].set_ylabel('RSI')
-                axes[1].set_ylim(0, 100)
-                axes[1].grid(True)
-                
-                # Plot MACD
-                axes[2].plot(df.index, df['macd'], color='blue', label='MACD')
-                axes[2].plot(df.index, df['macd_signal'], color='red', label='Signal')
-                axes[2].set_ylabel('MACD')
-                axes[2].legend()
-                axes[2].grid(True)
-                
-                # Format x-axis dates
-                plt.xticks(rotation=45)
-                
-                # Adjust layout and save
-                plt.tight_layout()
-                plt.savefig(filepath)
-                plt.close()
-                
-                # Return the path to the saved chart
-                chart_path = filepath
             else:
-                # For regular forex pairs, use the existing chart generator
-                # Get signal action for proper chart display
-                signal_action = signal.action.value if hasattr(signal.action, 'value') else str(signal.action)
-                logger.info(f"Creating chart for signal {signal_id} with action {signal_action}")
+                directory_symbol = signal.symbol
                 
-                # Use the modified chart_utils that passes signal action
-                from chart_generator_basic import ChartGenerator
-                from chart_utils import fetch_candles
-                
-                # Try to fetch candles from OANDA
-                candles = fetch_candles(signal.symbol, timeframe="H1", count=100)
-                
-                # If we can't get data from OANDA, return an informative error
-                if not candles or len(candles) < 10:
-                    logger.error(f"Cannot generate chart for {signal.symbol}: Insufficient candle data available")
-                    return jsonify({
-                        "status": "error", 
-                        "message": f"Unable to generate chart for {signal.symbol}. This symbol may not be available in OANDA."
-                    }), 404
-                
-                
-                # Create chart generator with signal action context
-                chart_gen = ChartGenerator(signal_action=signal_action)
-                
-                # Generate the chart with appropriate signal styling
-                chart_path = chart_gen.create_chart(
-                    candles=candles,
-                    symbol=signal.symbol,
-                    timeframe="H1",
-                    entry_point=(entry_time, float(signal.entry) if signal.entry else candles[-1]['close']),
-                    stop_loss=float(signal.sl) if signal.sl else None,
-                    take_profit=float(signal.tp) if signal.tp else None,
-                    result=result
-                )
+            symbol_dir = os.path.join('static/charts', directory_symbol)
+            os.makedirs(symbol_dir, exist_ok=True)
+            
+            # Generate filename based on signal properties
+            timestamp = datetime.now().strftime("%Y-%m-%dT%H%MZ")
+            filename = f"{directory_symbol}_H1_{timestamp}_{result}.png"
+            filepath = os.path.join(symbol_dir, filename)
+            
+            # Create chart generator with signal action context
+            chart_gen = ChartGenerator(signal_action=signal_action)
+            
+            # Generate the chart with appropriate signal styling
+            chart_path = chart_gen.create_chart(
+                candles=candles,
+                symbol=signal.symbol,
+                timeframe="H1",
+                entry_point=(entry_time, float(signal.entry) if signal.entry else candles[-1]['close']),
+                stop_loss=float(signal.sl) if signal.sl else None,
+                take_profit=float(signal.tp) if signal.tp else None,
+                result=result
+            )
         except Exception as chart_error:
             logger.error(f"Error generating chart for {signal.symbol}: {str(chart_error)}")
             raise
