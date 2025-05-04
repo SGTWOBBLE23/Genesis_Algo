@@ -4,7 +4,7 @@ from typing import Dict, List, Any, Optional, Tuple, Union
 from datetime import datetime
 
 from oanda_api import OandaAPI
-from chart_generator import ChartGenerator
+from chart_generator_basic import ChartGenerator
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
