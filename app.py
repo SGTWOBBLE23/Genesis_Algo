@@ -780,11 +780,12 @@ def get_trades_stats():
         
         for trade in closed_trades:
             # Ensure we only count each unique ticket once
-            if trade.ticket:
-                if trade.ticket in seen_tickets:
-                    logger.warning(f"Skipping duplicate trade ticket: {trade.ticket}")
-                    continue
-                seen_tickets.add(trade.ticket)
+            # Use trade.id if ticket is not available
+            ticket = trade.ticket or f"id_{trade.id}"
+            if ticket in seen_tickets:
+                logger.warning(f"Skipping duplicate trade: {ticket}")
+                continue
+            seen_tickets.add(ticket)
             
             filtered_trades.append(trade)
                 
@@ -811,8 +812,16 @@ def get_trades_stats():
         losing_trades = []
         
         for trade in filtered_trades:
-            if trade.pnl is None:
-                # Skip trades with no P&L info
+            try:
+                # Debug trade information
+                logger.debug(f"Processing trade for stats: ID={trade.id}, PnL={trade.pnl}")
+                
+                if trade.pnl is None:
+                    # Skip trades with no P&L info
+                    logger.warning(f"Skipping trade with no PnL: ID={trade.id}")
+                    continue
+            except Exception as e:
+                logger.error(f"Error processing trade for stats: {str(e)}")
                 continue
                 
             total_profit += trade.pnl
@@ -855,17 +864,21 @@ def get_trades_stats():
         sorted_trades = sorted(filtered_trades, key=lambda t: t.closed_at if t.closed_at else datetime.min)
         
         for trade in sorted_trades:
-            if trade.pnl is None:
-                continue
+            try:
+                if trade.pnl is None:
+                    continue
+                    
+                running_balance += trade.pnl
                 
-            running_balance += trade.pnl
-            
-            if running_balance > peak_balance:
-                peak_balance = running_balance
-            
-            drawdown = peak_balance - running_balance
-            if drawdown > max_drawdown:
-                max_drawdown = drawdown
+                if running_balance > peak_balance:
+                    peak_balance = running_balance
+                
+                drawdown = peak_balance - running_balance
+                if drawdown > max_drawdown:
+                    max_drawdown = drawdown
+            except Exception as e:
+                logger.error(f"Error calculating drawdown for trade: {str(e)}")
+                continue
         
         stats['max_drawdown'] = max_drawdown
         
