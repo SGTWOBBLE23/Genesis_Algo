@@ -35,6 +35,7 @@ class ChartGenerator:
         # Output directory for saving charts
         self.output_dir = os.path.join('static', 'charts')
         os.makedirs(self.output_dir, exist_ok=True)
+        logger.info(f"Using chart output directory: {os.path.abspath(self.output_dir)}")
         
         # Dark theme colors for mplfinance with your color specifications
         self.colors = {
@@ -61,9 +62,7 @@ class ChartGenerator:
             'tp': '#00ff00'             # Green line for take profit
         }
         
-        # Directory to save charts
-        self.output_dir = os.path.join(os.getcwd(), 'static', 'charts')
-        os.makedirs(self.output_dir, exist_ok=True)
+        # No need for a second directory definition - we already set self.output_dir above
     
     # Helper methods for calculating indicators
     def _ema(self, series, length):
@@ -381,16 +380,22 @@ class ChartGenerator:
                              color=marker_color, zorder=5, linewidth=2, edgecolor='white')
                     
             # Create symbol folder if it doesn't exist
-            symbol_dir = os.path.join(self.output_dir, symbol)
+            # Clean up symbol name for directory (remove underscores)
+            clean_symbol = symbol.replace('_', '')
+            symbol_dir = os.path.join(self.output_dir, clean_symbol)
             os.makedirs(symbol_dir, exist_ok=True)
             
-            # Generate ISO format timestamp for filename with current date
+            logger.info(f"Chart will be saved in directory: {os.path.abspath(symbol_dir)}")
+            
+            # Generate timestamp for filename with current date
             current_datetime = datetime.now()
-            now = current_datetime.strftime("%Y-%m-%dT%H%MZ")
+            now = current_datetime.strftime("%Y%m%d_%H%M%S")
             result_str = f"_{result.lower()}" if result else ""
-            # Format matches your requirement: SYMBOL_TIMEFRAME_TIMESTAMP_RESULT.png
-            filename = f"{symbol}_{timeframe}_{now}{result_str}.png"
+            # Format: SYMBOL_TIMEFRAME_TIMESTAMP_RESULT.png
+            filename = f"{clean_symbol}_{timeframe}_{now}{result_str}.png"
             filepath = os.path.join(symbol_dir, filename)
+            
+            logger.info(f"Chart will be saved as: {filename}")
             
             # Update the chart title to include symbol, timeframe, result and current date
             display_symbol = symbol.replace("_", "/")
