@@ -41,8 +41,9 @@ def demo_bitcoin_chart():
     
     # Setup entry, stop-loss, and take-profit parameters for annotation
     # Use the last candle's timestamp for the entry point
-    last_timestamp = datetime.fromisoformat(candles[-1]['time'].replace('Z', '+00:00'))
-    entry_point = (last_timestamp, float(candles[-1]['mid']['c']))
+    last_timestamp = candles[-1]['timestamp']
+    entry_price = candles[-1]['close']
+    entry_point = (last_timestamp, entry_price)
     sl_price = entry_point[1] * 0.95  # 5% below entry for stop-loss
     tp_price = entry_point[1] * 1.05  # 5% above entry for take-profit
     
@@ -54,7 +55,8 @@ def demo_bitcoin_chart():
         count=100,
         entry_point=entry_point,
         stop_loss=sl_price,
-        take_profit=tp_price
+        take_profit=tp_price,
+        signal_action="BUY_NOW"  # Specify this is an immediate buy signal
     )
     
     if chart_path:
@@ -82,8 +84,8 @@ def generate_anticipated_chart():
     
     # We'll use a point 10 candles back from the end for the anticipated entry
     entry_index = -10
-    entry_timestamp = datetime.fromisoformat(candles[entry_index]['time'].replace('Z', '+00:00'))
-    entry_price = float(candles[entry_index]['mid']['c'])
+    entry_timestamp = candles[entry_index]['timestamp']
+    entry_price = candles[entry_index]['close']
     
     # Define anticipated levels
     stop_loss = entry_price * 0.98  # 2% below entry
@@ -126,10 +128,10 @@ def generate_closed_trade_chart():
     entry_index = -30  # Entry 30 candles back
     exit_index = -10   # Exit 10 candles back
     
-    entry_timestamp = datetime.fromisoformat(candles[entry_index]['time'].replace('Z', '+00:00'))
-    entry_price = float(candles[entry_index]['mid']['c'])
+    entry_timestamp = candles[entry_index]['timestamp']
+    entry_price = candles[entry_index]['close']
     
-    exit_price = float(candles[exit_index]['mid']['c'])
+    exit_price = candles[exit_index]['close']
     
     # Determine if the trade was a win or loss (for a BUY trade)
     result = "win" if exit_price > entry_price else "loss"
