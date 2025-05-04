@@ -44,8 +44,15 @@ def demo_bitcoin_chart():
     last_timestamp = candles[-1]['timestamp']
     entry_price = candles[-1]['close']
     entry_point = (last_timestamp, entry_price)
-    sl_price = entry_point[1] * 0.95  # 5% below entry for stop-loss
-    tp_price = entry_point[1] * 1.05  # 5% above entry for take-profit
+    # Set more realistic TP/SL levels based on the instrument type
+    if "USD" in symbol:
+        # For forex and gold, use smaller percentages (0.5-1%)
+        sl_price = entry_point[1] * 0.995  # 0.5% below entry for stop-loss
+        tp_price = entry_point[1] * 1.01   # 1% above entry for take-profit
+    else:
+        # For other instruments, use slightly larger percentages (1-2%)
+        sl_price = entry_point[1] * 0.99   # 1% below entry for stop-loss
+        tp_price = entry_point[1] * 1.02   # 2% above entry for take-profit
     
     # Generate the chart with all indicators and annotations
     print("Generating chart with indicators and annotations...")

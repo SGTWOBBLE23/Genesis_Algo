@@ -282,11 +282,14 @@ class ChartGenerator:
             axes[2].set_ylabel('MACD (12,26,9)', color=self.colors['text'])
             axes[2].legend(loc='upper left')
             
-            # Set x-axis labels
+            # Set x-axis labels for all chart panels
             x_positions = np.linspace(0, len(df) - 1, min(10, len(df)))
-            x_labels = [df.index[int(pos)].strftime('%m-%d %H:%M') for pos in x_positions]
-            axes[2].set_xticks(x_positions)
-            axes[2].set_xticklabels(x_labels, rotation=45)
+            x_labels = [df.index[int(pos)].strftime('%Y-%m-%d %H:%M') for pos in x_positions]
+            
+            # Apply x-axis labels to all charts
+            for ax in axes:
+                ax.set_xticks(x_positions)
+                ax.set_xticklabels(x_labels, rotation=45)
             
             # Set x-axis ranges with extra space on the right for future price movement
             chart_padding = int(len(df) * 0.15)  # Add 15% padding to the right
