@@ -89,14 +89,15 @@ def generate_anticipated_chart():
     stop_loss = entry_price * 0.98  # 2% below entry
     take_profit = entry_price * 1.03  # 3% above entry
     
-    # Generate the anticipated trade chart
+    # Generate the anticipated trade chart with signal action type
     chart_path = generate_chart(
         symbol=symbol,
         timeframe=timeframe,
         count=100,
         entry_point=(entry_timestamp, entry_price),
         stop_loss=stop_loss,
-        take_profit=take_profit
+        take_profit=take_profit,
+        signal_action="ANTICIPATED_LONG"  # Specify signal action for proper marker positioning
     )
     
     if chart_path:
@@ -137,7 +138,7 @@ def generate_closed_trade_chart():
     stop_loss = entry_price * 0.97  # 3% below entry
     take_profit = entry_price * 1.05  # 5% above entry
     
-    # Generate the closed trade chart with result
+    # Generate the closed trade chart with result and signal action
     chart_path = generate_chart(
         symbol=symbol,
         timeframe=timeframe,
@@ -145,7 +146,8 @@ def generate_closed_trade_chart():
         entry_point=(entry_timestamp, entry_price),
         stop_loss=stop_loss,
         take_profit=take_profit,
-        result=result
+        result=result,
+        signal_action="BUY_NOW"  # Specify this was an immediate buy signal
     )
     
     if chart_path:
