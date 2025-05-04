@@ -498,7 +498,24 @@ def update_trades():
                 if 'status' in trade_info and trade_info['status'] != 'OPEN':
                     trade.status = TradeStatus(trade_info['status'])
                     if trade_info['status'] == 'CLOSED':
-                        trade.closed_at = datetime.now()
+                        # Only set closed_at if it's not already in trade_info
+                        if 'closed_at' in trade_info and trade_info['closed_at']:
+                            try:
+                                # Try MT5 format first (YYYY.MM.DD HH:MM:SS)
+                                trade.closed_at = datetime.strptime(trade_info['closed_at'], '%Y.%m.%d %H:%M:%S')
+                                logger.info(f"Using original closed_at time from MT5: {trade.closed_at}")
+                            except ValueError:
+                                try:
+                                    # Try ISO format as fallback (YYYY-MM-DD HH:MM:SS)
+                                    trade.closed_at = datetime.strptime(trade_info['closed_at'], '%Y-%m-%d %H:%M:%S')
+                                    logger.info(f"Using parsed closed_at time: {trade.closed_at}")
+                                except ValueError as e:
+                                    logger.error(f"Error parsing closed_at date: {e}. Using current time.")
+                                    trade.closed_at = datetime.now()
+                        else:
+                            # Fallback to current time if no closed_at in payload
+                            trade.closed_at = datetime.now()
+                            logger.info("No closed_at time in payload, using current time")
                 
                 # Update context with additional info
                 context = trade.context if hasattr(trade, 'context') and trade.context else {}
