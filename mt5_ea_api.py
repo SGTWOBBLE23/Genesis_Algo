@@ -248,6 +248,22 @@ def get_signals():
         
         signals = filtered_signals  # Use the filtered list for formatting
         
+        # Check if this terminal ID has any pending signals from direct execute requests
+        terminal_id = account_id  # Use account_id as terminal_id for simplicity
+        if terminal_id in active_terminals and 'pending_signals' in active_terminals[terminal_id] and active_terminals[terminal_id]['pending_signals']:
+            # Extract pending signals
+            pending_signals = active_terminals[terminal_id]['pending_signals']
+            logger.info(f"Found {len(pending_signals)} pending signals for terminal {terminal_id}")
+            
+            # Clear the pending signals so they're only sent once
+            active_terminals[terminal_id]['pending_signals'] = []
+            
+            # Just return the pending signals directly as they're already in the correct format
+            return jsonify({
+                "status": "success",
+                "signals": pending_signals
+            })
+        
         # Format signals for MT5 EA
         formatted_signals = []
         for signal in signals:
@@ -705,6 +721,57 @@ def execute_signal(signal_id):
             signal.status = SignalStatus.ACTIVE
             db.session.commit()
             logger.info(f"Updated signal {signal_id} status to ACTIVE")
+        
+        # Prepare signal data for MT5 terminal - similar format to what's used in get_signals
+        # Format signal data for MT5 EA, matching expected format
+        action = signal.action.value if hasattr(signal.action, 'value') else str(signal.action)
+        
+        # Basic symbol format conversion from internal (with underscore) to MT5 (no underscore)
+        mt5_symbol = signal.symbol
+        if '_' in mt5_symbol:
+            mt5_symbol = mt5_symbol.replace('_', '')
+            logger.info(f"Basic symbol mapping: {signal.symbol} -> {mt5_symbol}")
+            
+        # Manual mapping for any special cases
+        symbol_map = {
+            'BTC_USD': 'BTCUSD',
+            'ETH_USD': 'ETHUSD',
+            'XAU_USD': 'XAUUSD',
+            'XAG_USD': 'XAGUSD',
+            'EUR_USD': 'EURUSD',
+            'GBP_USD': 'GBPUSD',
+            'USD_JPY': 'USDJPY'
+        }
+        
+        if signal.symbol in symbol_map:
+            mt5_symbol = symbol_map[signal.symbol]
+            logger.info(f"Using map dictionary: {signal.symbol} -> {mt5_symbol}")
+        
+        # Create signal data in the format expected by MT5 EA
+        mt5_signal = {
+            "id": signal.id,
+            "asset": {
+                "symbol": mt5_symbol  # Use the mapped symbol if available
+            },
+            "action": action,
+            "entry_price": float(signal.entry) if signal.entry else 0.0,
+            "stop_loss": float(signal.sl) if signal.sl else 0.0,
+            "take_profit": float(signal.tp) if signal.tp else 0.0,
+            "confidence": float(signal.confidence),
+            "position_size": 0.1,  # Default lot size
+            "force_execution": True  # Force immediate execution
+        }
+        
+        # Store the signal in active terminals to be picked up on next get_signals request
+        # This ensures it will be sent even if the normal poll hasn't happened yet
+        if terminal_id not in active_terminals:
+            active_terminals[terminal_id] = {}
+        
+        if 'pending_signals' not in active_terminals[terminal_id]:
+            active_terminals[terminal_id]['pending_signals'] = []
+            
+        active_terminals[terminal_id]['pending_signals'].append(mt5_signal)
+        logger.info(f"Added signal {signal_id} to pending signals for terminal {terminal_id}")
         
         # Return success response
         return jsonify({
