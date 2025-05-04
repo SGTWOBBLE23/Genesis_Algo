@@ -10,8 +10,8 @@ from chart_generator_basic import ChartGenerator
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize the chart generator
-chart_generator = ChartGenerator()
+# Note: We'll create chart generators on-demand with appropriate signal_action parameters
+# rather than having a global instance that doesn't know about signal types
 
 # Initialize OANDA API client
 oanda_api = OandaAPI(
@@ -51,7 +51,8 @@ def generate_chart(symbol: str, timeframe: str = "H1", count: int = 100,
                   entry_point: Optional[Tuple[datetime, float]] = None,
                   stop_loss: Optional[float] = None, 
                   take_profit: Optional[float] = None,
-                  result: Optional[str] = None) -> str:
+                  result: Optional[str] = None,
+                  signal_action: Optional[str] = None) -> str:
     """Generate chart for a symbol with optional trade annotations
     
     Args:
@@ -62,6 +63,8 @@ def generate_chart(symbol: str, timeframe: str = "H1", count: int = 100,
         stop_loss: Optional price level for stop loss line
         take_profit: Optional price level for take profit line
         result: Optional trade result ("win" or "loss")
+        signal_action: Optional signal action type (e.g., "BUY_NOW", "SELL_NOW", "ANTICIPATED_LONG", "ANTICIPATED_SHORT")
+            affecting how entry points are positioned
         
     Returns:
         Path to saved chart image or empty string if error
@@ -74,8 +77,12 @@ def generate_chart(symbol: str, timeframe: str = "H1", count: int = 100,
             logger.error(f"No candle data available for {symbol}")
             return ""
         
+        # Create a chart generator with signal action
+        from chart_generator_basic import ChartGenerator
+        chart_gen = ChartGenerator(signal_action=signal_action)
+        
         # Generate and save chart
-        chart_path = chart_generator.create_chart(
+        chart_path = chart_gen.create_chart(
             candles=candles,
             symbol=symbol,
             timeframe=timeframe,
@@ -94,7 +101,8 @@ def generate_chart_bytes(symbol: str, timeframe: str = "H1", count: int = 100,
                        entry_point: Optional[Tuple[datetime, float]] = None,
                        stop_loss: Optional[float] = None, 
                        take_profit: Optional[float] = None,
-                       result: Optional[str] = None) -> bytes:
+                       result: Optional[str] = None,
+                       signal_action: Optional[str] = None) -> bytes:
     """Generate chart for a symbol and return as bytes
     
     Args:
@@ -105,6 +113,8 @@ def generate_chart_bytes(symbol: str, timeframe: str = "H1", count: int = 100,
         stop_loss: Optional price level for stop loss line
         take_profit: Optional price level for take profit line
         result: Optional trade result ("win" or "loss")
+        signal_action: Optional signal action type (e.g., "BUY_NOW", "SELL_NOW", "ANTICIPATED_LONG", "ANTICIPATED_SHORT")
+            affecting how entry points are positioned
         
     Returns:
         Chart as bytes or empty bytes if error
@@ -117,8 +127,12 @@ def generate_chart_bytes(symbol: str, timeframe: str = "H1", count: int = 100,
             logger.error(f"No candle data available for {symbol}")
             return b""
         
+        # Create a chart generator with signal action
+        from chart_generator_basic import ChartGenerator
+        chart_gen = ChartGenerator(signal_action=signal_action)
+        
         # Generate chart as bytes
-        chart_bytes = chart_generator.create_chart_bytes(
+        chart_bytes = chart_gen.create_chart_bytes(
             candles=candles,
             symbol=symbol,
             timeframe=timeframe,
