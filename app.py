@@ -774,9 +774,28 @@ def get_trades_stats():
         
         closed_trades = query.all()
         
-        # Calculate statistics
+        # Filter out trades without proper timestamps or duplicates by ticket
+        filtered_trades = []
+        seen_tickets = set()
+        
+        for trade in closed_trades:
+            # Skip trades without opened_at timestamp
+            if trade.opened_at is None:
+                logger.warning(f"Skipping trade with missing opened_at timestamp: {trade.id} - {trade.ticket}")
+                continue
+                
+            # Ensure we only count each unique ticket once
+            if trade.ticket:
+                if trade.ticket in seen_tickets:
+                    logger.warning(f"Skipping duplicate trade ticket: {trade.ticket}")
+                    continue
+                seen_tickets.add(trade.ticket)
+            
+            filtered_trades.append(trade)
+                
+        # Calculate statistics with the filtered trades
         stats = {
-            'total_trades': len(closed_trades),
+            'total_trades': len(filtered_trades),
             'win_count': 0,
             'loss_count': 0,
             'win_rate': 0.0,
@@ -788,7 +807,7 @@ def get_trades_stats():
         }
         
         # No trades, return default stats
-        if not closed_trades:
+        if not filtered_trades:
             return jsonify(stats)
         
         # Calculate win/loss counts and profit/loss
@@ -796,7 +815,7 @@ def get_trades_stats():
         winning_trades = []
         losing_trades = []
         
-        for trade in closed_trades:
+        for trade in filtered_trades:
             if trade.pnl is None:
                 # Skip trades with no P&L info
                 continue
@@ -838,7 +857,7 @@ def get_trades_stats():
         peak_balance = 0
         max_drawdown = 0
         
-        sorted_trades = sorted(closed_trades, key=lambda t: t.closed_at if t.closed_at else datetime.min)
+        sorted_trades = sorted(filtered_trades, key=lambda t: t.closed_at if t.closed_at else datetime.min)
         
         for trade in sorted_trades:
             if trade.pnl is None:

@@ -494,6 +494,20 @@ def update_trades():
                 if 'exit_price' in trade_info:
                     trade.exit = float(trade_info['exit_price'])
                 
+                # Update opened_at timestamp if it's in the incoming data and missing in our record
+                if 'opened_at' in trade_info and trade_info['opened_at'] and (trade.opened_at is None):
+                    try:
+                        # Try MT5 format first (YYYY.MM.DD HH:MM:SS)
+                        trade.opened_at = datetime.strptime(trade_info['opened_at'], '%Y.%m.%d %H:%M:%S')
+                        logger.info(f"Using original opened_at time from MT5: {trade.opened_at}")
+                    except ValueError:
+                        try:
+                            # Try ISO format as fallback (YYYY-MM-DD HH:MM:SS)
+                            trade.opened_at = datetime.strptime(trade_info['opened_at'], '%Y-%m-%d %H:%M:%S')
+                            logger.info(f"Using parsed opened_at time: {trade.opened_at}")
+                        except ValueError as e:
+                            logger.error(f"Error parsing opened_at date: {e}. Not updating.")
+                
                 # Update trade status if it has changed
                 if 'status' in trade_info and trade_info['status'] != 'OPEN':
                     trade.status = TradeStatus(trade_info['status'])
