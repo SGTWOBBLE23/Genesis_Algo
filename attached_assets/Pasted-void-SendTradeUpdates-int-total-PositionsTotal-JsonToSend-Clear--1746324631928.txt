@@ -1,0 +1,81 @@
+void SendTradeUpdates()
+{
+    int total = PositionsTotal();
+    
+    JsonToSend.Clear();
+    
+    // Use the same account naming convention across all functions
+    JsonToSend["account_id"] = AccountName;
+   
+    
+    // Create a JSON object for trades
+    CJAVal trades;
+    trades.Clear();
+    
+    bool hasTrades = false;
+    
+    // --- Open positions -------------------------------------------------
+    for(int i=0; i<total; i++)
+    {
+        ulong ticket = PositionGetTicket(i);
+        if(PositionSelectByTicket(ticket))
+        {
+            hasTrades = true;
+            string symbol = PositionGetString(POSITION_SYMBOL);
+            
+            CJAVal trade;
+            trade["symbol"]      = symbol;
+            trade["lot"]         = DoubleToString(PositionGetDouble(POSITION_VOLUME),2);
+            trade["type"]        = (PositionGetInteger(POSITION_TYPE)==POSITION_TYPE_BUY) ? "BUY" : "SELL";
+            trade["open_price"]  = DoubleToString(PositionGetDouble(POSITION_PRICE_OPEN), GetSymbolDigits(symbol));
+            trade["sl"]          = DoubleToString(PositionGetDouble(POSITION_SL), GetSymbolDigits(symbol));
+            trade["tp"]          = DoubleToString(PositionGetDouble(POSITION_TP), GetSymbolDigits(symbol));
+            trade["profit"]      = DoubleToString(PositionGetDouble(POSITION_PROFIT), 2);
+            trade["status"]      = "OPEN";
+            
+            // Add this trade to the trades object using ticket as key
+            trades[IntegerToString(ticket)] = trade;
+        }
+    }
+    
+    // --- Closed trades (last 7 days) ------------------------------------
+    datetime endTime   = TimeCurrent();
+    datetime startTime = endTime - 7*24*60*60;   // 7‑day window
+    
+    if(HistorySelect(startTime, endTime))
+    {
+        int dealsTotal  = HistoryDealsTotal();
+        
+        for(int i=0; i<dealsTotal; i++)
+        {
+            ulong dealTicket = HistoryDealGetTicket(i);
+            if(dealTicket>0 && HistoryDealSelect(dealTicket))
+            {
+                if(HistoryDealGetInteger(dealTicket, DEAL_ENTRY) == DEAL_ENTRY_OUT)
+                {
+                    int dealType = (int)HistoryDealGetInteger(dealTicket, DEAL_TYPE);
+                    if(dealType==DEAL_TYPE_BUY || dealType==DEAL_TYPE_SELL)
+                    {
+                        hasTrades = true;
+                        string symbol = HistoryDealGetString(dealTicket, DEAL_SYMBOL);
+                        
+                        // Get position ID instead of using counter
+                        ulong positionId = HistoryDealGetInteger(dealTicket, DEAL_POSITION_ID);
+                        
+                        CJAVal trade;
+                        trade["symbol"]      = symbol;
+                        trade["lot"]         = DoubleToString(HistoryDealGetDouble(dealTicket, DEAL_VOLUME), 2);
+                        trade["type"]        = (dealType==DEAL_TYPE_BUY) ? "BUY" : "SELL";
+                        trade["open_price"]  = "0";   // could be enhanced later
+                        trade["exit_price"]  = DoubleToString(HistoryDealGetDouble(dealTicket, DEAL_PRICE), GetSymbolDigits(symbol));
+                        trade["profit"]      = DoubleToString(HistoryDealGetDouble(dealTicket, DEAL_PROFIT), 2);
+                        trade["status"]      = "CLOSED";
+                        trade["closed_at"]   = TimeToString((datetime)HistoryDealGetInteger(dealTicket, DEAL_TIME), TIME_DATE|TIME_SECONDS);
+                        
+                        // Use position ID as key
+                        trades[IntegerToString(positionId)] = trade;
+                    }
+                }
+            }
+        }
+    }
