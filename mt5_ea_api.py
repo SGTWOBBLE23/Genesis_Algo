@@ -2,6 +2,9 @@ import json
 import time
 import logging
 import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, send_file
 from app import db, Signal, Trade, SignalAction, TradeStatus, TradeSide, Settings, SignalStatus
@@ -586,11 +589,7 @@ def signal_chart(signal_id):
             # For cryptocurrencies, we need to handle differently since OANDA doesn't support them
             if 'BTC' in signal.symbol or 'ETH' in signal.symbol:
                 # Use a direct approach for cryptocurrencies
-                import matplotlib.pyplot as plt
-                import numpy as np
-                import os
-                from datetime import datetime, timedelta
-                import pandas as pd
+                # (All imports moved to the top of the file)
                 
                 # Create a sample dataframe with fake data just for visualization
                 # In a real implementation, you would get this data from a crypto API
