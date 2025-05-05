@@ -223,9 +223,9 @@ class ChartGenerator:
                 title = f"{display_symbol} ({timeframe}) - {title_suffix}"
                 
             # Create a figure with subplots for price chart, volume, RSI, MACD, and ATR
-            # Updated height ratios to include volume and ATR panels
+            # Updated height ratios to make price chart much larger relative to indicators
             fig, axes = plt.subplots(5, 1, figsize=(self.fig_width, self.fig_height), 
-                                   gridspec_kw={'height_ratios': [6, 1, 2, 2, 1.5]})
+                                   gridspec_kw={'height_ratios': [8, 1, 1.5, 1.5, 1]})
             
             # Set background color
             fig.patch.set_facecolor(self.colors['bg'])
@@ -245,12 +245,12 @@ class ChartGenerator:
             up = df['Close'] > df['Open']
             down = df['Close'] <= df['Open']
             
-            # Plot candlestick wicks
-            axes[0].vlines(df.index[up], df['Low'][up], df['High'][up], color=self.colors['candle_up'])
-            axes[0].vlines(df.index[down], df['Low'][down], df['High'][down], color=self.colors['candle_down'])
+            # Plot candlestick wicks with increased line width
+            axes[0].vlines(df.index[up], df['Low'][up], df['High'][up], color=self.colors['candle_up'], linewidth=1.5)
+            axes[0].vlines(df.index[down], df['Low'][down], df['High'][down], color=self.colors['candle_down'], linewidth=1.5)
             
-            # Plot candlestick bodies
-            width = 0.6  # width of candlestick body
+            # Plot candlestick bodies - increased width for better readability
+            width = 0.8  # width of candlestick body - increased from 0.6
             for i, (idx, row) in enumerate(df.iterrows()):
                 if row['Close'] > row['Open']:
                     # Bullish candle
@@ -263,9 +263,9 @@ class ChartGenerator:
                                       fill=True, color=self.colors['candle_down'])
                     axes[0].add_patch(rect)
             
-            # Plot EMAs on main chart
-            axes[0].plot(np.arange(len(df)), df['ema20'], color=self.colors['ema20'], linewidth=1.5, label='EMA 20')
-            axes[0].plot(np.arange(len(df)), df['ema50'], color=self.colors['ema50'], linewidth=1.5, label='EMA 50')
+            # Plot EMAs on main chart with increased line width
+            axes[0].plot(np.arange(len(df)), df['ema20'], color=self.colors['ema20'], linewidth=2.0, label='EMA 20')
+            axes[0].plot(np.arange(len(df)), df['ema50'], color=self.colors['ema50'], linewidth=2.0, label='EMA 50')
             
             # Add stop loss and take profit lines if provided
             if stop_loss is not None:
