@@ -3,11 +3,15 @@
  */
 
 // Global variables
+let activeCharts = {};
 let activeTrades = [];
 let priceData = {};
 
 // Initialize Dashboard when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize the charts
+    initializeCharts();
+    
     // Load active trades (functions available but not displayed in UI)
     loadActiveTrades();
     
@@ -22,8 +26,181 @@ document.addEventListener('DOMContentLoaded', function() {
     setInterval(loadCurrentSignals, 60000); // Update signals every minute
 });
 
-// Chart-related functions have been removed as they are no longer needed
-// for this version of the dashboard
+/**
+ * Initialize price charts for tracked symbols
+ */
+function initializeCharts() {
+    const symbols = ['XAUUSD', 'GBPJPY', 'GBPUSD', 'EURUSD', 'AAPL', 'NAS100', 'BTCUSD'];
+    const chartContainer = document.getElementById('charts-container');
+    
+    // Check if the chart container exists
+    if (!chartContainer) {
+        console.log("Charts container not found. Charts will not be initialized.");
+        return;
+    }
+    
+    // Create chart containers
+    symbols.forEach(symbol => {
+        try {
+            // Create card for chart
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <div class="card-header">
+                    <h3>${symbol}</h3>
+                    <div class="price-indicator">
+                        <span class="bid">Bid: <strong id="${symbol}-bid">--</strong></span>
+                        <span class="ask">Ask: <strong id="${symbol}-ask">--</strong></span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <canvas id="chart-${symbol}" width="400" height="250"></canvas>
+                </div>
+                <div class="card-footer" id="signals-${symbol}">
+                    <div class="spinner-border spinner-border-sm" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    Waiting for signals...
+                </div>
+            `;
+            
+            chartContainer.appendChild(card);
+            
+            // Initialize chart
+            const ctx = document.getElementById(`chart-${symbol}`).getContext('2d');
+            
+            activeCharts[symbol] = new Chart(ctx, {
+            type: 'candlestick', // Using candlestick chart type for OHLC data
+            data: {
+                datasets: [{
+                    label: symbol,
+                    data: []
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const candle = context.raw;
+                                if (candle && candle.o !== undefined) {
+                                    return [
+                                        `Open: ${candle.o.toFixed(5)}`,
+                                        `High: ${candle.h.toFixed(5)}`,
+                                        `Low: ${candle.l.toFixed(5)}`,
+                                        `Close: ${candle.c.toFixed(5)}`
+                                    ];
+                                }
+                                return `Value: ${context.parsed.y}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    },
+                    y: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Price'
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Fetch initial chart data
+        fetchChartData(symbol);
+    });
+    
+    console.log("Charts initialized");
+}
+
+/**
+ * Fetch chart data for a symbol
+ * @param {string} symbol - The trading symbol
+ */
+function fetchChartData(symbol) {
+    // Adding timestamp to prevent caching
+    fetch(`/api/oanda/candles/${symbol}?t=${Date.now()}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            updateChart(symbol, data);
+        })
+        .catch(error => {
+            console.error('Error fetching chart data:', error);
+        });
+}
+
+/**
+ * Update chart with new candle data
+ * @param {string} symbol - The trading symbol
+ * @param {Array} candles - Array of candle data objects
+ */
+function updateChart(symbol, candles) {
+    if (!activeCharts[symbol]) {
+        console.error(`Chart for ${symbol} not found`);
+        return;
+    }
+    
+    // Format data for chart.js bar chart
+    const chartData = candles.map(candle => ({
+        x: new Date(candle.time).getTime(),
+        y: candle.close, // Use close price for bar chart
+        // Keep OHLC data for tooltip
+        o: candle.open,
+        h: candle.high,
+        l: candle.low,
+        c: candle.close
+    }));
+    
+    // Set bar colors based on price movement (green for up, red for down)
+    activeCharts[symbol].data.datasets[0].backgroundColor = chartData.map((d, i) => {
+        if (i === 0) return '#00c851'; // Default to green for first bar
+        return chartData[i].y > chartData[i-1].y ? '#00c851' : '#ff3547'; // Green for up, red for down
+    });
+    
+    // Update chart
+    activeCharts[symbol].data.datasets[0].data = chartData;
+    activeCharts[symbol].update();
+    
+    // Update latest prices
+    if (chartData.length > 0) {
+        const latest = chartData[chartData.length - 1];
+        
+        // Calculate bid/ask spread for display (simplified)
+        const spread = 0.0002 * latest.c; // 2 pips spread (example)
+        const bid = (latest.c - spread/2).toFixed(5);
+        const ask = (latest.c + spread/2).toFixed(5);
+        
+        // Store price data
+        priceData[symbol] = {
+            bid: parseFloat(bid),
+            ask: parseFloat(ask),
+            timestamp: new Date().toISOString()
+        };
+        
+        // Update UI
+        document.getElementById(`${symbol}-bid`).textContent = bid;
+        document.getElementById(`${symbol}-ask`).textContent = ask;
+    }
+}
 
 /**
  * Load active trades from the API
@@ -173,91 +350,126 @@ function loadCurrentSignals() {
 }
 
 /**
- * Update the signals display in the UI with a simple table layout, no cards
+ * Update the signals display in the UI with a rectangular box layout
  * @param {Array} signals - List of signal objects
  */
 function updateSignalsTable(signals) {
     // Try to find the signals container
     let container = document.getElementById('signals-container');
     
+    // If not found, check if we have a signals list in other containers
     if (!container) {
-        console.error('Signals container not found. Unable to display signals.');
-        return;
+        console.log('Primary signals container not found, checking alternatives...');
+        // Try to find any container with signals-list class
+        const signalsList = document.querySelector('.signals-list');
+        if (signalsList) {
+            container = signalsList;
+            console.log('Using alternative signals container');
+        } else {
+            console.error('No signals container found. Unable to display signals.');
+            return;
+        }
     }
     
     // Clear existing content
     container.innerHTML = '';
     
+    // Create header
+    const header = document.createElement('div');
+    header.className = 'signals-list-header';
+    header.innerHTML = `
+        <h5 class="m-0">Latest Signals</h5>
+        <a href="/signals" class="text-white">View All</a>
+    `;
+    container.appendChild(header);
+    
+    // Create signals container
+    const signalsContainer = document.createElement('div');
+    signalsContainer.className = 'signals-container';
+    container.appendChild(signalsContainer);
+    
     if (signals.length === 0) {
         // Show no signals message
         const emptyMessage = document.createElement('div');
-        emptyMessage.className = 'alert alert-info';
+        emptyMessage.className = 'p-3 text-center w-100';
         emptyMessage.textContent = 'No active signals';
-        container.appendChild(emptyMessage);
+        signalsContainer.appendChild(emptyMessage);
         return;
     }
     
     // Sort signals by created_at in descending order (newest first)
     signals.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     
-    // Create a table for the signals
-    const table = document.createElement('table');
-    table.className = 'table table-dark table-striped table-hover';
-    
-    // Create table header
-    const tableHead = document.createElement('thead');
-    tableHead.innerHTML = `
-        <tr>
-            <th>Symbol</th>
-            <th>Action</th>
-            <th>Entry</th>
-            <th>SL</th>
-            <th>TP</th>
-            <th>Confidence</th>
-            <th>Status</th>
-            <th>Created</th>
-            <th>Actions</th>
-        </tr>
-    `;
-    table.appendChild(tableHead);
-    
-    // Create table body
-    const tableBody = document.createElement('tbody');
-    
-    // Add signals to table
+    // Add signals as rectangular boxes
     signals.forEach(signal => {
+        // Format action badge class
+        let actionClass = '';
+        switch (signal.action) {
+            case 'BUY_NOW':
+                actionClass = 'action-buy-now';
+                break;
+            case 'SELL_NOW':
+                actionClass = 'action-sell-now';
+                break;
+            case 'ANTICIPATED_LONG':
+                actionClass = 'action-anticipated-long';
+                break;
+            case 'ANTICIPATED_SHORT':
+                actionClass = 'action-anticipated-short';
+                break;
+        }
+        
         // Format date
         const date = new Date(signal.created_at);
-        const dateStr = `${date.getMonth()+1}/${date.getDate()}/${date.getFullYear()}, ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+        const dateStr = `${date.getMonth()+1}/${date.getDate()}/${date.getFullYear()}, ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')} ${date.getHours() >= 12 ? 'PM' : 'AM'}`;
         
         // Format confidence class
-        const confidenceClass = signal.confidence > 0.8 ? 'text-success' : 
-                              signal.confidence > 0.6 ? 'text-warning' : 'text-danger';
+        const confidenceClass = signal.confidence > 0.8 ? 'confidence-high' : 
+                              signal.confidence > 0.6 ? 'confidence-medium' : 'confidence-low';
         
-        // Create row
-        const row = document.createElement('tr');
+        // Create signal card
+        const card = document.createElement('div');
+        card.className = 'signal-card';
+        card.setAttribute('data-action', signal.action);
         
-        // Add row content
-        row.innerHTML = `
-            <td>${signal.symbol.replace('_', '')}</td>
-            <td>${signal.action.replace('_', ' ')}</td>
-            <td>${signal.entry || '--'}</td>
-            <td>${signal.sl || '--'}</td>
-            <td>${signal.tp || '--'}</td>
-            <td class="${confidenceClass}">${Math.round(signal.confidence * 100)}%</td>
-            <td>${signal.status}${signal.status === 'ERROR' ? ' ⚠️' : ''}</td>
-            <td>${dateStr}</td>
-            <td>
-                <button class="btn btn-sm btn-primary" onclick="executeSignal(${signal.id});">Execute</button>
-                <button class="btn btn-sm btn-info" onclick="viewSignalChart(${signal.id});">Chart</button>
-            </td>
+        card.innerHTML = `
+            <div class="signal-header">
+                <div class="signal-symbol">${signal.symbol.replace('_', '')}</div>
+                <span class="action-badge ${actionClass}">${signal.action.replace('_', ' ')}</span>
+                ${signal.status === 'ERROR' ? '<span class="status-badge status-error">ERROR</span>' : ''}
+            </div>
+            
+            <div class="signal-details-grid">
+                <div class="signal-detail-item">
+                    <div class="signal-detail-label">Entry</div>
+                    <div class="signal-detail-value">${signal.entry || '--'}</div>
+                </div>
+                <div class="signal-detail-item">
+                    <div class="signal-detail-label">Stop Loss</div>
+                    <div class="signal-detail-value">${signal.sl || '--'}</div>
+                </div>
+                <div class="signal-detail-item">
+                    <div class="signal-detail-label">Take Profit</div>
+                    <div class="signal-detail-value">${signal.tp || '--'}</div>
+                </div>
+            </div>
+            
+            <div class="signal-detail-item" style="margin-bottom: 8px;">
+                <div class="signal-detail-label">Confidence</div>
+                <div class="signal-detail-value ${confidenceClass}">${Math.round(signal.confidence * 100)}%</div>
+            </div>
+            
+            <div class="signal-footer">
+                <div class="signal-timestamp">${dateStr}</div>
+                <div class="signal-actions">
+                    <button class="signal-execute-button" onclick="executeSignal(${signal.id});">Execute</button>
+                    <button class="signal-chart-button" onclick="viewSignalChart(${signal.id});">View Chart</button>
+                </div>
+            </div>
         `;
         
-        tableBody.appendChild(row);
+        signalsContainer.appendChild(card);
     });
-    
-    table.appendChild(tableBody);
-    container.appendChild(table);
 }
 
 /**
@@ -371,38 +583,22 @@ function executeSignal(signalId) {
 
 function connectWebSocket() {
     try {
-        // Use a global variable for socket to handle reconnection properly
-        if (window.tradingSocket) {
-            // If socket exists and is open, no need to reconnect
-            if (window.tradingSocket.readyState === WebSocket.OPEN) {
-                return;
-            }
-            // Otherwise try to close it before creating a new one
-            try {
-                window.tradingSocket.close();
-            } catch (e) {
-                console.error('Error closing existing socket:', e);
-            }
-        }
-        
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        // Make sure we're using the correct WebSocket endpoint
-        const wsUrl = `${protocol}//${window.location.host}/ws`;
+        const wsUrl = `${protocol}//${window.location.host}/api/signals/ws`;
         
-        window.tradingSocket = new WebSocket(wsUrl);
+        const socket = new WebSocket(wsUrl);
         
-        window.tradingSocket.onopen = function(e) {
+        socket.onopen = function(e) {
             console.log('WebSocket connection established');
         };
         
-        window.tradingSocket.onmessage = function(event) {
+        socket.onmessage = function(event) {
             try {
                 const data = JSON.parse(event.data);
                 
                 if (data.type === 'price_update') {
                     try {
-                        // Update price data - only storing in memory for P&L calculations
-                        // No UI elements are updated since chart elements have been removed
+                        // Update price data
                         const symbol = data.data.symbol;
                         priceData[symbol] = {
                             bid: data.data.bid,
@@ -410,8 +606,12 @@ function connectWebSocket() {
                             timestamp: data.data.timestamp
                         };
                         
-                        // No need to update UI elements since they don't exist in current layout
-                        // This prevents JavaScript errors trying to access non-existent DOM elements
+                        // Try to update UI if elements exist
+                        const bidElement = document.getElementById(`${symbol}-bid`);
+                        const askElement = document.getElementById(`${symbol}-ask`);
+                        
+                        if (bidElement) bidElement.textContent = data.data.bid.toFixed(5);
+                        if (askElement) askElement.textContent = data.data.ask.toFixed(5);
                     } catch (e) {
                         console.error('Error processing price update:', e);
                     }
@@ -435,7 +635,7 @@ function connectWebSocket() {
             }
         };
         
-        window.tradingSocket.onclose = function(event) {
+        socket.onclose = function(event) {
             if (event.wasClean) {
                 console.log(`WebSocket connection closed cleanly, code=${event.code}, reason=${event.reason}`);
             } else {
@@ -446,7 +646,7 @@ function connectWebSocket() {
             setTimeout(connectWebSocket, 5000);
         };
         
-        window.tradingSocket.onerror = function(error) {
+        socket.onerror = function(error) {
             console.error(`WebSocket error:`, error);
         };
     } catch (e) {
