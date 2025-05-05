@@ -38,30 +38,30 @@ class ChartGenerator:
         os.makedirs(self.output_dir, exist_ok=True)
         logger.info(f"Using chart output directory: {os.path.abspath(self.output_dir)}")
         
-        # Dark theme colors for mplfinance with your color specifications
+        # Light theme colors for mplfinance with improved readability
         self.colors = {
-            'bg': '#121826',            # Background color
-            'text': '#e0e0e0',          # Text color
-            'grid': '#2a2e39',          # Grid color with alpha for better legibility
-            'candle_up': '#26a69a',     # Bullish candle color
-            'candle_down': '#ef5350',   # Bearish candle color
-            'ema20': '#2962ff',         # Blue for EMA 20 - as requested
-            'ema50': '#ff9800',         # Orange for EMA 50 - as requested
-            'volume': '#2a2e39',        # Volume bars base color
-            'volume_up': '#26a69a',     # Up volume bar color
-            'volume_down': '#ef5350',   # Down volume bar color
-            'rsi': '#2962ff',           # RSI line color
-            'rsi_ob': '#ef5350',        # Overbought line color
-            'rsi_os': '#26a69a',        # Oversold line color
-            'macd': '#2962ff',          # MACD line color
-            'macd_signal': '#ff9800',   # Signal line color
-            'macd_hist_up': '#26a69a',  # MACD histogram up color
-            'macd_hist_down': '#ef5350',# MACD histogram down color
-            'buy_entry': '#00ff00',     # Green arrow for buy entry point
-            'sell_entry': '#ff0000',    # Red arrow for sell entry point
-            'sl': '#ff0000',            # Red line for stop loss
-            'tp': '#00ff00',            # Green line for take profit
-            'atr': '#00ffff'            # Bright cyan for ATR line
+            'bg': '#ffffff',            # White background for better readability
+            'text': '#111111',          # Dark text for contrast
+            'grid': '#D0D0D0',          # Light grey grid lines
+            'candle_up': '#0E8B5C',     # Darker green for bullish candles
+            'candle_down': '#D2384A',   # Darker red for bearish candles
+            'ema20': '#0072EC',         # Darker blue for EMA 20 - better contrast
+            'ema50': '#EB7200',         # Darker orange for EMA 50 - better contrast
+            'volume': '#A0A0A0',        # Grey volume bars
+            'volume_up': '#0E8B5C',     # Green up volume
+            'volume_down': '#D2384A',   # Red down volume
+            'rsi': '#0072EC',           # Blue RSI line
+            'rsi_ob': '#D2384A',        # Red overbought line
+            'rsi_os': '#0E8B5C',        # Green oversold line
+            'macd': '#0072EC',          # Blue MACD line
+            'macd_signal': '#EB7200',   # Orange signal line
+            'macd_hist_up': '#0E8B5C',  # Green histogram up
+            'macd_hist_down': '#D2384A',# Red histogram down
+            'buy_entry': '#00BB00',     # Green arrow for buy entry
+            'sell_entry': '#DD0000',    # Red arrow for sell entry
+            'sl': '#DD0000',            # Red line for stop loss
+            'tp': '#00BB00',            # Green line for take profit
+            'atr': '#9B30FF'            # Purple for ATR line
         }
         
         # No need for a second directory definition - we already set self.output_dir above
@@ -325,6 +325,18 @@ class ChartGenerator:
             axes[2].axhline(y=30, color=self.colors['rsi_os'], linestyle='--')
             axes[2].axhline(y=70, color=self.colors['rsi_ob'], linestyle='--')
             axes[2].set_ylim(0, 100)
+            
+            # Add RSI value label
+            rsi_val = df['rsi'].iloc[-1]
+            axes[2].annotate(
+                f"RSI: {rsi_val:.1f}",
+                xy=(len(df)-1, rsi_val),
+                xytext=(15, 0), textcoords="offset points",
+                ha="left", va="center",
+                fontsize=10, weight="bold",
+                bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="#111111")
+            )
+            
             axes[2].set_ylabel('RSI (14)', color=self.colors['text'], fontsize=10)
             
             # Plot MACD on the fourth panel
@@ -344,11 +356,33 @@ class ChartGenerator:
                     # Negative histogram
                     axes[3].bar(i, hist_val, width=0.8, color=self.colors['macd_hist_down'], alpha=0.5)
             
+            # Add MACD value labels
+            macd_val = df['macd'].iloc[-1]
+            signal_val = df['macd_signal'].iloc[-1]
+            hist_val = df['macd_hist'].iloc[-1]
+            
+            # Create legend with current values
+            axes[3].legend(
+                [f"MACD: {macd_val:.4f}", f"Signal: {signal_val:.4f}", f"Hist: {hist_val:.4f}"],
+                loc='upper left', fontsize=10
+            )
+            
             axes[3].set_ylabel('MACD (12,26,9)', color=self.colors['text'], fontsize=10)
-            axes[3].legend(loc='upper left', fontsize=10)
             
             # Plot ATR as a thin line in the fifth panel
             axes[4].plot(np.arange(len(df)), df['atr'], color=self.colors['atr'], linewidth=1.5)
+            
+            # Add ATR value label
+            atr_val = df['atr'].iloc[-1]
+            axes[4].annotate(
+                f"ATR: {atr_val:.5f}",
+                xy=(len(df)-1, atr_val),
+                xytext=(15, 0), textcoords="offset points",
+                ha="left", va="center",
+                fontsize=10, weight="bold",
+                bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="#111111")
+            )
+            
             axes[4].set_ylabel('ATR (14)', color=self.colors['text'], fontsize=10)
             
             # Set x-axis labels for all chart panels
@@ -466,7 +500,7 @@ class ChartGenerator:
             fig.suptitle(title_text, color=self.colors['text'], fontsize=14)
             
             # Save the chart to file
-            plt.savefig(filepath, dpi=self.dpi, bbox_inches='tight', facecolor=self.colors['bg'])
+            plt.savefig(filepath, dpi=self.dpi, bbox_inches='tight', facecolor=self.colors['bg'], edgecolor='none')
             plt.close(fig)  # Close the figure to free memory
             
             logger.info(f"Chart saved to {filepath}")
