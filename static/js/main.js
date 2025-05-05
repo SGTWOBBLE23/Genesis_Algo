@@ -297,9 +297,33 @@ function executeTrade(signalId) {
  * @param {number} signalId - Signal ID
  */
 function cancelSignal(signalId) {
-    // In production, replace with actual API call
-    console.log(`Cancelling signal ${signalId}`);
-    alert(`Signal #${signalId} has been cancelled`);
+    if (!confirm('Are you sure you want to cancel this signal?')) {
+        return;
+    }
+    
+    // Send request to cancel the signal
+    fetch(`/api/signals/${signalId}/cancel`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            console.log(`Successfully cancelled signal ${signalId}`);
+            alert(`Signal #${signalId} has been cancelled`);
+            // Refresh signals list
+            fetchCurrentSignals();
+        } else {
+            console.error(`Error cancelling signal: ${data.message}`);
+            alert(`Error: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('Error cancelling signal:', error);
+        alert('Failed to cancel signal due to a network error.');
+    });
 }
 
 /**

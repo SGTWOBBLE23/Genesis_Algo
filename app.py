@@ -875,6 +875,17 @@ def get_current_signals():
     
     return jsonify([signal.to_dict() for signal in signals])
 
+@app.route('/api/signals/<int:signal_id>/cancel', methods=['POST'])
+def cancel_signal(signal_id):
+    signal = db.session.query(Signal).get(signal_id)
+    if not signal:
+        return jsonify({"status": "error", "message": f"Signal with ID {signal_id} not found"}), 404
+        
+    signal.status = SignalStatus.CANCELLED
+    db.session.commit()
+    
+    return jsonify({"status": "success", "message": f"Signal {signal_id} cancelled successfully"})
+
 @app.route('/api/settings/<section>', methods=['GET'])
 def get_settings(section):
     # Get all settings for the section
