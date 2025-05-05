@@ -1,0 +1,3 @@
+# config.py  – single source of truth for symbols
+ASSETS        = ["EUR_USD", "GBP_USD", "USD_JPY", "XAU_USD", "GBP_JPY"]
+MT5_ASSETS    = [s.replace("_", "") for s in ASSETS]       # EURUSD …

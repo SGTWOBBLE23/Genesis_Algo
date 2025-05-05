@@ -7,17 +7,9 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 import capture_job
+from config import ASSETS              # 👈 unified list
 
 logger = logging.getLogger(__name__)
-
-# List of assets to monitor (restricted to 5 to focus processing)
-ASSETS = [
-    "EUR_USD",  # EURUSD
-    "GBP_USD",  # GBPUSD
-    "USD_JPY",  # USDJPY
-    "XAU_USD",  # XAUUSD (Gold)
-    "GBP_JPY"   # GBPJPY
-]
 
 
 def capture_all_assets():
