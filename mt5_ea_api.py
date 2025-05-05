@@ -9,6 +9,9 @@ from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, send_file
 from app import db, Signal, Trade, SignalAction, TradeStatus, TradeSide, Settings, SignalStatus
 
+# Import signal scoring module for improved filtering
+from signal_scoring import signal_scorer
+
 STALE_SECONDS = 30
 
 from config import MT5_ASSETS as DEFAULT_SYMBOLS   # single source
