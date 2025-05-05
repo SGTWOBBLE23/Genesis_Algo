@@ -335,7 +335,7 @@ def get_signals():
                 "take_profit": float(signal.tp) if signal.tp else 0.0,
                 "confidence": float(signal.confidence),
                 "position_size": 0.1,  # Default lot size
-                "force_execution": False
+                "force_execution": True  # Force immediate execution for all signals
             }
             
             # Get additional context from signal if available
