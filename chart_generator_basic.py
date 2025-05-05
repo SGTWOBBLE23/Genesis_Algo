@@ -24,9 +24,10 @@ class ChartGenerator:
         plt.switch_backend('agg')
         
         # Default chart size - high resolution for clear ChatGPT Vision analysis
-        self.fig_width = 12.8
-        self.fig_height = 7.2
-        self.dpi = 100  # 1280x720 resolution
+        # Updated to 1080p (19.2 x 10.8) for better legibility
+        self.fig_width = 19.2
+        self.fig_height = 10.8
+        self.dpi = 100  # 1920x1080 resolution
         
         # Store signal action for positioning marker appropriately
         self.current_signal_action = signal_action
@@ -41,7 +42,7 @@ class ChartGenerator:
         self.colors = {
             'bg': '#121826',            # Background color
             'text': '#e0e0e0',          # Text color
-            'grid': '#2a2e39',          # Grid color
+            'grid': '#2a2e39',          # Grid color with alpha for better legibility
             'candle_up': '#26a69a',     # Bullish candle color
             'candle_down': '#ef5350',   # Bearish candle color
             'ema20': '#2962ff',         # Blue for EMA 20 - as requested
@@ -59,7 +60,8 @@ class ChartGenerator:
             'buy_entry': '#00ff00',     # Green arrow for buy entry point
             'sell_entry': '#ff0000',    # Red arrow for sell entry point
             'sl': '#ff0000',            # Red line for stop loss
-            'tp': '#00ff00'             # Green line for take profit
+            'tp': '#00ff00',            # Green line for take profit
+            'atr': '#00ffff'            # Bright cyan for ATR line
         }
         
         # No need for a second directory definition - we already set self.output_dir above
