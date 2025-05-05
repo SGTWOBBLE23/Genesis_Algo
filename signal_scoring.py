@@ -5,9 +5,23 @@ Signal Scoring Module
 This module provides advanced signal filtering and scoring mechanisms to reduce excessive
 trade entries and improve signal quality. It implements three scoring layers:
 
-1. Technical Filter Layer: Additional scoring based on technical indicators
+1. Technical Filter Layer: Additional scoring based on technical indicators such as RSI and MACD
 2. Performance-Based Adjustment: Dynamically adjusting confidence thresholds based on recent signal performance
 3. Correlation Analysis: Avoiding multiple positions that are highly correlated
+
+Special features:
+- High-confidence override: Signals with confidence >= 0.95 will bypass correlation checks
+- Technical indicators can provide up to +0.10 boost to confidence scores
+- Performance tracking can adjust confidence by up to +/-0.10 based on recent trading history
+
+Usage:
+    from signal_scoring import signal_scorer
+    
+    # Score a single signal
+    final_score, should_execute = signal_scorer.score_signal(signal)
+    
+    # Filter a list of signals
+    approved_signals = signal_scorer.filter_signals(signals)
 """
 
 import json
