@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import time
+import os
 from typing import Dict, Any
 from datetime import datetime
 from config import ASSETS        # new
@@ -10,6 +11,12 @@ import redis
 import requests
 
 logger = logging.getLogger(__name__)
+
+# Configuration for OpenAI API
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+VISION_API_URL = "https://api.openai.com/v1/chat/completions"
+VISION_MODEL = "gpt-4-vision-preview"
+MAX_RETRIES = 3
 
 # Setup a direct approach without Redis
 from app import db, Signal, SignalAction, SignalStatus, app
@@ -64,12 +71,11 @@ class DirectVisionPipeline:
             logger.error(traceback.format_exc())
             return False
 
-# OpenAI API configuration
-OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
-VISION_MODEL = os.environ.get('VISION_MODEL', 'gpt-4o')
-VISION_API_URL = 'https://api.openai.com/v1/chat/completions'
-
-MAX_RETRIES = 2
+# These are already defined at the top of the file
+# OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+# VISION_MODEL = os.environ.get('VISION_MODEL', 'gpt-4o')
+# VISION_API_URL = 'https://api.openai.com/v1/chat/completions'
+# MAX_RETRIES = 2
 
 
 def analyze_image(image_path: str) -> Dict[str, Any]:
@@ -142,9 +148,21 @@ def analyze_image(image_path: str) -> Dict[str, Any]:
         try:
             # Format is typically static/charts/SYMBOL/filename.png
             parts = image_path.split('/')
-            symbol_index = parts.index('charts') + 1
-            symbol = parts[symbol_index] if symbol_index < len(parts) else 'UNKNOWN'
-        except:
+            if 'charts' in parts:
+                symbol_index = parts.index('charts') + 1
+                symbol = parts[symbol_index] if symbol_index < len(parts) else 'UNKNOWN'
+            else:
+                # Try to extract symbol from filename
+                filename = os.path.basename(image_path)
+                for asset in ASSETS:
+                    mt5_symbol = asset.replace('_', '')
+                    if mt5_symbol in filename:
+                        symbol = asset
+                        break
+                else:
+                    symbol = "UNKNOWN"
+        except Exception as e:
+            logger.warning(f"Could not extract symbol from path: {e}")
             symbol = "UNKNOWN"
         
         # Build request for OpenAI API
