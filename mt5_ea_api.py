@@ -713,6 +713,50 @@ def trade_report():
                 actual_signal_id = data.get('original_signal_id', signal_id - 1000000)
                 logger.info(f"Using original signal ID {actual_signal_id} for trade record")
             
+            # Check if a trade for this signal already exists to prevent duplicates
+            existing_trade = db.session.query(Trade).filter(
+                Trade.signal_id == actual_signal_id,
+                Trade.ticket == ticket
+            ).first()
+            
+            if existing_trade:
+                logger.info(f"Trade for signal {actual_signal_id} with ticket {ticket} already exists, skipping creation")
+                return jsonify({
+                    "status": "success",
+                    "message": "Trade report received, trade already exists"
+                })
+            
+            # Also check if another trade with the same signal_id exists but different ticket
+            existing_signal_trade = db.session.query(Trade).filter(
+                Trade.signal_id == actual_signal_id
+            ).first()
+            
+            if existing_signal_trade:
+                logger.info(f"A trade for signal {actual_signal_id} already exists with ticket {existing_signal_trade.ticket}, updating instead of creating new")
+                
+                # Update the existing trade with new information
+                existing_signal_trade.ticket = ticket  # Use the new ticket
+                existing_signal_trade.entry = float(entry_price) if entry_price else existing_signal_trade.entry
+                existing_signal_trade.sl = float(stop_loss) if stop_loss else existing_signal_trade.sl
+                existing_signal_trade.tp = float(take_profit) if take_profit else existing_signal_trade.tp
+                existing_signal_trade.status = TradeStatus.OPEN
+                
+                # Update context with new information
+                context = existing_signal_trade.context or {}
+                context['updated_ticket'] = ticket
+                context['account_id'] = account_id
+                context['execution_message'] = message
+                context['updated_at'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                existing_signal_trade.context = context
+                
+                db.session.commit()
+                logger.info(f"Updated existing trade for signal {actual_signal_id} with new ticket {ticket}")
+                return jsonify({
+                    "status": "success",
+                    "message": "Trade updated with new ticket"
+                })
+            
+            # Create new trade if no existing trade found
             trade = Trade(
                 signal_id=actual_signal_id,
                 ticket=ticket,
@@ -731,6 +775,41 @@ def trade_report():
             db.session.commit()
             
             logger.info(f"Trade recorded: Ticket {ticket}, Symbol {symbol}, Side {side}")
+        
+        # Check if this is for a pending order and status is 'pending'
+        elif status == 'pending' and ticket:
+            # Check if a trade for this signal already exists to prevent duplicates
+            if signal_id:
+                # Ensure actual_signal_id is defined for the pending branch
+                actual_signal_id = signal_id
+                # If signal_id is very large (from our execute_signal function), it's an execution ID
+                if signal_id > 1000000:
+                    actual_signal_id = data.get('original_signal_id', signal_id - 1000000)
+                    logger.info(f"Using original signal ID {actual_signal_id} for pending trade check")
+                
+                existing_trade = db.session.query(Trade).filter(
+                    Trade.signal_id == actual_signal_id,
+                    Trade.ticket == ticket
+                ).first()
+                
+                if existing_trade:
+                    logger.info(f"Pending trade for signal {actual_signal_id} with ticket {ticket} already exists, skipping creation")
+                    return jsonify({
+                        "status": "success",
+                        "message": "Pending trade report received, trade already exists"
+                    })
+            else:
+                # No signal_id, check by ticket
+                existing_trade = db.session.query(Trade).filter(
+                    Trade.ticket == ticket
+                ).first()
+                
+                if existing_trade:
+                    logger.info(f"Pending trade with ticket {ticket} already exists, skipping creation")
+                    return jsonify({
+                        "status": "success",
+                        "message": "Pending trade report received, trade already exists by ticket"
+                    })
         
         return jsonify({
             "status": "success",
