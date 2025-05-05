@@ -7,12 +7,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, send_file
-from app import db, Signal, Trade, SignalAction, TradeStatus, TradeSide, Settings, SignalStatus, Log, LogLevel
+from app import db, Signal, Trade, SignalAction, TradeStatus, TradeSide, Settings, SignalStatus
 
 STALE_SECONDS = 30
 
 from config import MT5_ASSETS as DEFAULT_SYMBOLS   # single source
-from signal_scoring import signal_scorer  # Import the signal scoring module
 
 # Define Symbol Mapping model for local use in this module
 class SymbolMapping(db.Model):
@@ -227,20 +226,31 @@ def get_signals():
             if not new_signals:
                 # Check if there are any active signals with lower IDs
                 any_active = db.session.query(Signal).filter(
-                    Signal.status.in_(['PENDING', 'ACTIVE']),
-                    ~Signal.id.in_(processed_signal_ids) if processed_signal_ids else True
+                    Signal.status.in_(['PENDING', 'ACTIVE'])
                 ).first() is not None
                 
                 if any_active:
                     logger.info(f"No new signals after ID {last_signal_id}, but found active signals with lower IDs")
-                    # We've already queried all signals and identified the processed ones,
-                    # so we can just check for active signals that aren't in the processed_signal_ids list
-                    
-                    # Use the existing list of active signals, but filter out processed ones
-                    unprocessed_signals = db.session.query(Signal).filter(
-                        Signal.status.in_(['PENDING', 'ACTIVE']),
-                        ~Signal.id.in_(processed_signal_ids) if processed_signal_ids else True
+                    # Return only unprocessed pending/active signals
+                    processed_signal_ids = []
+                    unprocessed_signals = []
+                    all_signals = db.session.query(Signal).filter(
+                        Signal.status.in_(['PENDING', 'ACTIVE'])
                     ).order_by(Signal.id.asc()).all()
+                    
+                    for signal in all_signals:
+                        processed = False
+                        if hasattr(signal, 'context_json') and signal.context_json:
+                            try:
+                                context = json.loads(signal.context_json)
+                                if context.get('mt5_processed', False):
+                                    processed = True
+                                    processed_signal_ids.append(signal.id)
+                            except Exception as e:
+                                logger.error(f"Error checking processed state for signal {signal.id}: {str(e)}")
+                                
+                        if not processed:
+                            unprocessed_signals.append(signal)
                     
                     logger.info(f"Found {len(unprocessed_signals)} unprocessed signals, skipping {len(processed_signal_ids)} processed signals")
                     if processed_signal_ids:
@@ -422,66 +432,7 @@ def get_signals():
         
         # Format signals for MT5 EA
         formatted_signals = []
-        rejected_signals = []
-        
         for signal in signals:
-            # Apply the signal scoring system to determine if signal should be executed
-            should_execute, scoring_details = signal_scorer.should_execute_signal(signal)
-            
-            # If scoring system rejects the signal, log and skip
-            if not should_execute:
-                logger.info(f"Signal {signal.id} ({signal.symbol} {signal.action.name}) rejected by scoring system: {scoring_details['reason']}")
-                rejected_signals.append({
-                    "id": signal.id,
-                    "symbol": signal.symbol,
-                    "action": signal.action.name,
-                    "reason": scoring_details['reason']
-                })
-                
-                # Update signal context with rejection reason
-                signal_context = None
-                if hasattr(signal, 'context_json') and signal.context_json:
-                    try:
-                        signal_context = json.loads(signal.context_json)
-                    except Exception as e:
-                        logger.error(f"Error parsing context_json: {e}")
-                        signal_context = {}
-                else:
-                    signal_context = {}
-                
-                # Add scoring details to context
-                signal_context['scoring_rejected'] = True
-                signal_context['scoring_details'] = scoring_details
-                signal_context['rejected_at'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                signal_context['mt5_processed'] = True  # Mark as processed so we don't keep evaluating it
-                
-                # Update signal context
-                if hasattr(signal, 'context'):
-                    signal.context = signal_context
-                else:
-                    signal.context_json = json.dumps(signal_context)
-                    
-                # Create a log entry for the rejected signal - but skip the context due to database schema issues
-                try:
-                    # Just log to console instead of database since the logs table might not have context_json column
-                    logger.info(f"Signal {signal.id} ({signal.symbol} {signal.action.name}) rejected: {scoring_details['reason']}")
-                    
-                    # If you want to add to database without context:
-                    # Log.add(
-                    #    level=LogLevel.INFO,
-                    #    source="signal_scoring",
-                    #    message=f"Signal {signal.id} ({signal.symbol} {signal.action.name}) rejected: {scoring_details['reason']}",
-                    #    context=None  # Skip context to avoid errors
-                    # )
-                except Exception as log_error:
-                    logger.error(f"Error creating log entry: {log_error}")
-                
-                db.session.commit()
-                continue
-            
-            # Signal passed scoring, proceed with formatting
-            logger.info(f"Signal {signal.id} ({signal.symbol} {signal.action.name}) passed scoring system")
-            
             # Convert SignalAction enum to string
             action = signal.action.value if hasattr(signal.action, 'value') else str(signal.action)
             
@@ -599,14 +550,10 @@ def get_signals():
             logger.info(f"Sending {len(formatted_signals)} signals to MT5 terminal for account {account_id}")
         else:
             logger.info(f"No signals to send to MT5 terminal for account {account_id}")
-            
-        if rejected_signals:
-            logger.info(f"Rejected {len(rejected_signals)} signals: {rejected_signals}")
         
         return jsonify({
             "status": "success",
-            "signals": formatted_signals,
-            "rejected_signals": rejected_signals
+            "signals": formatted_signals
         })
         
     except Exception as e:

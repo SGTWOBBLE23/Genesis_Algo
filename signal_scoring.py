@@ -132,12 +132,12 @@ class SignalScorer:
             # Convert to pandas DataFrame
             df = pd.DataFrame([
                 {
-                    'time': candle.get('timestamp', candle.get('time', None)),  # Handle either timestamp or time key
-                    'open': float(candle.get('open', candle.get('mid', {}).get('o', 0))),
-                    'high': float(candle.get('high', candle.get('mid', {}).get('h', 0))),
-                    'low': float(candle.get('low', candle.get('mid', {}).get('l', 0))),
-                    'close': float(candle.get('close', candle.get('mid', {}).get('c', 0))),
-                    'volume': float(candle.get('volume', 0))
+                    'time': candle['time'],
+                    'open': float(candle['mid']['o']),
+                    'high': float(candle['mid']['h']),
+                    'low': float(candle['mid']['l']),
+                    'close': float(candle['mid']['c']),
+                    'volume': float(candle['volume']) if 'volume' in candle else 0
                 } for candle in candles
             ])
             
@@ -145,13 +145,8 @@ class SignalScorer:
                 logger.warning(f"Empty DataFrame for {symbol}, using default score")
                 return 0.5, {"error": "Empty price data"}
             
-            try:
-                df['time'] = pd.to_datetime(df['time'])
-                df.set_index('time', inplace=True)
-            except Exception as e:
-                logger.warning(f"Error converting time format: {e}")
-                # Continue without time index if there's an issue
-                pass
+            df['time'] = pd.to_datetime(df['time'])
+            df.set_index('time', inplace=True)
             
             # Calculate technical indicators
             df['rsi'] = self._calculate_rsi(df['close'])
