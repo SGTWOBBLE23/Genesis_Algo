@@ -62,9 +62,8 @@ function initializeCharts() {
         // Initialize chart
         const ctx = document.getElementById(`chart-${symbol}`).getContext('2d');
         
-        // Using line chart which is supported by standard Chart.js instead of candlestick
         activeCharts[symbol] = new Chart(ctx, {
-            type: 'line',
+            type: 'candlestick', // Using candlestick chart type for OHLC data
             data: {
                 datasets: [{
                     label: symbol,
@@ -153,10 +152,10 @@ function updateChart(symbol, candles) {
         return;
     }
     
-    // Format data for chart.js line chart
+    // Format data for chart.js bar chart
     const chartData = candles.map(candle => ({
         x: new Date(candle.time).getTime(),
-        y: candle.close,
+        y: candle.close, // Use close price for bar chart
         // Keep OHLC data for tooltip
         o: candle.open,
         h: candle.high,
@@ -164,11 +163,11 @@ function updateChart(symbol, candles) {
         c: candle.close
     }));
     
-    // Set line color
-    activeCharts[symbol].data.datasets[0].borderColor = '#00c851';
-    activeCharts[symbol].data.datasets[0].backgroundColor = 'rgba(0, 200, 81, 0.1)';
-    activeCharts[symbol].data.datasets[0].pointRadius = 1;
-    activeCharts[symbol].data.datasets[0].fill = true;
+    // Set bar colors based on price movement (green for up, red for down)
+    activeCharts[symbol].data.datasets[0].backgroundColor = chartData.map((d, i) => {
+        if (i === 0) return '#00c851'; // Default to green for first bar
+        return chartData[i].y > chartData[i-1].y ? '#00c851' : '#ff3547'; // Green for up, red for down
+    });
     
     // Update chart
     activeCharts[symbol].data.datasets[0].data = chartData;
