@@ -447,6 +447,33 @@ def get_signals():
                 "signals": pending_signals
             })
         
+        # *** CRITICAL FIX ***
+        # First mark all signals as processed BEFORE formatting them
+        # This prevents duplicate signal processing if MT5 makes multiple requests
+        processed_signal_ids = []
+        
+        for signal in signals:
+            try:
+                # Mark the signal as processed in its context
+                if hasattr(signal, 'context_json') and signal.context_json:
+                    context = json.loads(signal.context_json)
+                    # Only mark if not already marked
+                    if not context.get('mt5_processed', False):
+                        context['mt5_processed'] = True
+                        signal.context_json = json.dumps(context)
+                        processed_signal_ids.append(signal.id)
+                        logger.info(f"Marked signal {signal.id} as processed by MT5")
+                # Always update status unless already done
+                if signal.status not in ['ACTIVE', 'TRIGGERED', 'ERROR']:
+                    signal.status = 'ACTIVE'
+            except Exception as e:
+                logger.error(f"Error marking signal {signal.id} as processed: {str(e)}")
+        
+        # Commit these changes immediately to avoid race conditions
+        if processed_signal_ids:
+            db.session.commit()  
+            logger.info(f"Committed {len(processed_signal_ids)} processed signals: {processed_signal_ids}")
+        
         # Format signals for MT5 EA
         formatted_signals = []
         for signal in signals:
@@ -517,8 +544,6 @@ def get_signals():
             elif hasattr(signal, 'context_json') and signal.context_json:
                 try:
                     signal_context = json.loads(signal.context_json)
-                    logger.info(f"Loaded context from context_json: {signal_context}")
-                    
                     # Check if context contains MT5 symbol - override the mapping if it does
                     if isinstance(signal_context, dict) and 'mt5_symbol' in signal_context:
                         mt5_symbol = signal_context['mt5_symbol']
@@ -541,29 +566,8 @@ def get_signals():
                     logger.info(f"Using timeframe from context: {formatted_signal['timeframe']}")
             
             formatted_signals.append(formatted_signal)
-            
-            # Mark all signals as processed by adding them to a processed_signals table
-            # or by setting a flag in the signal itself
-            if not hasattr(signal, 'mt5_processed') or not signal.mt5_processed:
-                # Only update signals that haven't been processed by MT5 yet
-                # This prevents the same signal from being sent multiple times
-                # First, check if the signal has a context_json field to store this info
-                if hasattr(signal, 'context_json') and signal.context_json:
-                    try:
-                        context = json.loads(signal.context_json)
-                        context['mt5_processed'] = True
-                        signal.context_json = json.dumps(context)
-                        logger.info(f"Marked signal {signal.id} as processed by MT5")
-                    except Exception as e:
-                        # If we can't update the context, just set the status
-                        logger.error(f"Error updating signal context: {str(e)}")
-                        signal.status = 'ACTIVE'
-                else:
-                    # No context exists, just set the status
-                    signal.status = 'ACTIVE'
-            
+        
         if formatted_signals:
-            db.session.commit()  # Save the status changes
             logger.info(f"Sending {len(formatted_signals)} signals to MT5 terminal for account {account_id}")
         else:
             logger.info(f"No signals to send to MT5 terminal for account {account_id}")
