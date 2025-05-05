@@ -397,9 +397,25 @@ def get_signals():
             
             formatted_signals.append(formatted_signal)
             
-            # Update signal status to indicate it has been sent to MT5
-            # This prevents resending unless explicitly requested
-            signal.status = 'ACTIVE'
+            # Mark all signals as processed by adding them to a processed_signals table
+            # or by setting a flag in the signal itself
+            if not hasattr(signal, 'mt5_processed') or not signal.mt5_processed:
+                # Only update signals that haven't been processed by MT5 yet
+                # This prevents the same signal from being sent multiple times
+                # First, check if the signal has a context_json field to store this info
+                if hasattr(signal, 'context_json') and signal.context_json:
+                    try:
+                        context = json.loads(signal.context_json)
+                        context['mt5_processed'] = True
+                        signal.context_json = json.dumps(context)
+                        logger.info(f"Marked signal {signal.id} as processed by MT5")
+                    except Exception as e:
+                        # If we can't update the context, just set the status
+                        logger.error(f"Error updating signal context: {str(e)}")
+                        signal.status = 'ACTIVE'
+                else:
+                    # No context exists, just set the status
+                    signal.status = 'ACTIVE'
             
         if formatted_signals:
             db.session.commit()  # Save the status changes

@@ -54,6 +54,7 @@ class SignalStatus(enum.Enum):
     TRIGGERED = "TRIGGERED"
     EXPIRED = "EXPIRED"
     CANCELLED = "CANCELLED"
+    ERROR = "ERROR"
 
 class SignalAction(enum.Enum):
     ANTICIPATED_LONG = "ANTICIPATED_LONG"
@@ -869,8 +870,10 @@ def get_trades_stats():
 
 @app.route('/api/signals/current', methods=['GET'])
 def get_current_signals():
+    # By default, show PENDING, ACTIVE, and ERROR signals from the last 24 hours
     signals = db.session.query(Signal).filter(
-        Signal.status.in_([SignalStatus.PENDING, SignalStatus.ACTIVE])
+        Signal.status.in_([SignalStatus.PENDING, SignalStatus.ACTIVE, SignalStatus.ERROR]),
+        Signal.created_at >= (datetime.now() - timedelta(days=1))
     ).order_by(Signal.created_at.desc()).all()
     
     return jsonify([signal.to_dict() for signal in signals])
