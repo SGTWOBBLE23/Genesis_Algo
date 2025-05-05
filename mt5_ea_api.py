@@ -282,8 +282,13 @@ def get_signals():
             
             
             # Get force_execution flag to ensure MT5 executes right away
-            if len(pending_signals) > 0 and all(signal.get('force_execution', False) for signal in pending_signals):
-                logger.info(f"Sending {len(pending_signals)} pending signals with force_execution=True")
+            force_all = True  # Force all signals to execute immediately
+            if len(pending_signals) > 0:
+                if force_all or all(signal.get('force_execution', False) for signal in pending_signals):
+                    logger.info(f"Sending {len(pending_signals)} pending signals with force_execution=True")
+                    # Set force_execution for all signals
+                    for signal in pending_signals:
+                        signal['force_execution'] = True
             
             # Clear the pending signals so they're only sent once
             active_terminals[terminal_id]['pending_signals'] = []

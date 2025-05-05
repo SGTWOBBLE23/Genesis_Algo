@@ -69,28 +69,33 @@ def get_quote(symbol: str) -> Dict[str, Any]:
 
 
 def take_screenshot(symbol: str) -> str:
-    """Take a screenshot of the chart and upload to S3"""
+    """Generate a technical chart for a symbol and return the path"""
     try:
-        # We'll simulate this function as the actual implementation
-        # would require browser automation or MT5 API integration
-        # In a real implementation, this would:
-        # 1. Capture the chart image for the symbol
-        # 2. Save it temporarily
-        # 3. Upload to S3
-        # 4. Return the S3 path
+        # Use chart_utils to generate a real chart with actual market data
+        from chart_utils import generate_chart
+        
+        # Generate the chart with timeframe H1 and 100 candles
+        # This will use OANDA API to get real price data
+        timeframe = "H1"
+        count = 100
         
         # Generate a unique filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{symbol}_{timestamp}.png"
+        filename = f"{symbol}_{timeframe}_{timestamp}.png"
         s3_path = f"charts/{symbol}/{filename}"
         
-        # In a real implementation, we would save and upload the actual screenshot
-        # For simulation, we'll just log and return the path
-        logger.info(f"Simulated taking screenshot for {symbol} and uploading to S3 at {s3_path}")
+        # Generate the chart with proper indicators
+        # This returns the path where the chart was saved
+        chart_path = generate_chart(symbol, timeframe, count)
         
+        # In a production environment, we would upload to S3 here
+        # For now, we'll just log and return the path
+        logger.info(f"Generated chart for {symbol} at {chart_path}, would upload to S3 at {s3_path}")
+        
+        # The s3_path is used as an identifier in the system
         return s3_path
     except Exception as e:
-        logger.error(f"Error taking screenshot for {symbol}: {str(e)}")
+        logger.error(f"Error generating chart for {symbol}: {str(e)}")
         return ""
 
 
