@@ -3,15 +3,11 @@
  */
 
 // Global variables
-let activeCharts = {};
 let activeTrades = [];
 let priceData = {};
 
 // Initialize Dashboard when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize the charts
-    initializeCharts();
-    
     // Load active trades (functions available but not displayed in UI)
     loadActiveTrades();
     
@@ -26,181 +22,8 @@ document.addEventListener('DOMContentLoaded', function() {
     setInterval(loadCurrentSignals, 60000); // Update signals every minute
 });
 
-/**
- * Initialize price charts for tracked symbols
- */
-function initializeCharts() {
-    const symbols = ['XAUUSD', 'GBPJPY', 'GBPUSD', 'EURUSD', 'AAPL', 'NAS100', 'BTCUSD'];
-    const chartContainer = document.getElementById('charts-container');
-    
-    // Check if the chart container exists
-    if (!chartContainer) {
-        console.log("Charts container not found. Charts will not be initialized.");
-        return;
-    }
-    
-    // Create chart containers
-    symbols.forEach(symbol => {
-        try {
-            // Create card for chart
-            const card = document.createElement('div');
-            card.className = 'card';
-            card.innerHTML = `
-                <div class="card-header">
-                    <h3>${symbol}</h3>
-                    <div class="price-indicator">
-                        <span class="bid">Bid: <strong id="${symbol}-bid">--</strong></span>
-                        <span class="ask">Ask: <strong id="${symbol}-ask">--</strong></span>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <canvas id="chart-${symbol}" width="400" height="250"></canvas>
-                </div>
-                <div class="card-footer" id="signals-${symbol}">
-                    <div class="spinner-border spinner-border-sm" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    Waiting for signals...
-                </div>
-            `;
-            
-            chartContainer.appendChild(card);
-            
-            // Initialize chart
-            const ctx = document.getElementById(`chart-${symbol}`).getContext('2d');
-            
-            activeCharts[symbol] = new Chart(ctx, {
-            type: 'candlestick', // Using candlestick chart type for OHLC data
-            data: {
-                datasets: [{
-                    label: symbol,
-                    data: []
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const candle = context.raw;
-                                if (candle && candle.o !== undefined) {
-                                    return [
-                                        `Open: ${candle.o.toFixed(5)}`,
-                                        `High: ${candle.h.toFixed(5)}`,
-                                        `Low: ${candle.l.toFixed(5)}`,
-                                        `Close: ${candle.c.toFixed(5)}`
-                                    ];
-                                }
-                                return `Value: ${context.parsed.y}`;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        display: true,
-                        title: {
-                            display: true,
-                            text: 'Time'
-                        }
-                    },
-                    y: {
-                        display: true,
-                        title: {
-                            display: true,
-                            text: 'Price'
-                        }
-                    }
-                }
-            }
-        });
-        
-        // Fetch initial chart data
-        fetchChartData(symbol);
-    });
-    
-    console.log("Charts initialized");
-}
-
-/**
- * Fetch chart data for a symbol
- * @param {string} symbol - The trading symbol
- */
-function fetchChartData(symbol) {
-    // Adding timestamp to prevent caching
-    fetch(`/api/oanda/candles/${symbol}?t=${Date.now()}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return response.json();
-        })
-        .then(data => {
-            updateChart(symbol, data);
-        })
-        .catch(error => {
-            console.error('Error fetching chart data:', error);
-        });
-}
-
-/**
- * Update chart with new candle data
- * @param {string} symbol - The trading symbol
- * @param {Array} candles - Array of candle data objects
- */
-function updateChart(symbol, candles) {
-    if (!activeCharts[symbol]) {
-        console.error(`Chart for ${symbol} not found`);
-        return;
-    }
-    
-    // Format data for chart.js bar chart
-    const chartData = candles.map(candle => ({
-        x: new Date(candle.time).getTime(),
-        y: candle.close, // Use close price for bar chart
-        // Keep OHLC data for tooltip
-        o: candle.open,
-        h: candle.high,
-        l: candle.low,
-        c: candle.close
-    }));
-    
-    // Set bar colors based on price movement (green for up, red for down)
-    activeCharts[symbol].data.datasets[0].backgroundColor = chartData.map((d, i) => {
-        if (i === 0) return '#00c851'; // Default to green for first bar
-        return chartData[i].y > chartData[i-1].y ? '#00c851' : '#ff3547'; // Green for up, red for down
-    });
-    
-    // Update chart
-    activeCharts[symbol].data.datasets[0].data = chartData;
-    activeCharts[symbol].update();
-    
-    // Update latest prices
-    if (chartData.length > 0) {
-        const latest = chartData[chartData.length - 1];
-        
-        // Calculate bid/ask spread for display (simplified)
-        const spread = 0.0002 * latest.c; // 2 pips spread (example)
-        const bid = (latest.c - spread/2).toFixed(5);
-        const ask = (latest.c + spread/2).toFixed(5);
-        
-        // Store price data
-        priceData[symbol] = {
-            bid: parseFloat(bid),
-            ask: parseFloat(ask),
-            timestamp: new Date().toISOString()
-        };
-        
-        // Update UI
-        document.getElementById(`${symbol}-bid`).textContent = bid;
-        document.getElementById(`${symbol}-ask`).textContent = ask;
-    }
-}
+// Chart-related functions have been removed as they are no longer needed
+// for this version of the dashboard
 
 /**
  * Load active trades from the API
@@ -598,7 +421,8 @@ function connectWebSocket() {
                 
                 if (data.type === 'price_update') {
                     try {
-                        // Update price data
+                        // Update price data - only storing in memory for P&L calculations
+                        // No UI elements are updated since chart elements have been removed
                         const symbol = data.data.symbol;
                         priceData[symbol] = {
                             bid: data.data.bid,
@@ -606,12 +430,8 @@ function connectWebSocket() {
                             timestamp: data.data.timestamp
                         };
                         
-                        // Try to update UI if elements exist
-                        const bidElement = document.getElementById(`${symbol}-bid`);
-                        const askElement = document.getElementById(`${symbol}-ask`);
-                        
-                        if (bidElement) bidElement.textContent = data.data.bid.toFixed(5);
-                        if (askElement) askElement.textContent = data.data.ask.toFixed(5);
+                        // No need to update UI elements since they don't exist in current layout
+                        // This prevents JavaScript errors trying to access non-existent DOM elements
                     } catch (e) {
                         console.error('Error processing price update:', e);
                     }
