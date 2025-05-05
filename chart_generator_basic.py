@@ -151,6 +151,13 @@ class ChartGenerator:
             'volume': 'Volume'
         })
         
+        # Ensure Volume data exists
+        if 'Volume' not in df.columns or df['Volume'].isnull().all():
+            logger.info(f"Volume data not found or all null, adding synthetic volume")
+            # Create synthetic volume based on price movement (for visualization purposes)
+            df['Volume'] = abs(df['Close'] - df['Open']) * 100
+            df['Volume'] = df['Volume'].fillna(1)  # Fill any NaN values
+        
         # Add a log entry to verify data
         if not df.empty:
             latest_time = df['datetime'].iloc[-1] if 'datetime' in df else None
@@ -298,10 +305,10 @@ class ChartGenerator:
             axes[2].set_ylim(0, 100)
             axes[2].set_ylabel('RSI (14)', color=self.colors['text'], fontsize=10)
             
-            # Plot MACD on the third panel
-            axes[2].plot(np.arange(len(df)), df['macd'], color=self.colors['macd'], linewidth=1.5, label='MACD')
-            axes[2].plot(np.arange(len(df)), df['macd_signal'], color=self.colors['macd_signal'], linewidth=1.5, label='Signal')
-            axes[2].axhline(y=0, color=self.colors['grid'], linestyle='-')
+            # Plot MACD on the fourth panel
+            axes[3].plot(np.arange(len(df)), df['macd'], color=self.colors['macd'], linewidth=1.5, label='MACD')
+            axes[3].plot(np.arange(len(df)), df['macd_signal'], color=self.colors['macd_signal'], linewidth=1.5, label='Signal')
+            axes[3].axhline(y=0, color=self.colors['grid'], linestyle='-')
             
             # Add MACD histogram bars
             for i, (idx, row) in enumerate(df.iterrows()):
@@ -310,13 +317,17 @@ class ChartGenerator:
                 hist_val = df['macd_hist'].iloc[i]
                 if hist_val >= 0:
                     # Positive histogram
-                    axes[2].bar(i, hist_val, width=0.8, color=self.colors['macd_hist_up'], alpha=0.5)
+                    axes[3].bar(i, hist_val, width=0.8, color=self.colors['macd_hist_up'], alpha=0.5)
                 else:
                     # Negative histogram
-                    axes[2].bar(i, hist_val, width=0.8, color=self.colors['macd_hist_down'], alpha=0.5)
+                    axes[3].bar(i, hist_val, width=0.8, color=self.colors['macd_hist_down'], alpha=0.5)
             
-            axes[2].set_ylabel('MACD (12,26,9)', color=self.colors['text'])
-            axes[2].legend(loc='upper left')
+            axes[3].set_ylabel('MACD (12,26,9)', color=self.colors['text'], fontsize=10)
+            axes[3].legend(loc='upper left', fontsize=10)
+            
+            # Plot ATR as a thin line in the fifth panel
+            axes[4].plot(np.arange(len(df)), df['atr'], color=self.colors['atr'], linewidth=1.5)
+            axes[4].set_ylabel('ATR (14)', color=self.colors['text'], fontsize=10)
             
             # Set x-axis labels for all chart panels
             x_positions = np.linspace(0, len(df) - 1, min(10, len(df)))
