@@ -26,8 +26,8 @@ def test_chart():
         logger.info(f"Fetched {len(candles)} candles for {symbol} {timeframe}")
         
         # Create chart generator
-        logger.info("Creating chart generator with BUY_NOW signal")
-        chart_gen = ChartGenerator(signal_action="BUY_NOW")
+        logger.info("Creating chart generator with ANTICIPATED_SHORT signal")
+        chart_gen = ChartGenerator(signal_action="ANTICIPATED_SHORT")
         
         # Calculate entry point, SL, and TP
         current_price = candles[-1]['close']
