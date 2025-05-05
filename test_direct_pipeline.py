@@ -34,7 +34,7 @@ def test_chart_generation():
         return None
 
 def test_direct_vision():
-    """Test the DirectVisionPipeline for each asset"""
+    """Test the DirectVisionPipeline for a single asset"""
     from vision_worker import DirectVisionPipeline
     
     # Create the pipeline
@@ -44,23 +44,26 @@ def test_direct_vision():
     from chart_utils import generate_chart
     
     with app.app_context():
-        for symbol in ASSETS:
-            logger.info(f"Testing DirectVisionPipeline with {symbol}")
-            
-            # Generate a chart
-            chart_path = generate_chart(symbol, DEFAULT_TIMEFRAME, count=100)
-            
-            if not chart_path or not os.path.exists(chart_path):
-                logger.error(f"❌ Failed to generate chart for {symbol}, skipping vision test")
-                continue
-            
-            # Process the chart with the pipeline
-            success = pipeline.process_chart(symbol, chart_path)
-            
-            if success:
-                logger.info(f"✅ Successfully processed {symbol} chart with DirectVisionPipeline")
-            else:
-                logger.error(f"❌ Failed to process {symbol} chart with DirectVisionPipeline")
+        # Just test with EUR_USD to make it faster
+        symbol = "EUR_USD"
+        logger.info(f"Testing DirectVisionPipeline with {symbol}")
+        
+        # Generate a chart
+        chart_path = generate_chart(symbol, DEFAULT_TIMEFRAME, count=100)
+        
+        if not chart_path or not os.path.exists(chart_path):
+            logger.error(f"❌ Failed to generate chart for {symbol}, skipping vision test")
+            return
+        
+        logger.info(f"Using chart path: {chart_path}")
+        
+        # Process the chart with the pipeline
+        success = pipeline.process_chart(symbol, chart_path)
+        
+        if success:
+            logger.info(f"✅ Successfully processed {symbol} chart with DirectVisionPipeline")
+        else:
+            logger.error(f"❌ Failed to process {symbol} chart with DirectVisionPipeline")
 
 def main():
     """Main function"""

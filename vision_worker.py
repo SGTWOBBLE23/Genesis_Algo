@@ -93,8 +93,23 @@ def analyze_image(image_path: str) -> Dict[str, Any]:
             if image_path.startswith("s3://"):
                 # TODO: download with boto3 if you keep S3
                 raise FileNotFoundError
-            local_path = image_path if os.path.isabs(image_path) \
-                         else os.path.join("static", image_path)
+            # Fix path handling: avoid adding 'static/' if it's already there
+            if os.path.exists(image_path):
+                local_path = image_path
+            elif os.path.exists(os.path.join("static", image_path)):
+                local_path = os.path.join("static", image_path)
+            else:
+                # Try to handle cases where the image path has a double 'static/static/'
+                if 'static/' in image_path:
+                    test_path = image_path.replace('static/', '', 1)
+                    if os.path.exists(os.path.join("static", test_path)):
+                        local_path = os.path.join("static", test_path)
+                    else:
+                        raise FileNotFoundError(f"Cannot find image file: {image_path}")
+                else:
+                    raise FileNotFoundError(f"Cannot find image file: {image_path}")
+                
+            logger.info(f"Reading image file from: {local_path}")
             with open(local_path, "rb") as f:
                 image_bytes = f.read()
         except Exception as e:
