@@ -21,7 +21,7 @@ def test_enhanced_chart():
     os.makedirs("test_charts", exist_ok=True)
     
     # Test for each of the 5 restricted assets
-    for symbol in ASSETS[:2]:  # Just test the first 2 for speed
+    for symbol in ASSETS:  # Test all restricted assets
         try:
             logger.info(f"Generating enhanced chart for {symbol}")
             
