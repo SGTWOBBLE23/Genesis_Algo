@@ -91,11 +91,50 @@ def analyze_image(image_path: str) -> Dict[str, Any]:
                          else os.path.join("static", image_path)
             with open(local_path, "rb") as f:
                 image_bytes = f.read()
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to read image from path {image_path}: {str(e)}")
             # Fallback: regenerate a fresh chart on-the-fly
             from chart_utils import generate_chart_bytes
-            symbol = (image_path.split('/')[1] if '/' in image_path else "EUR_USD")
-            image_bytes = generate_chart_bytes(symbol)
+            
+            # Extract the symbol from the path, usually in format static/charts/SYMBOL/...
+            try:
+                parts = image_path.split('/')
+                if 'charts' in parts:
+                    symbol_idx = parts.index('charts') + 1
+                    if symbol_idx < len(parts):
+                        symbol_format = parts[symbol_idx]
+                        # Convert from MT5 to OANDA format if needed (XAUUSD -> XAU_USD)
+                        if symbol_format == 'XAUUSD':
+                            symbol = 'XAU_USD'
+                        elif len(symbol_format) == 6:  # For currency pairs like EURUSD
+                            symbol = symbol_format[:3] + '_' + symbol_format[3:]
+                        else:
+                            symbol = symbol_format
+                    else:
+                        symbol = "EUR_USD"  # Default
+                else:
+                    symbol = "EUR_USD"  # Default
+            except Exception:
+                symbol = "EUR_USD"  # Default if parsing fails
+                
+            logger.info(f"Generating fresh chart for {symbol}")
+            try:
+                image_bytes = generate_chart_bytes(symbol, count=100)
+            except Exception as chart_e:
+                logger.error(f"Failed to generate chart: {str(chart_e)}")
+                # Return an empty image to avoid crashing
+                import base64
+                from pathlib import Path
+                # Use a placeholder image from static folder
+                placeholder_path = Path("static/placeholder.png")
+                if placeholder_path.exists():
+                    with open(placeholder_path, "rb") as f:
+                        image_bytes = f.read()
+                else:
+                    # Create a minimal valid PNG
+                    image_bytes = base64.b64decode(
+                        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVQI12P4//8/AAX+Av7czFnnAAAAAElFTkSuQmCC"
+                    )
 
         image_base64 = base64.b64encode(image_bytes).decode("utf-8")
         

@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 from config import ASSETS
 from capture_job import run
+from app import app  # Import Flask app for context
 
 def test_capture_signal(symbol=None):
     """Test the capture and signal generation for a symbol"""
@@ -36,6 +37,23 @@ def test_capture_signal(symbol=None):
         local_path = f"static/{image_path}"
         if os.path.exists(local_path):
             logger.info(f"Chart generated successfully at {local_path}")
+            
+            # Now try direct vision processing
+            try:
+                from vision_worker import DirectVisionPipeline
+                
+                with app.app_context():
+                    pipeline = DirectVisionPipeline()
+                    success = pipeline.process_chart(symbol, local_path)
+                    
+                    if success:
+                        logger.info(f"Successfully processed chart directly: {symbol}")
+                    else:
+                        logger.error(f"Failed to process chart directly: {symbol}")
+            except Exception as e:
+                logger.error(f"Error in direct vision processing: {str(e)}")
+                import traceback
+                logger.error(traceback.format_exc())
         else:
             logger.error(f"Chart file not found at {local_path}")
     else:
