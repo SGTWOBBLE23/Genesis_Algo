@@ -72,6 +72,25 @@ body {
     font-weight: 500;
 }
 
+/* Signal Status Badges */
+.status-badge {
+    display: inline-block;
+    padding: 0.35em 0.65em;
+    font-size: 0.75em;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 0.25rem;
+    margin-left: 5px;
+}
+
+.status-badge.status-error {
+    background-color: #dc3545;
+    color: white;
+}
+
 /* Form Controls */
 .form-control:focus,
 .form-select:focus {
