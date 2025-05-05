@@ -63,7 +63,6 @@ class DirectVisionPipeline:
                     'processed_at': datetime.now().isoformat()
                 })
             )
-
             try:
                 from app import OandaService
                 DIGITS = {'XAU_USD': 2, 'XAG_USD': 3, 'USD_JPY': 3,      # metals / yen pairs
@@ -97,6 +96,7 @@ class DirectVisionPipeline:
             if signal.sl    is not None: signal.sl    = round(signal.sl,    d)
             if signal.tp    is not None: signal.tp    = round(signal.tp,    d)
             # ------------------------------------------------------------------
+            
 
             
             db.session.add(signal)
@@ -151,7 +151,7 @@ def generate_technical_signal(symbol: str, image_path: str) -> Dict[str, Any]:
         oanda_service = OandaService()
         if oanda_service.api_key and oanda_service.account_id:
             # Get latest candle data
-            candles = oanda_service.get_candles(symbol, granularity="H1", count=1)
+            candles = oanda_service.get_candles(symbol, granularity="M1", count=1)
             if candles and len(candles) > 0:
                 latest_candle = candles[-1]
                 current_price = float(latest_candle['mid']['c'])
