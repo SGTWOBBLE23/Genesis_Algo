@@ -31,34 +31,98 @@ MAX_RETRIES = 2
 
 
 def analyze_image(image_s3: str) -> Dict[str, Any]:
-    """Send image to Vision API for analysis (simulated for now)"""
+    """Send image to Vision API for analysis with OpenAI"""
     try:
-        # In a real implementation, we would:
-        # 1. Download the image from S3 or generate a pre‑signed URL
-        # 2. Send to OpenAI Vision API
-        # 3. Parse the response
-
-        # --- Simulated call -------------------------------------------------
-        logger.info(f"Simulating Vision API call for {image_s3}")
-        simulated_response = {
-            'action': 'BUY_NOW',
-            'entry': 1.13005,
-            'sl': 1.12750,
-            'tp': 1.13500,
-            'confidence': 0.85
+        if not OPENAI_API_KEY:
+            logger.error("OpenAI API key not found in environment variables")
+            return {}
+            
+        logger.info(f"Calling OpenAI Vision API for {image_s3}")
+        
+        # In a production environment, you'd download the image from S3
+        # For now, we'll simulate having the image content
+        # In the real implementation this would be the actual image data from S3
+        import base64
+        
+        # Use a sample chart image or generate one with chart_utils
+        from chart_utils import generate_chart_bytes
+        # Extract symbol from s3_path (format: charts/SYMBOL/filename.png)
+        try:
+            symbol = image_s3.split('/')[1]
+        except:
+            symbol = "EUR_USD"  # Default if parsing fails
+            
+        image_bytes = generate_chart_bytes(symbol)
+        image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+        
+        # Build request for OpenAI API
+        headers = {
+            'Authorization': f'Bearer {OPENAI_API_KEY}',
+            'Content-Type': 'application/json'
         }
-        return simulated_response
-        # -------------------------------------------------------------------
-
-        # ↳ Real‑world code (commented out)
-        # headers = {
-        #     'Authorization': f'Bearer {OPENAI_API_KEY}',
-        #     'Content-Type': 'application/json'
-        # }
-        # payload = {...}
-        # response = requests.post(VISION_API_URL, headers=headers, json=payload)
-        # response.raise_for_status()
-        # return response.json()
+        
+        # Construct a detailed prompt for the vision model
+        system_prompt = """You are an expert forex trading analyst. Analyze this chart and identify trading opportunities. 
+        If you see a clear buy or sell signal, respond with action: BUY_NOW or SELL_NOW. 
+        If you see a potential future setup forming, use action: ANTICIPATED_LONG or ANTICIPATED_SHORT.
+        Always include entry price, stop loss (sl), take profit (tp) levels, and confidence score (0-1).
+        Format your response as a valid JSON object with the following fields only:
+        {"action": "BUY_NOW|SELL_NOW|ANTICIPATED_LONG|ANTICIPATED_SHORT", "entry": float, "sl": float, "tp": float, "confidence": float}
+        """
+        
+        # Construct payload with the image
+        payload = {
+            "model": VISION_MODEL,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": system_prompt
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"Analyze this {symbol} forex chart and identify any trading opportunities. Look for key support/resistance levels, trend direction, and technical patterns. Consider price action around EMAs, RSI, MACD, and ATR indicators."
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{image_base64}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            "response_format": {"type": "json_object"}
+        }
+        
+        # Send to OpenAI Vision API
+        logger.info("Sending request to OpenAI Vision API")
+        response = requests.post(VISION_API_URL, headers=headers, json=payload)
+        response.raise_for_status()
+        
+        # Parse the response
+        result = response.json()
+        if 'choices' in result and len(result['choices']) > 0:
+            content = result['choices'][0]['message']['content']
+            
+            # Extract JSON from the response
+            import json
+            try:
+                trading_signal = json.loads(content)
+                # Validate required fields
+                required_fields = ['action', 'entry', 'sl', 'tp', 'confidence']
+                if all(field in trading_signal for field in required_fields):
+                    logger.info(f"Successfully analyzed chart: {trading_signal}")
+                    return trading_signal
+                else:
+                    logger.error(f"Missing required fields in response: {content}")
+            except json.JSONDecodeError:
+                logger.error(f"Could not parse JSON from response: {content}")
+        
+        logger.error(f"Unexpected response format from OpenAI: {result}")
+        return {}
 
     except Exception as e:
         logger.error(f"Error analyzing image {image_s3}: {str(e)}")
