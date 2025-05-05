@@ -11,6 +11,9 @@ from app import db, Signal, Trade, SignalAction, TradeStatus, TradeSide, Setting
 
 STALE_SECONDS = 30
 
+# Default supported symbols (limited to 5 for focused processing)
+DEFAULT_SYMBOLS = ['XAUUSD', 'GBPJPY', 'GBPUSD', 'EURUSD', 'USDJPY']
+
 # Define Symbol Mapping model for local use in this module
 class SymbolMapping(db.Model):
     """Mapping between internal symbols and MT5 symbols"""
@@ -312,17 +315,15 @@ def get_signals():
             
         new_signals = filtered_by_market
         
-        # Check if we received valid symbols array
-        valid_symbols = []
+        # Use limited set of symbols regardless of what was received
+        # This limits processing to just 5 assets: XAUUSD, GBPJPY, GBPUSD, EURUSD, USDJPY
+        valid_symbols = DEFAULT_SYMBOLS
+        
+        # Check if we received symbols array, but ignore it and use our defaults
         if symbols and isinstance(symbols, list):
-            # Convert integer symbols to strings if necessary
-            for symbol in symbols:
-                if symbol and not (isinstance(symbol, int) and symbol == 0):
-                    if isinstance(symbol, int):
-                        # Try to convert integer to string symbol name
-                        valid_symbols.append(str(symbol))
-                    else:
-                        valid_symbols.append(symbol)
+            logger.info(f"Received symbols from MT5: {symbols}, but using restricted list: {valid_symbols}")
+        else:
+            logger.info(f"No symbols received from MT5, using restricted list: {valid_symbols}")
         
         # If we have valid symbols, filter the signals we already retrieved with smart mapping
         filtered_signals = []

@@ -10,13 +10,13 @@ import capture_job
 
 logger = logging.getLogger(__name__)
 
-# List of assets to monitor
+# List of assets to monitor (restricted to 5 to focus processing)
 ASSETS = [
-    "EUR_USD",
-    "GBP_USD",
-    "USD_JPY",
-    "XAU_USD",  # Gold
-    "GBP_JPY"   # Added as requested
+    "EUR_USD",  # EURUSD
+    "GBP_USD",  # GBPUSD
+    "USD_JPY",  # USDJPY
+    "XAU_USD",  # XAUUSD (Gold)
+    "GBP_JPY"   # GBPJPY
 ]
 
 
