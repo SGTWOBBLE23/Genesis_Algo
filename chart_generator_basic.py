@@ -215,9 +215,10 @@ class ChartGenerator:
             else:
                 title = f"{display_symbol} ({timeframe}) - {title_suffix}"
                 
-            # Create a figure with subplots for price chart, RSI, and MACD
-            fig, axes = plt.subplots(3, 1, figsize=(self.fig_width, self.fig_height), 
-                                   gridspec_kw={'height_ratios': [6, 2, 2]})
+            # Create a figure with subplots for price chart, volume, RSI, MACD, and ATR
+            # Updated height ratios to include volume and ATR panels
+            fig, axes = plt.subplots(5, 1, figsize=(self.fig_width, self.fig_height), 
+                                   gridspec_kw={'height_ratios': [6, 1, 2, 2, 1.5]})
             
             # Set background color
             fig.patch.set_facecolor(self.colors['bg'])
@@ -270,12 +271,32 @@ class ChartGenerator:
             axes[0].set_ylabel('Price', color=self.colors['text'])
             axes[0].legend(loc='upper left')
             
-            # Plot RSI on the second panel
-            axes[1].plot(np.arange(len(df)), df['rsi'], color=self.colors['rsi'], linewidth=1.5)
-            axes[1].axhline(y=30, color=self.colors['rsi_os'], linestyle='--')
-            axes[1].axhline(y=70, color=self.colors['rsi_ob'], linestyle='--')
-            axes[1].set_ylim(0, 100)
-            axes[1].set_ylabel('RSI (14)', color=self.colors['text'])
+            # Plot volume on the second panel with colored bars matching candle colors
+            for i, (idx, row) in enumerate(df.iterrows()):
+                if i >= len(df) or 'Volume' not in df or pd.isna(df['Volume'].iloc[i]):
+                    continue
+                    
+                vol_val = df['Volume'].iloc[i]
+                # Use the same color as the candlestick (green for up, red for down)
+                if i > 0 and 'Close' in df and 'Open' in df:
+                    if df['Close'].iloc[i] > df['Open'].iloc[i]:
+                        # Bullish volume
+                        axes[1].bar(i, vol_val, width=0.8, color=self.colors['candle_up'], alpha=0.8)
+                    else:
+                        # Bearish volume
+                        axes[1].bar(i, vol_val, width=0.8, color=self.colors['candle_down'], alpha=0.8)
+                else:
+                    # Default color if we can't determine direction
+                    axes[1].bar(i, vol_val, width=0.8, color='gray', alpha=0.5)
+            
+            axes[1].set_ylabel('Volume', color=self.colors['text'], fontsize=10)
+            
+            # Plot RSI on the third panel
+            axes[2].plot(np.arange(len(df)), df['rsi'], color=self.colors['rsi'], linewidth=1.5)
+            axes[2].axhline(y=30, color=self.colors['rsi_os'], linestyle='--')
+            axes[2].axhline(y=70, color=self.colors['rsi_ob'], linestyle='--')
+            axes[2].set_ylim(0, 100)
+            axes[2].set_ylabel('RSI (14)', color=self.colors['text'], fontsize=10)
             
             # Plot MACD on the third panel
             axes[2].plot(np.arange(len(df)), df['macd'], color=self.colors['macd'], linewidth=1.5, label='MACD')

@@ -19,7 +19,7 @@ oanda_api = OandaAPI(
     account_id=os.environ.get('OANDA_ACCOUNT_ID')
 )
 
-def fetch_candles(symbol: str, timeframe: str = "H1", count: int = 100) -> List[Dict]:
+def fetch_candles(symbol: str, timeframe: str = "H1", count: int = 300) -> List[Dict]:
     """Fetch candle data from OANDA API
     
     Args:
@@ -47,7 +47,7 @@ def fetch_candles(symbol: str, timeframe: str = "H1", count: int = 100) -> List[
         logger.error(f"Exception fetching candles for {symbol}: {str(e)}")
         return []
 
-def generate_chart(symbol: str, timeframe: str = "H1", count: int = 100, 
+def generate_chart(symbol: str, timeframe: str = "H1", count: int = 300, 
                   entry_point: Optional[Tuple[datetime, float]] = None,
                   stop_loss: Optional[float] = None, 
                   take_profit: Optional[float] = None,
@@ -97,7 +97,7 @@ def generate_chart(symbol: str, timeframe: str = "H1", count: int = 100,
         logger.error(f"Error generating chart for {symbol}: {str(e)}")
         return ""
 
-def generate_chart_bytes(symbol: str, timeframe: str = "H1", count: int = 100, 
+def generate_chart_bytes(symbol: str, timeframe: str = "H1", count: int = 300, 
                        entry_point: Optional[Tuple[datetime, float]] = None,
                        stop_loss: Optional[float] = None, 
                        take_profit: Optional[float] = None,
