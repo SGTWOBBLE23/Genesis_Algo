@@ -126,7 +126,7 @@ function initializeCharts() {
  */
 function fetchChartData(symbol) {
     // Adding timestamp to prevent caching
-    fetch(`/api/candles/${symbol}?t=${Date.now()}`)
+    fetch(`/api/oanda/candles/${symbol}?t=${Date.now()}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Network response was not ok');

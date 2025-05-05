@@ -929,6 +929,7 @@ def get_oanda_instruments():
     return jsonify(instruments)
 
 @app.route('/api/oanda/candles/<instrument>', methods=['GET'])
+@app.route('/api/candles/<instrument>', methods=['GET'])  # Add compatibility route for dashboard.js
 def get_oanda_candles(instrument):
     """Get price candles for a specific instrument"""
     granularity = request.args.get('granularity', 'H1')
