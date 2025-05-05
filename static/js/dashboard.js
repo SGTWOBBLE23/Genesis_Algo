@@ -33,12 +33,6 @@ function initializeCharts() {
     const symbols = ['XAUUSD', 'GBPJPY', 'GBPUSD', 'EURUSD', 'AAPL', 'NAS100', 'BTCUSD'];
     const chartContainer = document.getElementById('charts-container');
     
-    // If chart container doesn't exist, don't try to create charts
-    if (!chartContainer) {
-        console.log("Charts container not found. Charts will not be initialized.");
-        return;
-    }
-    
     // Create chart containers
     symbols.forEach(symbol => {
         // Create card for chart
@@ -66,11 +60,9 @@ function initializeCharts() {
         chartContainer.appendChild(card);
         
         // Initialize chart
-        const canvas = document.getElementById(`chart-${symbol}`);
-        if (canvas) {
-            const ctx = canvas.getContext('2d');
-            
-            activeCharts[symbol] = new Chart(ctx, {
+        const ctx = document.getElementById(`chart-${symbol}`).getContext('2d');
+        
+        activeCharts[symbol] = new Chart(ctx, {
             type: 'candlestick', // Using candlestick chart type for OHLC data
             data: {
                 datasets: [{
@@ -123,7 +115,6 @@ function initializeCharts() {
         
         // Fetch initial chart data
         fetchChartData(symbol);
-        }
     });
     
     console.log("Charts initialized");
@@ -308,12 +299,6 @@ function closeTrade(tradeId) {
 function showAlert(message, type = 'info') {
     const alertsContainer = document.getElementById('alerts-container');
     
-    // Check if alerts container exists
-    if (!alertsContainer) {
-        console.error('Alerts container not found. Cannot display alert:', message);
-        return;
-    }
-    
     const alert = document.createElement('div');
     alert.className = `alert alert-${type} alert-dismissible fade show`;
     alert.innerHTML = `
@@ -482,11 +467,6 @@ function executeSignal(signalId) {
     
     // Show loading state by changing the button text and style
     const button = document.querySelector(`button[onclick="executeSignal(${signalId});"]`);
-    if (!button) {
-        console.error(`Execute button for signal ${signalId} not found`);
-        return;
-    }
-    
     const originalText = button.textContent;
     button.textContent = 'Sending...';
     button.disabled = true;
