@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, send_file
 from app import db, Signal, Trade, SignalAction, TradeStatus, TradeSide, Settings, SignalStatus
 
+STALE_SECONDS = 30
+
 # Define Symbol Mapping model for local use in this module
 class SymbolMapping(db.Model):
     """Mapping between internal symbols and MT5 symbols"""
@@ -32,6 +34,7 @@ api_routes = Blueprint('api', __name__, url_prefix='/api')
 
 # Dictionary to store active MT5 terminal connections
 active_terminals = {}
+account_to_terminal = {}
 
 # Add a route for get-signals (with hyphen) since the MT5 EA is looking for that URL
 @mt5_api.route('/get-signals', methods=['POST'])
@@ -42,6 +45,7 @@ def get_signals_hyphen():
 @mt5_api.route('/heartbeat', methods=['POST'])
 def heartbeat():
     """Receive heartbeat from MT5 EA"""
+    global active_terminals, account_to_terminal
     try:
         # Debug the raw request data
         raw_data = request.data
@@ -81,6 +85,7 @@ def heartbeat():
             'last_seen': current_time,
             'connection_time': connection_time
         }
+        account_to_terminal[account_id] = terminal_id
         
         # Update settings table for dashboard monitoring
         from app import Settings
@@ -249,11 +254,32 @@ def get_signals():
         signals = filtered_signals  # Use the filtered list for formatting
         
         # Check if this terminal ID has any pending signals from direct execute requests
-        terminal_id = account_id  # Use account_id as terminal_id for simplicity
+        terminal_id = account_to_terminal.get(account_id)  # Use account_id as terminal_id for simplicity
+        if not terminal_id:
+            return jsonify({"status": "success", "signals": []})
         if terminal_id in active_terminals and 'pending_signals' in active_terminals[terminal_id] and active_terminals[terminal_id]['pending_signals']:
             # Extract pending signals
             pending_signals = active_terminals[terminal_id]['pending_signals']
             logger.info(f"Found {len(pending_signals)} pending signals for terminal {terminal_id}")
+
+            now_ts = datetime.now()
+            fresh_signals = []
+            for sig in pending_signals:
+                ts_str = sig.get("execution_timestamp")         # added by execute_signal()
+                if not ts_str:
+                    fresh_signals.append(sig)                   # no timestamp → keep
+                    continue
+                try:
+                    queued_at = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
+                    if (now_ts - queued_at).total_seconds() <= STALE_SECONDS:
+                        fresh_signals.append(sig)               # still fresh
+                    else:
+                        logger.info(f"Skipping stale signal {sig.get('id')} queued at {ts_str}")
+                except ValueError:
+                    fresh_signals.append(sig)                   # parse failure → keep
+
+            pending_signals = fresh_signals
+            
             
             # Get force_execution flag to ensure MT5 executes right away
             if len(pending_signals) > 0 and all(signal.get('force_execution', False) for signal in pending_signals):
