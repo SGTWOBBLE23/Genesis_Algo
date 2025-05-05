@@ -6,9 +6,12 @@ import time
 from datetime import datetime
 from typing import Dict, Any, Optional
 
+from config import ASSETS  # Import ASSETS from config.py
+
 import boto3
 import redis
 from oanda_api import OandaAPI
+from app import app  # Import Flask app for context
 
 logger = logging.getLogger(__name__)
 
@@ -79,21 +82,34 @@ def take_screenshot(symbol: str) -> str:
         timeframe = "H1"
         count = 100
         
-        # Generate a unique filename
+        # Convert OANDA symbol format to MT5 format for directory structure
+        # e.g., XAU_USD -> XAUUSD
+        mt5_symbol = symbol.replace('_', '')
+        
+        # Generate a unique filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{symbol}_{timeframe}_{timestamp}.png"
-        s3_path = f"charts/{symbol}/{filename}"
+        filename = f"{mt5_symbol}_{timeframe}_{timestamp}.png"
+        
+        # Ensure the charts directory exists for this symbol
+        charts_dir = f"static/charts/{mt5_symbol}"
+        if not os.path.exists(charts_dir):
+            os.makedirs(charts_dir, exist_ok=True)
+            logger.info(f"Created chart directory: {charts_dir}")
+        
+        # Full path for saving locally
+        local_path = f"{charts_dir}/{filename}"
         
         # Generate the chart with proper indicators
-        # This returns the path where the chart was saved
+        # This creates the chart and returns the path where it was saved
         chart_path = generate_chart(symbol, timeframe, count)
         
-        # In a production environment, we would upload to S3 here
-        # For now, we'll just log and return the path
-        logger.info(f"Generated chart for {symbol} at {chart_path}, would upload to S3 at {s3_path}")
+        # Define the path that Vision worker would use
+        vision_path = f"charts/{mt5_symbol}/{filename}"
         
-        # The s3_path is used as an identifier in the system
-        return s3_path
+        logger.info(f"Generated chart for {symbol} at {chart_path}, would use path {vision_path} for vision analysis")
+        
+        # The vision_path is used as an identifier in the system
+        return vision_path
     except Exception as e:
         logger.error(f"Error generating chart for {symbol}: {str(e)}")
         return ""
@@ -178,7 +194,32 @@ def run(symbol: str, timestamp: Optional[datetime] = None) -> Dict[str, Any]:
             except Exception as e:
                 logger.warning(f"Could not push to Redis queue: {e}")
         else:
-            logger.info(f"Capture job completed for {symbol}, Redis not available - data not queued")
+            # Direct vision processing as a workaround for environments without Redis
+            try:
+                # Import here to avoid circular imports
+                from vision_worker import DirectVisionPipeline
+                # Extract just the image path for the pipeline
+                mt5_symbol = symbol.replace('_', '') 
+                img_path = f"static/{s3_path}"
+                
+                # Check if the file exists
+                if os.path.exists(img_path):
+                    logger.info(f"Processing chart directly: {img_path}")
+                    with app.app_context():
+                        pipeline = DirectVisionPipeline()
+                        success = pipeline.process_chart(symbol, img_path)
+                        if success:
+                            logger.info(f"Successfully processed chart for {symbol} without Redis")
+                        else:
+                            logger.error(f"Failed to process chart for {symbol} without Redis")
+                else:
+                    logger.error(f"Chart file not found at {img_path}")
+            except Exception as e:
+                logger.error(f"Error in direct vision processing: {str(e)}")
+                import traceback
+                logger.error(traceback.format_exc())
+                
+            logger.info(f"Capture job completed for {symbol}, Redis not available - attempted direct vision processing")
         
         return payload
     except Exception as e:
