@@ -15,7 +15,6 @@ ASSETS = [
     "EUR_USD",
     "GBP_USD",
     "USD_JPY",
-    "USD_CAD",
     "XAU_USD",  # Gold
     "GBP_JPY"   # Added as requested
 ]
