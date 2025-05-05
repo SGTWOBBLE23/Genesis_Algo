@@ -255,6 +255,10 @@ def get_signals():
             pending_signals = active_terminals[terminal_id]['pending_signals']
             logger.info(f"Found {len(pending_signals)} pending signals for terminal {terminal_id}")
             
+            # Get force_execution flag to ensure MT5 executes right away
+            if len(pending_signals) > 0 and all(signal.get('force_execution', False) for signal in pending_signals):
+                logger.info(f"Sending {len(pending_signals)} pending signals with force_execution=True")
+            
             # Clear the pending signals so they're only sent once
             active_terminals[terminal_id]['pending_signals'] = []
             
@@ -406,8 +410,18 @@ def trade_report():
         
         # Update signal status if signal_id is provided
         if signal_id:
-            signal = db.session.query(Signal).filter(Signal.id == signal_id).first()
+            # Handle the case where we're getting the execution ID instead of original signal ID
+            actual_signal_id = signal_id
+            # If signal_id is very large (from our execute_signal function), it's an execution ID
+            if signal_id > 1000000:
+                logger.info(f"Received execution ID {signal_id}, looking for original signal ID")
+                # Check if the data includes the original signal_id field
+                actual_signal_id = data.get('original_signal_id', signal_id - 1000000)
+                logger.info(f"Using original signal ID: {actual_signal_id}")
+            
+            signal = db.session.query(Signal).filter(Signal.id == actual_signal_id).first()
             if signal:
+                logger.info(f"Found signal {actual_signal_id} to update status to {status}")
                 if status == 'success':
                     signal.status = 'TRIGGERED'
                 elif status == 'error':
@@ -423,6 +437,10 @@ def trade_report():
                 signal.context['execution_time'] = execution_time
                 
                 db.session.commit()
+            else:
+                logger.error(f"Signal with ID {actual_signal_id} not found for status update")
+        else:
+            logger.warning("No signal_id provided in trade report")
         
         # Create a trade record if status is success
         if status == 'success' and ticket:
@@ -439,9 +457,15 @@ def trade_report():
             if 'SELL' in action or 'SHORT' in action:
                 side = TradeSide.SELL
             
-            # Create new trade
+            # Create new trade with the original signal ID, not the execution ID
+            actual_signal_id = signal_id
+            # If signal_id is very large (from our execute_signal function), it's an execution ID
+            if signal_id > 1000000:
+                actual_signal_id = data.get('original_signal_id', signal_id - 1000000)
+                logger.info(f"Using original signal ID {actual_signal_id} for trade record")
+            
             trade = Trade(
-                signal_id=signal_id,
+                signal_id=actual_signal_id,
                 ticket=ticket,
                 symbol=symbol,
                 side=side,
@@ -748,8 +772,16 @@ def execute_signal(signal_id):
             logger.info(f"Using map dictionary: {signal.symbol} -> {mt5_symbol}")
         
         # Create signal data in the format expected by MT5 EA
+        # Add a very large ID to ensure it's higher than last_signal_id from MT5
+        # This makes sure the signal gets processed even if it's already known by MT5
+        # The actual signal ID is kept in signal_id field for reconciliation
+        execution_id = signal.id + 1000000  # Use a large offset
+        logger.info(f"Assigning execution ID {execution_id} to signal {signal.id}")
+        
         mt5_signal = {
-            "id": signal.id,
+            "id": execution_id,  # Use execution ID for immediate processing
+            "signal_id": signal.id,  # Original signal ID for reconciliation
+            "original_signal_id": signal.id,  # Make this explicitly available
             "asset": {
                 "symbol": mt5_symbol  # Use the mapped symbol if available
             },
@@ -759,7 +791,8 @@ def execute_signal(signal_id):
             "take_profit": float(signal.tp) if signal.tp else 0.0,
             "confidence": float(signal.confidence),
             "position_size": 0.1,  # Default lot size
-            "force_execution": True  # Force immediate execution
+            "force_execution": True,  # Force immediate execution
+            "execution_timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         
         # Store the signal in active terminals to be picked up on next get_signals request

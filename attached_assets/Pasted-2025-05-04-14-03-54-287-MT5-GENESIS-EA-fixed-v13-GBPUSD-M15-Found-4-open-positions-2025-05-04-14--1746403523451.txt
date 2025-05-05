@@ -1,0 +1,109 @@
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found 4 open positions
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Processing open position: Ticket=120051756, Symbol=XAUUSD, Open Price=3239.52000, Current Price=3246.09000, Profit=20.40
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 120051756 to: 2025.05.05 01:09:58
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Processing open position: Ticket=120051758, Symbol=XAUUSD, Open Price=3239.44000, Current Price=3246.09000, Profit=20.65
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 120051758 to: 2025.05.05 01:09:59
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Processing open position: Ticket=120051759, Symbol=XAUUSD, Open Price=3239.44000, Current Price=3246.09000, Profit=20.65
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 120051759 to: 2025.05.05 01:09:59
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Processing open position: Ticket=120051763, Symbol=XAUUSD, Open Price=3239.44000, Current Price=3246.09000, Profit=20.65
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 120051763 to: 2025.05.05 01:10:00
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	History select returned: true for period 2025.04.05 03:03 to 2025.05.05 03:03
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found 53 total deals in history
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=100972261, Position=116460216, Symbol=XAUUSD, Volume=1.06, Exit Price=3321.95000, Profit=-496.09, Close Time=2025.04.23 15:04
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=100971385, Entry Price=3324.95000, Open Time=2025.04.23 15:02, Type=BUY
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 116460216 to: 2025.04.23 15:02:14
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 116460216 to: 2025.04.23 15:04:13
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=101011742, Position=116502053, Symbol=XAUUSD, Volume=1.01, Exit Price=3305.91000, Profit=-472.32, Close Time=2025.04.23 16:07
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=101010291, Entry Price=3308.91000, Open Time=2025.04.23 16:05, Type=BUY
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 116502053 to: 2025.04.23 16:05:25
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 116502053 to: 2025.04.23 16:07:25
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=101020574, Position=116513749, Symbol=XAUUSD, Volume=0.96, Exit Price=3307.97000, Profit=598.41, Close Time=2025.04.23 16:22
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=101019766, Entry Price=3303.97000, Open Time=2025.04.23 16:20, Type=BUY
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 116513749 to: 2025.04.23 16:20:23
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 116513749 to: 2025.04.23 16:22:21
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=101026543, Position=116521373, Symbol=XAUUSD, Volume=1.02, Exit Price=3296.51000, Profit=-477.11, Close Time=2025.04.23 16:31
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=101026003, Entry Price=3299.51000, Open Time=2025.04.23 16:31, Type=BUY
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 116521373 to: 2025.04.23 16:31:07
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 116521373 to: 2025.04.23 16:31:38
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=101060967, Position=116558425, Symbol=XAUUSD, Volume=0.97, Exit Price=3273.87000, Profit=-453.74, Close Time=2025.04.23 16:58
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=101059302, Entry Price=3276.87000, Open Time=2025.04.23 16:57, Type=BUY
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 116558425 to: 2025.04.23 16:57:04
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 116558425 to: 2025.04.23 16:58:34
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=101130039, Position=116631581, Symbol=XAUUSD, Volume=0.92, Exit Price=3289.57000, Profit=88.99, Close Time=2025.04.23 17:56
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=101128779, Entry Price=3288.95000, Open Time=2025.04.23 17:54, Type=BUY
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 116631581 to: 2025.04.23 17:54:26
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 116631581 to: 2025.04.23 17:56:03
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=101207789, Position=116752035, Symbol=XAUUSD, Volume=0.92, Exit Price=3300.29000, Profit=-433.04, Close Time=2025.04.23 20:03
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=101205464, Entry Price=3297.29000, Open Time=2025.04.23 19:58, Type=SELL
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 116752035 to: 2025.04.23 19:58:42
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 116752035 to: 2025.04.23 20:03:45
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=101210594, Position=116758839, Symbol=XAUUSD, Volume=0.88, Exit Price=3294.77000, Profit=552.29, Close Time=2025.04.23 20:10
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=101209170, Entry Price=3298.77000, Open Time=2025.04.23 20:06, Type=SELL
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 116758839 to: 2025.04.23 20:06:50
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 116758839 to: 2025.04.23 20:10:24
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=101284152, Position=116875514, Symbol=XAUUSD, Volume=0.94, Exit Price=3286.04000, Profit=796.52, Close Time=2025.04.23 23:32
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=101283238, Entry Price=3291.43000, Open Time=2025.04.23 23:27, Type=SELL
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 116875514 to: 2025.04.23 23:27:58
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 116875514 to: 2025.04.23 23:32:15
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=101290458, Position=116880656, Symbol=XAUUSD, Volume=1.02, Exit Price=3292.56000, Profit=641.41, Close Time=2025.04.24 01:01
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=101286688, Entry Price=3288.56000, Open Time=2025.04.23 23:53, Type=BUY
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 116880656 to: 2025.04.23 23:53:30
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 116880656 to: 2025.04.24 01:01:05
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=103450183, Position=119229332, Symbol=XAUUSD, Volume=0.01, Exit Price=3268.00000, Profit=-11.67, Close Time=2025.05.01 03:19
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=103446582, Entry Price=3275.48000, Open Time=2025.05.01 02:46, Type=BUY
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 119229332 to: 2025.05.01 02:46:55
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 119229332 to: 2025.05.01 03:19:52
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=103463758, Position=119229824, Symbol=XAUUSD, Volume=0.01, Exit Price=3241.43000, Profit=-51.01, Close Time=2025.05.01 05:06
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=103447047, Entry Price=3274.13000, Open Time=2025.05.01 02:54, Type=BUY
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 119229824 to: 2025.05.01 02:54:22
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 119229824 to: 2025.05.01 05:06:59
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=103463772, Position=119229825, Symbol=XAUUSD, Volume=0.01, Exit Price=3241.41000, Profit=-51.03, Close Time=2025.05.01 05:07
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=103447048, Entry Price=3274.13000, Open Time=2025.05.01 02:54, Type=BUY
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 119229825 to: 2025.05.01 02:54:22
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 119229825 to: 2025.05.01 05:07:02
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=103463776, Position=119229826, Symbol=XAUUSD, Volume=0.01, Exit Price=3241.60000, Profit=-50.73, Close Time=2025.05.01 05:07
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=103447049, Entry Price=3274.13000, Open Time=2025.05.01 02:54, Type=BUY
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 119229826 to: 2025.05.01 02:54:23
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 119229826 to: 2025.05.01 05:07:03
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=103463780, Position=119229827, Symbol=XAUUSD, Volume=0.01, Exit Price=3241.60000, Profit=-50.73, Close Time=2025.05.01 05:07
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=103447050, Entry Price=3274.13000, Open Time=2025.05.01 02:54, Type=BUY
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 119229827 to: 2025.05.01 02:54:23
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 119229827 to: 2025.05.01 05:07:04
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=103463782, Position=119229828, Symbol=XAUUSD, Volume=0.01, Exit Price=3241.60000, Profit=-50.73, Close Time=2025.05.01 05:07
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=103447051, Entry Price=3274.13000, Open Time=2025.05.01 02:54, Type=BUY
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 119229828 to: 2025.05.01 02:54:24
+2025.05.04 14:03:54.287	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 119229828 to: 2025.05.01 05:07:04
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=103476677, Position=119245702, Symbol=XAUUSD, Volume=0.01, Exit Price=3231.03000, Profit=-16.88, Close Time=2025.05.01 06:56
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=103461554, Entry Price=3241.85000, Open Time=2025.05.01 04:54, Type=BUY
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 119245702 to: 2025.05.01 04:54:29
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 119245702 to: 2025.05.01 06:56:55
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=103476679, Position=119243561, Symbol=XAUUSD, Volume=0.01, Exit Price=3231.03000, Profit=-24.83, Close Time=2025.05.01 06:56
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=103459431, Entry Price=3246.94000, Open Time=2025.05.01 04:40, Type=BUY
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 119243561 to: 2025.05.01 04:40:36
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 119243561 to: 2025.05.01 06:56:56
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=103476681, Position=119243125, Symbol=XAUUSD, Volume=0.01, Exit Price=3231.13000, Profit=-26.98, Close Time=2025.05.01 06:56
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=103459088, Entry Price=3248.42000, Open Time=2025.05.01 04:35, Type=BUY
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 119243125 to: 2025.05.01 04:35:35
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 119243125 to: 2025.05.01 06:56:56
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=103476683, Position=119242689, Symbol=XAUUSD, Volume=0.01, Exit Price=3231.39000, Profit=-24.76, Close Time=2025.05.01 06:56
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=103458744, Entry Price=3247.26000, Open Time=2025.05.01 04:30, Type=BUY
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 119242689 to: 2025.05.01 04:30:16
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 119242689 to: 2025.05.01 06:56:56
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=103476686, Position=119239566, Symbol=XAUUSD, Volume=0.01, Exit Price=3231.44000, Profit=-23.33, Close Time=2025.05.01 06:56
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=103456202, Entry Price=3246.39000, Open Time=2025.05.01 04:04, Type=BUY
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 119239566 to: 2025.05.01 04:04:01
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 119239566 to: 2025.05.01 06:56:57
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=103909360, Position=119725926, Symbol=XAUUSD, Volume=0.01, Exit Price=3259.58000, Profit=-0.37, Close Time=2025.05.02 11:43
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=103909347, Entry Price=3259.82000, Open Time=2025.05.02 11:43, Type=BUY
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 119725926 to: 2025.05.02 11:43:10
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 119725926 to: 2025.05.02 11:43:15
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=104205573, Position=120043024, Symbol=BTCUSD, Volume=0.15, Exit Price=96301.40000, Profit=-13.73, Close Time=2025.05.04 01:34
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=104205571, Entry Price=96242.50000, Open Time=2025.05.04 01:32, Type=SELL
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 120043024 to: 2025.05.04 01:32:18
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 120043024 to: 2025.05.04 01:34:04
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found closed deal: Deal=104206369, Position=120043797, Symbol=BTCUSD, Volume=0.15, Exit Price=96230.10000, Profit=-7.21, Close Time=2025.05.04 05:04
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Found matching entry deal: Deal=104206327, Entry Price=96261.00000, Open Time=2025.05.04 05:03, Type=BUY
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting opened_at for position 120043797 to: 2025.05.04 05:03:02
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Setting closed_at for position 120043797 to: 2025.05.04 05:04:27
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Added 24 closed trades to the update
+2025.05.04 14:03:54.288	MT5_GENESIS_EA_fixed_v13 (GBPUSD,M15)	Trade update payload: {"account_id":"163499","trades":{"120051756":{"symbol":"XAUUSD","lot":"0.02","type":"BUY","open_price":"3239.52","sl":"3230.00","tp":"3290.00","profit":"20.40","opened_at":"2025.05.05 01:09:58","status":"OPEN"},"120051758":{"symbol":"XAUUSD","lot":"0.02","type":"BUY","open_price":"3239.44","sl":"3230.00","tp":"3290.00","profit":"20.65","opened_at":"2025.05.05 01:09:59","status":"OPEN"},"120051759":{"symbol":"XAUUSD","lot":"0.02","type":"BUY","open_price":"3239.44","sl":"3230.00","tp":
