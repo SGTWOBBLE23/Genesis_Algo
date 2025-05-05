@@ -1,0 +1,64 @@
+Refactor the chart generator so charts use a light theme, larger fonts, and show numeric overlays for price + EMAs.
+Make surgical edits only; keep all external APIs unchanged.
+
+──────────────── PATCH 1 ────────────────
+FILE: chart_utils.py             (function generate_chart)
+
+@@
+-import matplotlib.pyplot as plt
+-plt.style.use("dark_background")
++import matplotlib.pyplot as plt
++from matplotlib import rcParams
++
++# ---------- global light theme ----------
++plt.style.use("seaborn-v0_8-white")
++rcParams["figure.facecolor"] = "white"
++rcParams["axes.facecolor"]   = "white"
++rcParams["grid.color"]       = "#D0D0D0"
++rcParams["grid.alpha"]       = 0.4
++rcParams["text.color"]       = "#111111"
++rcParams["axes.labelcolor"]  = "#111111"
++rcParams["xtick.color"]      = "#111111"
++rcParams["ytick.color"]      = "#111111"
++rcParams["font.size"]        = 11              # bump base font
++
+ # existing code continues …
+
+──────────────── PATCH 2 ────────────────
+Still in generate_chart, **after** plotting candles & EMAs but **before** plt.legend():
+
+```python
+# ---------- explicit numeric overlays ----------
+last_close = candles['close'].iloc[-1]
+ema20_val  = ema20.iloc[-1]
+ema50_val  = ema50.iloc[-1]
+
+# Update legend to include values
+plt.legend([
+    f"EMA 20  {ema20_val:.2f}",
+    f"EMA 50  {ema50_val:.2f}",
+    "Stop Loss",
+    "Take Profit"
+], loc="upper left", fontsize=9)
+
+# Large label for current close
+ax_price.annotate(
+    f"Close {last_close:.2f}",
+    xy=(len(candles)-1, last_close),
+    xytext=(15, 0), textcoords="offset points",
+    ha="left", va="center",
+    fontsize=10, weight="bold",
+    bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="#111111")
+)
+──────────────── NOTES ────────────────
+
+No other files touched.
+
+PNG size & filename logic stay the same.
+
+After saving, delete old PNGs in static/charts/* so the scheduler regenerates them.
+
+Apply both patches, save, run the app, and confirm new charts have:
+• White background
+• Bigger axis / label fonts
+• Numeric legend + “Close XXX.XX” call-out

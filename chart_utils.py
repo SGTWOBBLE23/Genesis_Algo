@@ -3,6 +3,21 @@ import logging
 from typing import Dict, List, Any, Optional, Tuple, Union
 from datetime import datetime
 
+import matplotlib.pyplot as plt
+from matplotlib import rcParams
+
+# ---------- global light theme ----------
+plt.style.use("seaborn-v0_8-white")
+rcParams["figure.facecolor"] = "white"
+rcParams["axes.facecolor"]   = "white"
+rcParams["grid.color"]       = "#D0D0D0"
+rcParams["grid.alpha"]       = 0.4
+rcParams["text.color"]       = "#111111"
+rcParams["axes.labelcolor"]  = "#111111"
+rcParams["xtick.color"]      = "#111111"
+rcParams["ytick.color"]      = "#111111"
+rcParams["font.size"]        = 11              # bump base font
+
 from oanda_api import OandaAPI
 from chart_generator_basic import ChartGenerator
 

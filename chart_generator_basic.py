@@ -274,9 +274,31 @@ class ChartGenerator:
             if take_profit is not None:
                 axes[0].axhline(y=take_profit, color=self.colors['tp'], linestyle='--', linewidth=1.5, label='Take Profit')
             
-            # Set labels and legend
+            # ---------- explicit numeric overlays ----------
+            last_close = df['Close'].iloc[-1]
+            ema20_val  = df['ema20'].iloc[-1]
+            ema50_val  = df['ema50'].iloc[-1]
+            
+            # Update legend to include values
+            plt.legend([
+                f"EMA 20  {ema20_val:.2f}",
+                f"EMA 50  {ema50_val:.2f}",
+                "Stop Loss",
+                "Take Profit"
+            ], loc="upper left", fontsize=9)
+            
+            # Large label for current close
+            axes[0].annotate(
+                f"Close {last_close:.2f}",
+                xy=(len(df)-1, last_close),
+                xytext=(15, 0), textcoords="offset points",
+                ha="left", va="center",
+                fontsize=10, weight="bold",
+                bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="#111111")
+            )
+            
+            # Set labels
             axes[0].set_ylabel('Price', color=self.colors['text'])
-            axes[0].legend(loc='upper left')
             
             # Plot volume on the second panel with colored bars matching candle colors
             for i, (idx, row) in enumerate(df.iterrows()):
