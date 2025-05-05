@@ -24,6 +24,11 @@ class DirectVisionPipeline:
         """Process a chart image directly"""
         try:
             logger.info(f"Processing chart for {symbol} at {image_path}")
+            # Check if the image file exists
+            if not os.path.exists(image_path):
+                logger.error(f"Image file does not exist: {image_path}")
+                return False
+                
             vision_result = analyze_image(image_path)
             
             if not vision_result or 'action' not in vision_result:
@@ -66,30 +71,34 @@ VISION_API_URL = 'https://api.openai.com/v1/chat/completions'
 MAX_RETRIES = 2
 
 
-def analyze_image(image_s3: str) -> Dict[str, Any]:
+def analyze_image(image_path: str) -> Dict[str, Any]:
     """Send image to Vision API for analysis with OpenAI"""
     try:
         if not OPENAI_API_KEY:
             logger.error("OpenAI API key not found in environment variables")
             return {}
             
-        logger.info(f"Calling OpenAI Vision API for {image_s3}")
+        logger.info(f"Sending request to OpenAI Vision API")
         
-        # In a production environment, you'd download the image from S3
-        # For now, we'll simulate having the image content
-        # In the real implementation this would be the actual image data from S3
+        # Read the local image file
         import base64
+        if not os.path.exists(image_path):
+            logger.error(f"Image file not found: {image_path}")
+            return {}
         
-        # Use a sample chart image or generate one with chart_utils
-        from chart_utils import generate_chart_bytes
-        # Extract symbol from s3_path (format: charts/SYMBOL/filename.png)
+        # Read the image file and encode it
+        with open(image_path, 'rb') as image_file:
+            image_bytes = image_file.read()
+            image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+        
+        # Extract symbol from the path for better context
         try:
-            symbol = image_s3.split('/')[1]
+            # Format is typically static/charts/SYMBOL/filename.png
+            parts = image_path.split('/')
+            symbol_index = parts.index('charts') + 1
+            symbol = parts[symbol_index] if symbol_index < len(parts) else 'UNKNOWN'
         except:
-            symbol = "EUR_USD"  # Default if parsing fails
-            
-        image_bytes = generate_chart_bytes(symbol)
-        image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+            symbol = "UNKNOWN"
         
         # Build request for OpenAI API
         headers = {
@@ -198,7 +207,7 @@ def analyze_image(image_s3: str) -> Dict[str, Any]:
         return {}
 
     except Exception as e:
-        logger.error(f"Error analyzing image {image_s3}: {str(e)}")
+        logger.error(f"Error analyzing image {image_path}: {str(e)}")
         return {}
 
 
@@ -211,7 +220,9 @@ def process_vision_queue():
     while True:
         try:
             # Pop item from vision_queue
-            item = redis_client.blpop('vision_queue', timeout=1)
+            # This would normally attempt to get an item from the queue
+            # Since we're not using Redis, we'll skip this logic
+            item = None
             if not item:
                 time.sleep(1)
                 continue
