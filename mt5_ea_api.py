@@ -161,16 +161,64 @@ def get_signals():
         
         if reset_signals:
             # If reset_signals is true, return all pending/active signals regardless of ID
-            logger.info(f"Reset signals requested, returning all pending/active signals")
-            new_signals = db.session.query(Signal).filter(
+            # but ONLY signals that haven't been processed by MT5 yet
+            logger.info(f"Reset signals requested, returning all unprocessed pending/active signals")
+            
+            # Get all PENDING or ACTIVE signals that don't have the mt5_processed flag
+            processed_signal_ids = []
+            unprocessed_signals = []
+            all_signals = db.session.query(Signal).filter(
                 Signal.status.in_(['PENDING', 'ACTIVE'])
             ).order_by(Signal.id.asc()).all()
+            
+            for signal in all_signals:
+                processed = False
+                if hasattr(signal, 'context_json') and signal.context_json:
+                    try:
+                        context = json.loads(signal.context_json)
+                        if context.get('mt5_processed', False):
+                            processed = True
+                            processed_signal_ids.append(signal.id)
+                    except Exception as e:
+                        logger.error(f"Error checking processed state for signal {signal.id}: {str(e)}")
+                        
+                if not processed:
+                    unprocessed_signals.append(signal)
+            
+            logger.info(f"Found {len(unprocessed_signals)} unprocessed signals, skipping {len(processed_signal_ids)} processed signals")
+            if processed_signal_ids:
+                logger.info(f"Processed signal IDs: {processed_signal_ids}")
+                
+            new_signals = unprocessed_signals
         elif last_signal_id > 0:
             # Only get signals with higher IDs than what MT5 already has
-            new_signals = db.session.query(Signal).filter(
+            # AND that haven't been processed yet
+            processed_signal_ids = []
+            unprocessed_signals = []
+            all_signals = db.session.query(Signal).filter(
                 Signal.id > last_signal_id,
                 Signal.status.in_(['PENDING', 'ACTIVE'])
             ).order_by(Signal.id.asc()).all()
+            
+            for signal in all_signals:
+                processed = False
+                if hasattr(signal, 'context_json') and signal.context_json:
+                    try:
+                        context = json.loads(signal.context_json)
+                        if context.get('mt5_processed', False):
+                            processed = True
+                            processed_signal_ids.append(signal.id)
+                    except Exception as e:
+                        logger.error(f"Error checking processed state for signal {signal.id}: {str(e)}")
+                        
+                if not processed:
+                    unprocessed_signals.append(signal)
+            
+            logger.info(f"Found {len(unprocessed_signals)} unprocessed signals with ID > {last_signal_id}, skipping {len(processed_signal_ids)} processed signals")
+            if processed_signal_ids:
+                logger.info(f"Processed signal IDs: {processed_signal_ids}")
+                
+            new_signals = unprocessed_signals
             
             # If no new signals are found, check if we should send all current signals
             if not new_signals:
@@ -181,10 +229,32 @@ def get_signals():
                 
                 if any_active:
                     logger.info(f"No new signals after ID {last_signal_id}, but found active signals with lower IDs")
-                    # Return all pending/active signals when we have active signals but they're all with lower IDs
-                    new_signals = db.session.query(Signal).filter(
+                    # Return only unprocessed pending/active signals
+                    processed_signal_ids = []
+                    unprocessed_signals = []
+                    all_signals = db.session.query(Signal).filter(
                         Signal.status.in_(['PENDING', 'ACTIVE'])
                     ).order_by(Signal.id.asc()).all()
+                    
+                    for signal in all_signals:
+                        processed = False
+                        if hasattr(signal, 'context_json') and signal.context_json:
+                            try:
+                                context = json.loads(signal.context_json)
+                                if context.get('mt5_processed', False):
+                                    processed = True
+                                    processed_signal_ids.append(signal.id)
+                            except Exception as e:
+                                logger.error(f"Error checking processed state for signal {signal.id}: {str(e)}")
+                                
+                        if not processed:
+                            unprocessed_signals.append(signal)
+                    
+                    logger.info(f"Found {len(unprocessed_signals)} unprocessed signals, skipping {len(processed_signal_ids)} processed signals")
+                    if processed_signal_ids:
+                        logger.info(f"Processed signal IDs: {processed_signal_ids}")
+                        
+                    new_signals = unprocessed_signals
                 else:
                     logger.info(f"No active signals found at all, returning empty list")
                     return jsonify({
@@ -192,10 +262,32 @@ def get_signals():
                         "signals": []
                     })
         else:
-            # First request, return all pending/active signals
-            new_signals = db.session.query(Signal).filter(
+            # First request, return all unprocessed pending/active signals
+            processed_signal_ids = []
+            unprocessed_signals = []
+            all_signals = db.session.query(Signal).filter(
                 Signal.status.in_(['PENDING', 'ACTIVE'])
             ).order_by(Signal.id.asc()).all()
+            
+            for signal in all_signals:
+                processed = False
+                if hasattr(signal, 'context_json') and signal.context_json:
+                    try:
+                        context = json.loads(signal.context_json)
+                        if context.get('mt5_processed', False):
+                            processed = True
+                            processed_signal_ids.append(signal.id)
+                    except Exception as e:
+                        logger.error(f"Error checking processed state for signal {signal.id}: {str(e)}")
+                        
+                if not processed:
+                    unprocessed_signals.append(signal)
+            
+            logger.info(f"Found {len(unprocessed_signals)} unprocessed signals, skipping {len(processed_signal_ids)} processed signals")
+            if processed_signal_ids:
+                logger.info(f"Processed signal IDs: {processed_signal_ids}")
+                
+            new_signals = unprocessed_signals
         
         # Filter by market hours and exclude crypto as requested
         filtered_by_market = []
@@ -238,13 +330,31 @@ def get_signals():
             logger.info(f"Filtering signals for symbols: {valid_symbols}")
             # Create mappings for both directions
             symbol_map = {
+                # Crypto
                 'BTC_USD': 'BTCUSD',
                 'ETH_USD': 'ETHUSD',
+                
+                # Metals
                 'XAU_USD': 'XAUUSD',
                 'XAG_USD': 'XAGUSD',
+                
+                # Major forex pairs
                 'EUR_USD': 'EURUSD',
                 'GBP_USD': 'GBPUSD',
-                'USD_JPY': 'USDJPY'
+                'USD_JPY': 'USDJPY',
+                'AUD_USD': 'AUDUSD',
+                'USD_CAD': 'USDCAD',
+                'USD_CHF': 'USDCHF',
+                'NZD_USD': 'NZDUSD',
+                
+                # Cross pairs
+                'EUR_JPY': 'EURJPY',
+                'GBP_JPY': 'GBPJPY',
+                'EUR_GBP': 'EURGBP',
+                'AUD_JPY': 'AUDJPY',
+                'EUR_AUD': 'EURAUD',
+                'EUR_CAD': 'EURCAD',
+                'EUR_CHF': 'EURCHF'
             }
             # Create reverse mapping (MT5 -> internal)
             reverse_map = {v: k for k, v in symbol_map.items()}
@@ -337,13 +447,31 @@ def get_signals():
                 
             # Manual mapping for any special cases
             symbol_map = {
+                # Crypto
                 'BTC_USD': 'BTCUSD',
                 'ETH_USD': 'ETHUSD',
+                
+                # Metals
                 'XAU_USD': 'XAUUSD',
                 'XAG_USD': 'XAGUSD',
+                
+                # Major forex pairs
                 'EUR_USD': 'EURUSD',
                 'GBP_USD': 'GBPUSD',
-                'USD_JPY': 'USDJPY'
+                'USD_JPY': 'USDJPY',
+                'AUD_USD': 'AUDUSD',
+                'USD_CAD': 'USDCAD',
+                'USD_CHF': 'USDCHF',
+                'NZD_USD': 'NZDUSD',
+                
+                # Cross pairs
+                'EUR_JPY': 'EURJPY',
+                'GBP_JPY': 'GBPJPY',
+                'EUR_GBP': 'EURGBP',
+                'AUD_JPY': 'AUDJPY',
+                'EUR_AUD': 'EURAUD',
+                'EUR_CAD': 'EURCAD',
+                'EUR_CHF': 'EURCHF'
             }
             
             if signal.symbol in symbol_map:
