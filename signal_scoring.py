@@ -132,12 +132,12 @@ class SignalScorer:
             # Convert to pandas DataFrame
             df = pd.DataFrame([
                 {
-                    'time': candle['time'],
-                    'open': float(candle['mid']['o']),
-                    'high': float(candle['mid']['h']),
-                    'low': float(candle['mid']['l']),
-                    'close': float(candle['mid']['c']),
-                    'volume': float(candle['volume']) if 'volume' in candle else 0
+                    'time': candle.get('timestamp', candle.get('time', None)),  # Handle either timestamp or time key
+                    'open': float(candle.get('open', candle.get('mid', {}).get('o', 0))),
+                    'high': float(candle.get('high', candle.get('mid', {}).get('h', 0))),
+                    'low': float(candle.get('low', candle.get('mid', {}).get('l', 0))),
+                    'close': float(candle.get('close', candle.get('mid', {}).get('c', 0))),
+                    'volume': float(candle.get('volume', 0))
                 } for candle in candles
             ])
             
