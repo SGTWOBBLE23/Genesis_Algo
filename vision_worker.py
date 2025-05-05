@@ -63,41 +63,6 @@ class DirectVisionPipeline:
                     'processed_at': datetime.now().isoformat()
                 })
             )
-
-            try:
-                from app import OandaService
-                DIGITS = {'XAU_USD': 2, 'XAG_USD': 3, 'USD_JPY': 3,      # metals / yen pairs
-                          'EUR_USD': 5, 'GBP_USD': 5, 'GBP_JPY': 3}      # default FX pairs
-                MAX_SLIPPAGE = {'XAU_USD': 50.0,    # dollars
-                                'XAG_USD': 2.0,
-                                'USD_JPY': 5.0,
-                                '*': 0.005}         # 0.005 for most FX pairs (≈50 pips)
-
-                live_price = None
-                oanda = OandaService()
-                if oanda.api_key and oanda.account_id:
-                    # OANDA wants underscores (XAU_USD) – convert if needed
-                    oanda_symbol = symbol if '_' in symbol else symbol[:3] + '_' + symbol[3:]
-                    candles = oanda.get_candles(oanda_symbol, granularity="M1", count=1)
-                    if candles:
-                        live_price = float(candles[-1]['mid']['c'])
-            except Exception as price_err:
-                logger.warning(f"Live-price lookup failed for {symbol}: {price_err}")
-
-            # If live price found, validate the entry coming from Vision
-            if live_price is not None and signal.entry is not None:
-                tolerance = MAX_SLIPPAGE.get(symbol, MAX_SLIPPAGE['*'])
-                if abs(live_price - signal.entry) > tolerance:
-                    logger.warning(f"Discarding {symbol} signal: entry {signal.entry} ≠ live {live_price}")
-                    return False                    # <- abort instead of committing a bad price
-
-            # Instrument-specific rounding (cosmetic but keeps digits consistent)
-            d = DIGITS.get(symbol, 5)
-            if signal.entry is not None: signal.entry = round(signal.entry, d)
-            if signal.sl    is not None: signal.sl    = round(signal.sl,    d)
-            if signal.tp    is not None: signal.tp    = round(signal.tp,    d)
-            # ------------------------------------------------------------------
-
             
             db.session.add(signal)
             db.session.commit()
