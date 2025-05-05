@@ -25,6 +25,17 @@ class SymbolMapping(db.Model):
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 from chart_utils import generate_chart
 
+class SentSignal(db.Model):
+    __tablename__ = "sent_signals"
+    id          = db.Column(db.Integer, primary_key=True)
+    terminal_id = db.Column(db.String(64), nullable=False)
+    signal_id   = db.Column(db.Integer,     nullable=False)
+    sent_at     = db.Column(db.DateTime,    server_default=db.func.now())
+
+    __table_args__ = (
+        db.UniqueConstraint("terminal_id", "signal_id", name="uix_term_sig"),
+    )
+
 # Set up logging
 logger = logging.getLogger(__name__)
 
@@ -330,11 +341,7 @@ def get_signals():
             logger.info(f"Filtering signals for symbols: {valid_symbols}")
             # Create mappings for both directions
             symbol_map = {
-                # Crypto
-                'BTC_USD': 'BTCUSD',
-                'ETH_USD': 'ETHUSD',
-                
-                # Metals
+                 # Metals
                 'XAU_USD': 'XAUUSD',
                 'XAG_USD': 'XAGUSD',
                 
@@ -342,19 +349,12 @@ def get_signals():
                 'EUR_USD': 'EURUSD',
                 'GBP_USD': 'GBPUSD',
                 'USD_JPY': 'USDJPY',
-                'AUD_USD': 'AUDUSD',
-                'USD_CAD': 'USDCAD',
-                'USD_CHF': 'USDCHF',
-                'NZD_USD': 'NZDUSD',
+
                 
                 # Cross pairs
                 'EUR_JPY': 'EURJPY',
-                'GBP_JPY': 'GBPJPY',
-                'EUR_GBP': 'EURGBP',
-                'AUD_JPY': 'AUDJPY',
-                'EUR_AUD': 'EURAUD',
-                'EUR_CAD': 'EURCAD',
-                'EUR_CHF': 'EURCHF'
+                'GBP_JPY': 'GBPJPY'
+
             }
             # Create reverse mapping (MT5 -> internal)
             reverse_map = {v: k for k, v in symbol_map.items()}
@@ -388,47 +388,65 @@ def get_signals():
         terminal_id = account_to_terminal.get(account_id)  # Use account_id as terminal_id for simplicity
         if not terminal_id:
             return jsonify({"status": "success", "signals": []})
-        if terminal_id in active_terminals and 'pending_signals' in active_terminals[terminal_id] and active_terminals[terminal_id]['pending_signals']:
-            # Extract pending signals
-            pending_signals = active_terminals[terminal_id]['pending_signals']
-            logger.info(f"Found {len(pending_signals)} pending signals for terminal {terminal_id}")
 
+        if terminal_id in active_terminals \
+           and active_terminals[terminal_id].get('pending_signals'):
+
+            # ------------------------------------------------------------------
+            # 1.  Deduplicate by ID (keep latest copy if somehow queued twice)
+            # ------------------------------------------------------------------
+            raw_queue = active_terminals[terminal_id]['pending_signals']
+            unique_by_id = {sig['id']: sig for sig in raw_queue}
+            pending_signals = list(unique_by_id.values())
+
+            logger.info(f"Found {len(pending_signals)} unique pending signals for terminal {terminal_id}")
+
+            # ------------------------------------------------------------------
+            # 2.  Drop stale ones (> STALE_SECONDS in queue)
+            # ------------------------------------------------------------------
             now_ts = datetime.now()
             fresh_signals = []
             for sig in pending_signals:
-                ts_str = sig.get("execution_timestamp")         # added by execute_signal()
+                ts_str = sig.get("execution_timestamp")
                 if not ts_str:
-                    fresh_signals.append(sig)                   # no timestamp → keep
+                    fresh_signals.append(sig)                      # no timestamp → keep
                     continue
                 try:
                     queued_at = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
                     if (now_ts - queued_at).total_seconds() <= STALE_SECONDS:
-                        fresh_signals.append(sig)               # still fresh
+                        fresh_signals.append(sig)
                     else:
                         logger.info(f"Skipping stale signal {sig.get('id')} queued at {ts_str}")
                 except ValueError:
-                    fresh_signals.append(sig)                   # parse failure → keep
+                    fresh_signals.append(sig)                      # bad ts → keep anyway
 
             pending_signals = fresh_signals
-            
-            
-            # Get force_execution flag to ensure MT5 executes right away
-            force_all = True  # Force all signals to execute immediately
-            if len(pending_signals) > 0:
-                if force_all or all(signal.get('force_execution', False) for signal in pending_signals):
-                    logger.info(f"Sending {len(pending_signals)} pending signals with force_execution=True")
-                    # Set force_execution for all signals
-                    for signal in pending_signals:
-                        signal['force_execution'] = True
-            
-            # Clear the pending signals so they're only sent once
+
+            # ------------------------------------------------------------------
+            # 3.  Force-execution flag so EA fires immediately
+            # ------------------------------------------------------------------
+            if pending_signals:
+                for sig in pending_signals:
+                    sig['force_execution'] = True
+
+            # ------------------------------------------------------------------
+            # 4.  Record “sent” so we never send the same ID twice to this terminal
+            # ------------------------------------------------------------------
+            for sig in pending_signals:
+                try:
+                    db.session.merge(SentSignal(terminal_id=str(terminal_id),
+                                                signal_id=sig['id']))
+                except Exception as e:
+                    logger.warning(f"SentSignal merge failed for {sig['id']}: {e}")
+            db.session.commit()
+
+            # ------------------------------------------------------------------
+            # 5.  Flush the in-memory queue so they’re only sent once
+            # ------------------------------------------------------------------
             active_terminals[terminal_id]['pending_signals'] = []
-            
-            # Just return the pending signals directly as they're already in the correct format
-            return jsonify({
-                "status": "success",
-                "signals": pending_signals
-            })
+
+            return jsonify({"status": "success", "signals": pending_signals})
+
         
         # Format signals for MT5 EA
         formatted_signals = []
@@ -447,10 +465,7 @@ def get_signals():
                 
             # Manual mapping for any special cases
             symbol_map = {
-                # Crypto
-                'BTC_USD': 'BTCUSD',
-                'ETH_USD': 'ETHUSD',
-                
+           
                 # Metals
                 'XAU_USD': 'XAUUSD',
                 'XAG_USD': 'XAGUSD',
@@ -459,19 +474,10 @@ def get_signals():
                 'EUR_USD': 'EURUSD',
                 'GBP_USD': 'GBPUSD',
                 'USD_JPY': 'USDJPY',
-                'AUD_USD': 'AUDUSD',
-                'USD_CAD': 'USDCAD',
-                'USD_CHF': 'USDCHF',
-                'NZD_USD': 'NZDUSD',
                 
                 # Cross pairs
                 'EUR_JPY': 'EURJPY',
                 'GBP_JPY': 'GBPJPY',
-                'EUR_GBP': 'EURGBP',
-                'AUD_JPY': 'AUDJPY',
-                'EUR_AUD': 'EURAUD',
-                'EUR_CAD': 'EURCAD',
-                'EUR_CHF': 'EURCHF'
             }
             
             if signal.symbol in symbol_map:
