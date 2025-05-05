@@ -362,25 +362,39 @@ def get_signals():
             # Create reverse mapping (MT5 -> internal)
             reverse_map = {v: k for k, v in symbol_map.items()}
             
+            # 1. First filter signals based on symbol matching
+            symbol_filtered_signals = []
+            
             # Filter signals with smart symbol matching
             for signal in new_signals:
                 # Direct match
                 if signal.symbol in valid_symbols:
-                    filtered_signals.append(signal)
+                    symbol_filtered_signals.append(signal)
                     continue
                     
                 # Check if the signal symbol has a mapped version that matches
                 if signal.symbol in symbol_map and symbol_map[signal.symbol] in valid_symbols:
                     logger.info(f"Symbol mapping match: {signal.symbol} -> {symbol_map[signal.symbol]}")
-                    filtered_signals.append(signal)
+                    symbol_filtered_signals.append(signal)
                     continue
                     
                 # Check if any of the requested symbols have a reverse mapping that matches the signal
                 for req_symbol in valid_symbols:
                     if req_symbol in reverse_map and reverse_map[req_symbol] == signal.symbol:
                         logger.info(f"Reverse symbol mapping match: {req_symbol} -> {signal.symbol}")
-                        filtered_signals.append(signal)
+                        symbol_filtered_signals.append(signal)
                         break
+                        
+            # 2. Apply the signal scoring and filtering system
+            logger.info(f"After symbol filtering: {len(symbol_filtered_signals)} signals")
+            try:
+                # Apply all scoring layers and determine which signals to execute
+                filtered_signals = signal_scorer.filter_signals(symbol_filtered_signals)
+                logger.info(f"After signal scoring: {len(filtered_signals)}/{len(symbol_filtered_signals)} signals approved")
+            except Exception as e:
+                logger.error(f"Error in signal scoring: {str(e)}")
+                # Fall back to symbol filtering only if scoring fails
+                filtered_signals = symbol_filtered_signals
         else:
             logger.info("No valid symbols received, returning available signals")
             filtered_signals = new_signals
