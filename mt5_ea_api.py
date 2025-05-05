@@ -7,11 +7,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, send_file
-from app import db, Signal, Trade, SignalAction, TradeStatus, TradeSide, Settings, SignalStatus
+from app import db, Signal, Trade, SignalAction, TradeStatus, TradeSide, Settings, SignalStatus, Log, LogLevel
 
 STALE_SECONDS = 30
 
 from config import MT5_ASSETS as DEFAULT_SYMBOLS   # single source
+from signal_scoring import signal_scorer  # Import the signal scoring module
 
 # Define Symbol Mapping model for local use in this module
 class SymbolMapping(db.Model):
