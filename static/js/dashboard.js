@@ -406,16 +406,31 @@ function executeSignal(signalId) {
 
 function connectWebSocket() {
     try {
+        // Use a global variable for socket to handle reconnection properly
+        if (window.tradingSocket) {
+            // If socket exists and is open, no need to reconnect
+            if (window.tradingSocket.readyState === WebSocket.OPEN) {
+                return;
+            }
+            // Otherwise try to close it before creating a new one
+            try {
+                window.tradingSocket.close();
+            } catch (e) {
+                console.error('Error closing existing socket:', e);
+            }
+        }
+        
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/api/signals/ws`;
+        // Make sure we're using the correct WebSocket endpoint
+        const wsUrl = `${protocol}//${window.location.host}/ws`;
         
-        const socket = new WebSocket(wsUrl);
+        window.tradingSocket = new WebSocket(wsUrl);
         
-        socket.onopen = function(e) {
+        window.tradingSocket.onopen = function(e) {
             console.log('WebSocket connection established');
         };
         
-        socket.onmessage = function(event) {
+        window.tradingSocket.onmessage = function(event) {
             try {
                 const data = JSON.parse(event.data);
                 
@@ -455,7 +470,7 @@ function connectWebSocket() {
             }
         };
         
-        socket.onclose = function(event) {
+        window.tradingSocket.onclose = function(event) {
             if (event.wasClean) {
                 console.log(`WebSocket connection closed cleanly, code=${event.code}, reason=${event.reason}`);
             } else {
@@ -466,7 +481,7 @@ function connectWebSocket() {
             setTimeout(connectWebSocket, 5000);
         };
         
-        socket.onerror = function(error) {
+        window.tradingSocket.onerror = function(error) {
             console.error(`WebSocket error:`, error);
         };
     } catch (e) {
