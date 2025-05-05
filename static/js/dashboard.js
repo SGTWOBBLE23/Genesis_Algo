@@ -63,7 +63,7 @@ function initializeCharts() {
         const ctx = document.getElementById(`chart-${symbol}`).getContext('2d');
         
         activeCharts[symbol] = new Chart(ctx, {
-            type: 'candlestick',
+            type: 'bar', // Changed from 'candlestick' to 'bar' which is supported by standard Chart.js
             data: {
                 datasets: [{
                     label: symbol,
@@ -81,12 +81,15 @@ function initializeCharts() {
                         callbacks: {
                             label: function(context) {
                                 const candle = context.raw;
-                                return [
-                                    `Open: ${candle.o}`,
-                                    `High: ${candle.h}`,
-                                    `Low: ${candle.l}`,
-                                    `Close: ${candle.c}`
-                                ];
+                                if (candle && candle.o !== undefined) {
+                                    return [
+                                        `Open: ${candle.o.toFixed(5)}`,
+                                        `High: ${candle.h.toFixed(5)}`,
+                                        `Low: ${candle.l.toFixed(5)}`,
+                                        `Close: ${candle.c.toFixed(5)}`
+                                    ];
+                                }
+                                return `Value: ${context.parsed.y}`;
                             }
                         }
                     }
@@ -149,14 +152,22 @@ function updateChart(symbol, candles) {
         return;
     }
     
-    // Format data for chart.js
+    // Format data for chart.js bar chart
     const chartData = candles.map(candle => ({
         x: new Date(candle.time).getTime(),
+        y: candle.close, // Use close price for bar chart
+        // Keep OHLC data for tooltip
         o: candle.open,
         h: candle.high,
         l: candle.low,
         c: candle.close
     }));
+    
+    // Set bar colors based on price movement (green for up, red for down)
+    activeCharts[symbol].data.datasets[0].backgroundColor = chartData.map((d, i) => {
+        if (i === 0) return '#00c851'; // Default to green for first bar
+        return chartData[i].y > chartData[i-1].y ? '#00c851' : '#ff3547'; // Green for up, red for down
+    });
     
     // Update chart
     activeCharts[symbol].data.datasets[0].data = chartData;
