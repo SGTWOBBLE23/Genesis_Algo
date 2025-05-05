@@ -403,12 +403,20 @@ function updateSignalsTable(signals) {
         // Create signal card
         const card = document.createElement('div');
         card.className = 'signal-card';
+        
+        // Add error status class if applicable
+        if (signal.status === 'ERROR') {
+            card.className += ' signal-error';
+        }
+        
         card.setAttribute('data-action', signal.action);
+        card.setAttribute('data-status', signal.status);
         
         card.innerHTML = `
             <div class="signal-header">
                 <div class="signal-symbol">${signal.symbol.replace('_', '')}</div>
                 <span class="action-badge ${actionClass}">${signal.action.replace('_', ' ')}</span>
+                ${signal.status === 'ERROR' ? '<span class="status-badge status-error">ERROR</span>' : ''}
             </div>
             
             <div class="signal-details-grid">
