@@ -145,8 +145,13 @@ class SignalScorer:
                 logger.warning(f"Empty DataFrame for {symbol}, using default score")
                 return 0.5, {"error": "Empty price data"}
             
-            df['time'] = pd.to_datetime(df['time'])
-            df.set_index('time', inplace=True)
+            try:
+                df['time'] = pd.to_datetime(df['time'])
+                df.set_index('time', inplace=True)
+            except Exception as e:
+                logger.warning(f"Error converting time format: {e}")
+                # Continue without time index if there's an issue
+                pass
             
             # Calculate technical indicators
             df['rsi'] = self._calculate_rsi(df['close'])

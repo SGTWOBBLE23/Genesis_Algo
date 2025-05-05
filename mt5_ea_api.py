@@ -473,12 +473,15 @@ def get_signals():
                     signal.context_json = json.dumps(signal_context)
                     
                 # Create a log entry for the rejected signal
-                Log.add(
-                    level=LogLevel.INFO,
-                    source="signal_scoring",
-                    message=f"Signal {signal.id} ({signal.symbol} {signal.action.name}) rejected: {scoring_details['reason']}",
-                    context=scoring_details
-                )
+                try:
+                    Log.add(
+                        level=LogLevel.INFO,
+                        source="signal_scoring",
+                        message=f"Signal {signal.id} ({signal.symbol} {signal.action.name}) rejected: {scoring_details['reason']}",
+                        context=scoring_details
+                    )
+                except Exception as log_error:
+                    logger.error(f"Error creating log entry: {log_error}")
                 
                 db.session.commit()
                 continue

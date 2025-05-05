@@ -106,4 +106,7 @@ def test_signal_scoring():
     logger.info("\n=== Test Completed ===")
 
 if __name__ == "__main__":
-    test_signal_scoring()
+    # Import Flask app and run within app context
+    from app import app
+    with app.app_context():
+        test_signal_scoring()
