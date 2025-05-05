@@ -227,31 +227,20 @@ def get_signals():
             if not new_signals:
                 # Check if there are any active signals with lower IDs
                 any_active = db.session.query(Signal).filter(
-                    Signal.status.in_(['PENDING', 'ACTIVE'])
+                    Signal.status.in_(['PENDING', 'ACTIVE']),
+                    ~Signal.id.in_(processed_signal_ids) if processed_signal_ids else True
                 ).first() is not None
                 
                 if any_active:
                     logger.info(f"No new signals after ID {last_signal_id}, but found active signals with lower IDs")
-                    # Return only unprocessed pending/active signals
-                    processed_signal_ids = []
-                    unprocessed_signals = []
-                    all_signals = db.session.query(Signal).filter(
-                        Signal.status.in_(['PENDING', 'ACTIVE'])
-                    ).order_by(Signal.id.asc()).all()
+                    # We've already queried all signals and identified the processed ones,
+                    # so we can just check for active signals that aren't in the processed_signal_ids list
                     
-                    for signal in all_signals:
-                        processed = False
-                        if hasattr(signal, 'context_json') and signal.context_json:
-                            try:
-                                context = json.loads(signal.context_json)
-                                if context.get('mt5_processed', False):
-                                    processed = True
-                                    processed_signal_ids.append(signal.id)
-                            except Exception as e:
-                                logger.error(f"Error checking processed state for signal {signal.id}: {str(e)}")
-                                
-                        if not processed:
-                            unprocessed_signals.append(signal)
+                    # Use the existing list of active signals, but filter out processed ones
+                    unprocessed_signals = db.session.query(Signal).filter(
+                        Signal.status.in_(['PENDING', 'ACTIVE']),
+                        ~Signal.id.in_(processed_signal_ids) if processed_signal_ids else True
+                    ).order_by(Signal.id.asc()).all()
                     
                     logger.info(f"Found {len(unprocessed_signals)} unprocessed signals, skipping {len(processed_signal_ids)} processed signals")
                     if processed_signal_ids:
