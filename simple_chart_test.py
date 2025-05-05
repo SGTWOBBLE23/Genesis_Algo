@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Test parameters
-symbol = "XAU_USD"
+symbol = "GBP_JPY"
 timeframe = "M15"
 
 def test_chart():
@@ -17,7 +17,7 @@ def test_chart():
     try:
         # Fetch candle data
         logger.info(f"Fetching candles for {symbol} {timeframe}")
-        candles = fetch_candles(symbol, timeframe, count=300)
+        candles = fetch_candles(symbol, timeframe, count=100)
         
         if not candles or len(candles) == 0:
             logger.error(f"No candles found for {symbol} {timeframe}")
