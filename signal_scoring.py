@@ -220,10 +220,17 @@ class SignalScorer:
         # Calculate final score
         final_score = base_confidence + technical_adj + performance_adj
         
+        # Exceptional override: allow extremely high confidence signals to bypass correlation check
+        override_correlation = final_score >= 0.95
+        
+        # Log correlation override if applicable
+        if has_correlation_conflict and override_correlation:
+            logger.info(f"High confidence signal ({final_score:.2f}) overriding correlation check")
+        
         # Decision logic
         should_execute = (
             final_score >= self.min_confidence_threshold and 
-            not has_correlation_conflict
+            (not has_correlation_conflict or override_correlation)
         )
         
         # Log scoring results
@@ -233,7 +240,9 @@ class SignalScorer:
         logger.info(f"  - Performance adjustment: {performance_adj:.2f}")
         logger.info(f"  - Correlation conflict: {has_correlation_conflict}")
         logger.info(f"  - Final score: {final_score:.2f}")
+        logger.info(f"  - Override correlation: {override_correlation}")
         logger.info(f"  - Decision: {'EXECUTE' if should_execute else 'REJECT'}")
+
         
         return (final_score, should_execute)
     
