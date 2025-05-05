@@ -266,6 +266,29 @@ def process_vision_queue():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    logger.info("Starting Vision Worker…")
-    process_vision_queue()
+    # Setup more verbose logging
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    logger.info("Starting Vision Worker with more verbose logging...")
+    
+    # Check OpenAI API key
+    if not OPENAI_API_KEY:
+        logger.error("No OpenAI API key found! Vision analysis will fail.")
+    else:
+        logger.info("OpenAI API key found.")
+    
+    # Check Redis connection
+    if not redis_client:
+        logger.error("Redis client not available, vision worker will not function correctly.")
+    else:
+        logger.info("Redis client connected successfully.")
+        
+    # Start processing queue
+    try:
+        process_vision_queue()
+    except Exception as e:
+        logger.error(f"Fatal error in vision worker: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
