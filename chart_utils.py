@@ -69,6 +69,17 @@ def generate_chart(symbol: str, timeframe: str = "H1", count: int = 300,
     Returns:
         Path to saved chart image or empty string if error
     """
+    logger.info(f"Generating enhanced chart for {symbol} ({timeframe}) with {count} candles")
+    if signal_action:
+        logger.info(f"Chart signal action: {signal_action}")
+    if entry_point:
+        logger.info(f"Entry point: time={entry_point[0]}, price={entry_point[1]}")
+    if stop_loss:
+        logger.info(f"Stop loss: {stop_loss}")
+    if take_profit:
+        logger.info(f"Take profit: {take_profit}")
+    if result:
+        logger.info(f"Trade result: {result}")
     try:
         # Fetch candles for the symbol
         candles = fetch_candles(symbol, timeframe, count)
@@ -119,6 +130,7 @@ def generate_chart_bytes(symbol: str, timeframe: str = "H1", count: int = 300,
     Returns:
         Chart as bytes or empty bytes if error
     """
+    logger.info(f"Generating chart bytes for {symbol} ({timeframe}) with {count} candles")
     try:
         # Fetch candles for the symbol
         candles = fetch_candles(symbol, timeframe, count)
