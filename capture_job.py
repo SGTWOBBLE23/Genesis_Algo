@@ -5,44 +5,91 @@ import logging
 import time
 from datetime import datetime
 from typing import Dict, Any, Optional
+from pathlib import Path
 
-from config import ASSETS  # Import ASSETS from config.py
+# Configure logging first
+logger = logging.getLogger(__name__)
 
-import boto3
-import redis
+# Import configuration from config.py
+from config import ASSETS, CHARTS_DIR, DEFAULT_TIMEFRAME, mt5_to_oanda, oanda_to_mt5
+
+# Use try/except for dependencies that might not be available
+try:
+    import boto3
+    S3_AVAILABLE = True
+except ImportError:
+    boto3 = None
+    S3_AVAILABLE = False
+    logger.info("boto3 not available, S3 functionality disabled")
+
+try:
+    import redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    redis = None
+    REDIS_AVAILABLE = False
+    logger.info("redis not available, queue functionality disabled")
+
 from oanda_api import OandaAPI
 from app import app  # Import Flask app for context
 
-logger = logging.getLogger(__name__)
+# Redis connection - only try if Redis is available
+redis_client = None
+if REDIS_AVAILABLE:
+    try:
+        # Create Redis client
+        redis_client = redis.Redis(
+            host=os.environ.get('REDIS_HOST', 'localhost'),
+            port=int(os.environ.get('REDIS_PORT', 6379)),
+            db=int(os.environ.get('REDIS_DB', 0)),
+            password=os.environ.get('REDIS_PASSWORD', None),
+            decode_responses=True
+        )
+        # Test connection
+        redis_client.ping()
+        logger.info("Successfully connected to Redis")
+    except Exception as e:
+        logger.warning(f"Could not connect to Redis: {e}")
+        redis_client = None
+else:
+    logger.info("Redis client not created as Redis is not available")
 
-# Redis connection
-try:
-    redis_client = redis.Redis(
-        host=os.environ.get('REDIS_HOST', 'localhost'),
-        port=int(os.environ.get('REDIS_PORT', 6379)),
-        db=int(os.environ.get('REDIS_DB', 0)),
-        password=os.environ.get('REDIS_PASSWORD', None),
-        decode_responses=True
-    )
-except Exception as e:
-    logger.warning(f"Could not connect to Redis: {e}")
-    redis_client = None
-
-# S3 connection
-s3_client = boto3.client(
-    's3',
-    aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
-    aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY'),
-    region_name=os.environ.get('AWS_REGION', 'us-east-1')
-)
-
+# S3 connection - only try if boto3 is available
+s3_client = None
 S3_BUCKET = os.environ.get('S3_BUCKET', 'genesis-trading-charts')
+if S3_AVAILABLE:
+    try:
+        # Create S3 client
+        s3_client = boto3.client(
+            's3',
+            aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
+            aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY'),
+            region_name=os.environ.get('AWS_REGION', 'us-east-1')
+        )
+        logger.info("Successfully created S3 client")
+    except Exception as e:
+        logger.warning(f"Could not connect to S3: {e}")
+        s3_client = None
+else:
+    logger.info("S3 client not created as boto3 is not available")
 
 # OANDA API client
 oanda_api = OandaAPI(
     api_key=os.environ.get('OANDA_API_KEY'),
     account_id=os.environ.get('OANDA_ACCOUNT_ID')
 )
+
+# Initialize DirectVisionPipeline if available
+try:
+    from vision_worker import DirectVisionPipeline
+    # Don't instantiate here to avoid circular imports
+    # We'll create instances when needed in the run() function
+    DIRECT_VISION_AVAILABLE = True
+    logger.info("DirectVisionPipeline is available for use")
+except ImportError:
+    DIRECT_VISION_AVAILABLE = False
+    logger.warning("DirectVisionPipeline not available, vision functionality limited")
+
 
 
 def get_quote(symbol: str) -> Dict[str, Any]:
