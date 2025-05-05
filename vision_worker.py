@@ -15,8 +15,11 @@ logger = logging.getLogger(__name__)
 # Configuration for OpenAI API
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 VISION_API_URL = "https://api.openai.com/v1/chat/completions"
+# the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
+# do not change this unless explicitly requested by the user
 VISION_MODEL = "gpt-4o"  # Updated to gpt-4o which has vision capabilities
 MAX_RETRIES = 3
+REQUEST_TIMEOUT = 60  # seconds
 
 # Setup a direct approach without Redis
 from app import db, Signal, SignalAction, SignalStatus, app
@@ -374,17 +377,17 @@ def analyze_image(image_path: str) -> Dict[str, Any]:
             "response_format": {"type": "json_object"}
         }
         
-        # Send to OpenAI Vision API with a timeout of 10 seconds
-        logger.info("Sending request to OpenAI Vision API")
+        # Send to OpenAI Vision API with a timeout
+        logger.info(f"Sending request to OpenAI Vision API using model: {VISION_MODEL}")
         try:
-            response = requests.post(VISION_API_URL, headers=headers, json=payload, timeout=10)
+            response = requests.post(VISION_API_URL, headers=headers, json=payload, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
         except requests.exceptions.Timeout:
-            logger.error("OpenAI API request timed out after 10 seconds")
-            return {'action': 'ANTICIPATED_LONG', 'entry': 1.1300, 'sl': 1.1250, 'tp': 1.1400, 'confidence': 0.55}
+            logger.error(f"OpenAI API request timed out after {REQUEST_TIMEOUT} seconds")
+            raise Exception("Vision API request timed out")
         except requests.exceptions.RequestException as e:
             logger.error(f"OpenAI API request failed: {e}")
-            return {'action': 'ANTICIPATED_LONG', 'entry': 1.1300, 'sl': 1.1250, 'tp': 1.1400, 'confidence': 0.55}
+            raise Exception(f"Vision API request failed: {e}")
         
         # Parse the response
         result = response.json()
