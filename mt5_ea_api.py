@@ -156,20 +156,41 @@ def get_signals():
         # Get signals from database that are in PENDING or ACTIVE status
         new_signals = []
         
-        if last_signal_id > 0:
+        # Check if the reset_signals flag is present and true to force a reset
+        reset_signals = data.get('reset_signals', False)
+        
+        if reset_signals:
+            # If reset_signals is true, return all pending/active signals regardless of ID
+            logger.info(f"Reset signals requested, returning all pending/active signals")
+            new_signals = db.session.query(Signal).filter(
+                Signal.status.in_(['PENDING', 'ACTIVE'])
+            ).order_by(Signal.id.asc()).all()
+        elif last_signal_id > 0:
             # Only get signals with higher IDs than what MT5 already has
             new_signals = db.session.query(Signal).filter(
                 Signal.id > last_signal_id,
                 Signal.status.in_(['PENDING', 'ACTIVE'])
             ).order_by(Signal.id.asc()).all()
             
-            # Do NOT fall back to previous signals if no new ones are found
+            # If no new signals are found, check if we should send all current signals
             if not new_signals:
-                logger.info(f"No new signals found after ID {last_signal_id}, returning empty list")
-                return jsonify({
-                    "status": "success",
-                    "signals": []
-                })
+                # Check if there are any active signals with lower IDs
+                any_active = db.session.query(Signal).filter(
+                    Signal.status.in_(['PENDING', 'ACTIVE'])
+                ).first() is not None
+                
+                if any_active:
+                    logger.info(f"No new signals after ID {last_signal_id}, but found active signals with lower IDs")
+                    # Return all pending/active signals when we have active signals but they're all with lower IDs
+                    new_signals = db.session.query(Signal).filter(
+                        Signal.status.in_(['PENDING', 'ACTIVE'])
+                    ).order_by(Signal.id.asc()).all()
+                else:
+                    logger.info(f"No active signals found at all, returning empty list")
+                    return jsonify({
+                        "status": "success",
+                        "signals": []
+                    })
         else:
             # First request, return all pending/active signals
             new_signals = db.session.query(Signal).filter(
