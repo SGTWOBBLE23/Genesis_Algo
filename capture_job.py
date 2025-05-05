@@ -86,27 +86,31 @@ def take_screenshot(symbol: str) -> str:
         # e.g., XAU_USD -> XAUUSD
         mt5_symbol = symbol.replace('_', '')
         
-        # Generate a unique filename with timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{mt5_symbol}_{timeframe}_{timestamp}.png"
-        
-        # Ensure the charts directory exists for this symbol
-        charts_dir = f"static/charts/{mt5_symbol}"
-        if not os.path.exists(charts_dir):
-            os.makedirs(charts_dir, exist_ok=True)
-            logger.info(f"Created chart directory: {charts_dir}")
-        
-        # Full path for saving locally
-        local_path = f"{charts_dir}/{filename}"
-        
         # Generate the chart with proper indicators
         # This creates the chart and returns the path where it was saved
         chart_path = generate_chart(symbol, timeframe, count)
         
-        # Define the path that Vision worker would use
-        vision_path = f"charts/{mt5_symbol}/{filename}"
-        
-        logger.info(f"Generated chart for {symbol} at {chart_path}, would use path {vision_path} for vision analysis")
+        # Extract the filename from the generated chart path
+        if chart_path and os.path.exists(chart_path):
+            # The chart_path looks like: static/charts/XAUUSD/XAUUSD_H1_20250505_075127.png
+            # We just need the relative path for vision_worker
+            vision_path = chart_path.replace('static/', '')
+            logger.info(f"Generated chart for {symbol} at {chart_path}, will use path {vision_path} for vision analysis")
+        else:
+            # Fallback if chart_path is empty or not found
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            mt5_symbol = symbol.replace('_', '')
+            filename = f"{mt5_symbol}_{timeframe}_{timestamp}.png"
+            
+            # Ensure the charts directory exists for this symbol
+            charts_dir = f"static/charts/{mt5_symbol}"
+            if not os.path.exists(charts_dir):
+                os.makedirs(charts_dir, exist_ok=True)
+                logger.info(f"Created chart directory: {charts_dir}")
+            
+            vision_path = f"charts/{mt5_symbol}/{filename}"
+            logger.error(f"Chart generation failed for {symbol}, using fallback path {vision_path}")
+
         
         # The vision_path is used as an identifier in the system
         return vision_path
