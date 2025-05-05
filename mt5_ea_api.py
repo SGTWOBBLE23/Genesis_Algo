@@ -11,8 +11,7 @@ from app import db, Signal, Trade, SignalAction, TradeStatus, TradeSide, Setting
 
 STALE_SECONDS = 30
 
-# Default supported symbols (limited to 5 for focused processing)
-DEFAULT_SYMBOLS = ['XAUUSD', 'GBPJPY', 'GBPUSD', 'EURUSD', 'USDJPY']
+from config import MT5_ASSETS as DEFAULT_SYMBOLS   # single source
 
 # Define Symbol Mapping model for local use in this module
 class SymbolMapping(db.Model):

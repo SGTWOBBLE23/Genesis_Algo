@@ -4,6 +4,7 @@ import logging
 import time
 from typing import Dict, Any
 from datetime import datetime
+from config import ASSETS        # new
 
 import redis
 import requests
@@ -80,16 +81,23 @@ def analyze_image(image_path: str) -> Dict[str, Any]:
             
         logger.info(f"Sending request to OpenAI Vision API")
         
-        # Read the local image file
-        import base64
-        if not os.path.exists(image_path):
-            logger.error(f"Image file not found: {image_path}")
-            return {}
-        
-        # Read the image file and encode it
-        with open(image_path, 'rb') as image_file:
-            image_bytes = image_file.read()
-            image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+        # --- Get raw bytes for the supplied image_s3/local path ----------
+        import base64, os
+        try:
+            if image_path.startswith("s3://"):
+                # TODO: download with boto3 if you keep S3
+                raise FileNotFoundError
+            local_path = image_path if os.path.isabs(image_path) \
+                         else os.path.join("static", image_path)
+            with open(local_path, "rb") as f:
+                image_bytes = f.read()
+        except Exception:
+            # Fallback: regenerate a fresh chart on-the-fly
+            from chart_utils import generate_chart_bytes
+            symbol = (image_path.split('/')[1] if '/' in image_path else "EUR_USD")
+            image_bytes = generate_chart_bytes(symbol)
+
+        image_base64 = base64.b64encode(image_bytes).decode("utf-8")
         
         # Extract symbol from the path for better context
         try:
@@ -322,8 +330,7 @@ def process_charts_directory():
     try:
         logger.info("Starting direct charts processing...")
         
-        # Process only our restricted symbols
-        symbols = ['XAU_USD', 'GBP_JPY', 'GBP_USD', 'EUR_USD', 'USD_JPY']
+        symbols = ASSETS
         
         # Create app context for database operations
         with app.app_context():
