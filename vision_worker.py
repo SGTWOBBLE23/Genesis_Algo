@@ -3,24 +3,60 @@ import json
 import logging
 import time
 from typing import Dict, Any
+from datetime import datetime
 
 import redis
 import requests
 
 logger = logging.getLogger(__name__)
 
-# Redis connection
-try:
-    redis_client = redis.Redis(
-        host=os.environ.get('REDIS_HOST', 'localhost'),
-        port=int(os.environ.get('REDIS_PORT', 6379)),
-        db=int(os.environ.get('REDIS_DB', 0)),
-        password=os.environ.get('REDIS_PASSWORD', None),
-        decode_responses=True
-    )
-except Exception as e:
-    logger.warning(f"Could not connect to Redis: {e}")
-    redis_client = None
+# Setup a direct approach without Redis
+from app import db, Signal, SignalAction, SignalStatus, app
+
+# Redis will be mocked since it's not available
+redis_client = None
+
+class DirectVisionPipeline:
+    """A direct approach to vision processing without Redis"""
+    
+    @staticmethod
+    def process_chart(symbol, image_path):
+        """Process a chart image directly"""
+        try:
+            logger.info(f"Processing chart for {symbol} at {image_path}")
+            vision_result = analyze_image(image_path)
+            
+            if not vision_result or 'action' not in vision_result:
+                logger.error(f"Failed to analyze chart for {symbol}")
+                return False
+                
+            # Create a signal directly in the database
+            signal = Signal(
+                symbol=symbol,
+                action=vision_result['action'],
+                entry=vision_result.get('entry'),
+                sl=vision_result.get('sl'),
+                tp=vision_result.get('tp'),
+                confidence=vision_result.get('confidence', 0.5),
+                status=SignalStatus.PENDING,
+                context_json=json.dumps({
+                    'source': 'direct_vision_pipeline',
+                    'image_path': image_path,
+                    'processed_at': datetime.now().isoformat()
+                })
+            )
+            
+            db.session.add(signal)
+            db.session.commit()
+            
+            logger.info(f"Created signal for {symbol} with action {vision_result['action']}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error in direct vision pipeline: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return False
 
 # OpenAI API configuration
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
@@ -265,6 +301,76 @@ def process_vision_queue():
             time.sleep(1)
 
 
+def process_charts_directory():
+    """Process all charts in static/charts directory"""
+    import os
+    import glob
+    import time
+    from datetime import datetime
+    
+    try:
+        logger.info("Starting direct charts processing...")
+        
+        # Process only our restricted symbols
+        symbols = ['XAU_USD', 'GBP_JPY', 'GBP_USD', 'EUR_USD', 'USD_JPY']
+        
+        # Create app context for database operations
+        with app.app_context():
+            # Ensure static/charts directory exists
+            charts_dir = "static/charts"
+            if not os.path.exists(charts_dir):
+                os.makedirs(charts_dir)
+                logger.info(f"Created charts directory: {charts_dir}")
+                
+            # Create directories for each symbol if they don't exist
+            for symbol in symbols:
+                mt5_symbol = symbol.replace('_', '')
+                chart_dir = f"{charts_dir}/{mt5_symbol}"
+                if not os.path.exists(chart_dir):
+                    os.makedirs(chart_dir)
+                    logger.info(f"Created chart directory for {symbol}: {chart_dir}")
+                    # Generate a test chart for this symbol
+                    from chart_utils import generate_chart
+                    chart_path = generate_chart(symbol)
+                    if chart_path:
+                        logger.info(f"Generated test chart for {symbol}: {chart_path}")
+                    else:
+                        logger.error(f"Failed to generate test chart for {symbol}")
+                    # Wait a bit to not overwhelm the API
+                    time.sleep(1)
+            
+            # Process the charts
+            pipeline = DirectVisionPipeline()
+            for symbol in symbols:
+                # Look for the most recent chart for this symbol
+                mt5_symbol = symbol.replace('_', '')
+                chart_dir = f"{charts_dir}/{mt5_symbol}"
+                
+                # Get all PNG files in the directory, sorted by modification time (newest first)
+                chart_files = glob.glob(f"{chart_dir}/*.png")
+                if not chart_files:
+                    logger.warning(f"No chart files found in {chart_dir}")
+                    continue
+                    
+                chart_files.sort(key=os.path.getmtime, reverse=True)
+                latest_chart = chart_files[0]
+                
+                logger.info(f"Processing latest chart for {symbol}: {latest_chart}")
+                success = pipeline.process_chart(symbol, latest_chart)
+                
+                if success:
+                    logger.info(f"Successfully processed chart for {symbol}")
+                else:
+                    logger.error(f"Failed to process chart for {symbol}")
+                    
+                # Wait a bit to not overwhelm the OpenAI API
+                time.sleep(1)
+                    
+    except Exception as e:
+        logger.error(f"Error in process_charts_directory: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+
 if __name__ == "__main__":
     # Setup more verbose logging
     logging.basicConfig(
@@ -279,16 +385,11 @@ if __name__ == "__main__":
     else:
         logger.info("OpenAI API key found.")
     
-    # Check Redis connection
-    if not redis_client:
-        logger.error("Redis client not available, vision worker will not function correctly.")
-    else:
-        logger.info("Redis client connected successfully.")
-        
-    # Start processing queue
-    try:
-        process_vision_queue()
-    except Exception as e:
-        logger.error(f"Fatal error in vision worker: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
+    # Since Redis is not available, use direct processing
+    logger.info("Redis not available, using direct chart processing instead")
+    
+    # Import datetime here for use in the log
+    from datetime import datetime
+    
+    # Process all charts in the directory
+    process_charts_directory()
