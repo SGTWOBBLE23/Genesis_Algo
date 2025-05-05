@@ -33,36 +33,43 @@ function initializeCharts() {
     const symbols = ['XAUUSD', 'GBPJPY', 'GBPUSD', 'EURUSD', 'AAPL', 'NAS100', 'BTCUSD'];
     const chartContainer = document.getElementById('charts-container');
     
+    // Check if the chart container exists
+    if (!chartContainer) {
+        console.log("Charts container not found. Charts will not be initialized.");
+        return;
+    }
+    
     // Create chart containers
     symbols.forEach(symbol => {
-        // Create card for chart
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.innerHTML = `
-            <div class="card-header">
-                <h3>${symbol}</h3>
-                <div class="price-indicator">
-                    <span class="bid">Bid: <strong id="${symbol}-bid">--</strong></span>
-                    <span class="ask">Ask: <strong id="${symbol}-ask">--</strong></span>
+        try {
+            // Create card for chart
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <div class="card-header">
+                    <h3>${symbol}</h3>
+                    <div class="price-indicator">
+                        <span class="bid">Bid: <strong id="${symbol}-bid">--</strong></span>
+                        <span class="ask">Ask: <strong id="${symbol}-ask">--</strong></span>
+                    </div>
                 </div>
-            </div>
-            <div class="card-body">
-                <canvas id="chart-${symbol}" width="400" height="250"></canvas>
-            </div>
-            <div class="card-footer" id="signals-${symbol}">
-                <div class="spinner-border spinner-border-sm" role="status">
-                    <span class="visually-hidden">Loading...</span>
+                <div class="card-body">
+                    <canvas id="chart-${symbol}" width="400" height="250"></canvas>
                 </div>
-                Waiting for signals...
-            </div>
-        `;
-        
-        chartContainer.appendChild(card);
-        
-        // Initialize chart
-        const ctx = document.getElementById(`chart-${symbol}`).getContext('2d');
-        
-        activeCharts[symbol] = new Chart(ctx, {
+                <div class="card-footer" id="signals-${symbol}">
+                    <div class="spinner-border spinner-border-sm" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    Waiting for signals...
+                </div>
+            `;
+            
+            chartContainer.appendChild(card);
+            
+            // Initialize chart
+            const ctx = document.getElementById(`chart-${symbol}`).getContext('2d');
+            
+            activeCharts[symbol] = new Chart(ctx, {
             type: 'candlestick', // Using candlestick chart type for OHLC data
             data: {
                 datasets: [{
@@ -299,6 +306,12 @@ function closeTrade(tradeId) {
 function showAlert(message, type = 'info') {
     const alertsContainer = document.getElementById('alerts-container');
     
+    // Check if alerts container exists
+    if (!alertsContainer) {
+        console.log(`Alert message (${type}): ${message}`);
+        return;
+    }
+    
     const alert = document.createElement('div');
     alert.className = `alert alert-${type} alert-dismissible fade show`;
     alert.innerHTML = `
@@ -341,8 +354,22 @@ function loadCurrentSignals() {
  * @param {Array} signals - List of signal objects
  */
 function updateSignalsTable(signals) {
-    const container = document.getElementById('signals-container');
-    if (!container) return;
+    // Try to find the signals container
+    let container = document.getElementById('signals-container');
+    
+    // If not found, check if we have a signals list in other containers
+    if (!container) {
+        console.log('Primary signals container not found, checking alternatives...');
+        // Try to find any container with signals-list class
+        const signalsList = document.querySelector('.signals-list');
+        if (signalsList) {
+            container = signalsList;
+            console.log('Using alternative signals container');
+        } else {
+            console.error('No signals container found. Unable to display signals.');
+            return;
+        }
+    }
     
     // Clear existing content
     container.innerHTML = '';
@@ -465,12 +492,21 @@ function executeSignal(signalId) {
         return;
     }
     
-    // Show loading state by changing the button text and style
+    // Find the button
     const button = document.querySelector(`button[onclick="executeSignal(${signalId});"]`);
-    const originalText = button.textContent;
-    button.textContent = 'Sending...';
-    button.disabled = true;
-    button.style.opacity = '0.7';
+    let originalText = 'Execute';
+    
+    // Update button if found
+    if (button) {
+        try {
+            originalText = button.textContent;
+            button.textContent = 'Sending...';
+            button.disabled = true;
+            button.style.opacity = '0.7';
+        } catch (e) {
+            console.error('Error updating button:', e);
+        }
+    }
     
     // Send request to execute the signal
     fetch(`/api/signals/${signalId}/execute`, {
@@ -481,91 +517,141 @@ function executeSignal(signalId) {
     })
     .then(response => response.json())
     .then(data => {
-        // Reset button
-        button.disabled = false;
-        button.style.opacity = '1';
+        // Reset button if found
+        if (button) {
+            try {
+                button.disabled = false;
+                button.style.opacity = '1';
+            } catch (e) {
+                console.error('Error resetting button:', e);
+            }
+        }
         
         if (data.status === 'success') {
             // Show success message
             showAlert(`Signal ${signalId} executed successfully. Trade sent to MT5.`, 'success');
-            button.textContent = 'Executed ✓';
-            button.classList.remove('signal-execute-button');
-            button.classList.add('signal-executed-button');
-            button.disabled = true;
+            
+            // Update button if found
+            if (button) {
+                try {
+                    button.textContent = 'Executed ✓';
+                    button.classList.remove('signal-execute-button');
+                    button.classList.add('signal-executed-button');
+                    button.disabled = true;
+                } catch (e) {
+                    console.error('Error updating button after success:', e);
+                }
+            }
             
             // Reload trades after a short delay
             setTimeout(loadActiveTrades, 2000);
+            
+            // Reload signals to reflect the updated status
+            setTimeout(loadCurrentSignals, 1000);
         } else {
             // Show error message
             showAlert(`Error executing signal: ${data.message}`, 'danger');
-            button.textContent = originalText;
+            
+            // Update button if found
+            if (button) {
+                try {
+                    button.textContent = originalText;
+                } catch (e) {
+                    console.error('Error restoring button text:', e);
+                }
+            }
         }
     })
     .catch(error => {
         // Show error message
         showAlert(`Error executing signal: ${error.message}`, 'danger');
-        button.textContent = originalText;
-        button.disabled = false;
-        button.style.opacity = '1';
+        
+        // Update button if found
+        if (button) {
+            try {
+                button.textContent = originalText;
+                button.disabled = false;
+                button.style.opacity = '1';
+            } catch (e) {
+                console.error('Error resetting button after error:', e);
+            }
+        }
     });
 }
 
 
 
 function connectWebSocket() {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/api/signals/ws`;
-    
-    const socket = new WebSocket(wsUrl);
-    
-    socket.onopen = function(e) {
-        console.log('WebSocket connection established');
-    };
-    
-    socket.onmessage = function(event) {
-        const data = JSON.parse(event.data);
+    try {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/api/signals/ws`;
         
-        if (data.type === 'price_update') {
-            // Update price data
-            const symbol = data.data.symbol;
-            priceData[symbol] = {
-                bid: data.data.bid,
-                ask: data.data.ask,
-                timestamp: data.data.timestamp
-            };
-            
-            // Update UI
-            document.getElementById(`${symbol}-bid`).textContent = data.data.bid.toFixed(5);
-            document.getElementById(`${symbol}-ask`).textContent = data.data.ask.toFixed(5);
-            
-        } else if (data.type === 'new_signal') {
-            // Reload all signals
-            loadCurrentSignals();
-            
-            // Show alert
-            showAlert(`New signal for ${data.data.symbol}: ${data.data.action}`, 'info');
-            
-        } else if (data.type === 'new_trade') {
-            // Add new trade
-            loadActiveTrades(); // Reload all trades
-            
-            // Show alert
-            showAlert(`New trade opened: ${data.data.symbol} ${data.data.side}`, 'success');
-        }
-    };
-    
-    socket.onclose = function(event) {
-        if (event.wasClean) {
-            console.log(`WebSocket connection closed cleanly, code=${event.code}, reason=${event.reason}`);
-        } else {
-            console.log('WebSocket connection died');
-        }
+        const socket = new WebSocket(wsUrl);
         
-        // Try to reconnect after 5 seconds
-        setTimeout(connectWebSocket, 5000);
-    };
-    
-    socket.onerror = function(error) {
-        console.error(`WebSocket error: ${error.message}`);
-    };
+        socket.onopen = function(e) {
+            console.log('WebSocket connection established');
+        };
+        
+        socket.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'price_update') {
+                    try {
+                        // Update price data
+                        const symbol = data.data.symbol;
+                        priceData[symbol] = {
+                            bid: data.data.bid,
+                            ask: data.data.ask,
+                            timestamp: data.data.timestamp
+                        };
+                        
+                        // Try to update UI if elements exist
+                        const bidElement = document.getElementById(`${symbol}-bid`);
+                        const askElement = document.getElementById(`${symbol}-ask`);
+                        
+                        if (bidElement) bidElement.textContent = data.data.bid.toFixed(5);
+                        if (askElement) askElement.textContent = data.data.ask.toFixed(5);
+                    } catch (e) {
+                        console.error('Error processing price update:', e);
+                    }
+                    
+                } else if (data.type === 'new_signal') {
+                    // Reload all signals
+                    loadCurrentSignals();
+                    
+                    // Show alert
+                    showAlert(`New signal for ${data.data.symbol}: ${data.data.action}`, 'info');
+                    
+                } else if (data.type === 'new_trade') {
+                    // Add new trade
+                    loadActiveTrades(); // Reload all trades
+                    
+                    // Show alert
+                    showAlert(`New trade opened: ${data.data.symbol} ${data.data.side}`, 'success');
+                }
+            } catch (e) {
+                console.error('Error processing WebSocket message:', e);
+            }
+        };
+        
+        socket.onclose = function(event) {
+            if (event.wasClean) {
+                console.log(`WebSocket connection closed cleanly, code=${event.code}, reason=${event.reason}`);
+            } else {
+                console.log('WebSocket connection died');
+            }
+            
+            // Try to reconnect after 5 seconds
+            setTimeout(connectWebSocket, 5000);
+        };
+        
+        socket.onerror = function(error) {
+            console.error(`WebSocket error:`, error);
+        };
+    } catch (e) {
+        console.error('Error setting up WebSocket connection:', e);
+        // Try to reconnect after 10 seconds if there was an error during setup
+        setTimeout(connectWebSocket, 10000);
+    }
 }
