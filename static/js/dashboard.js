@@ -173,126 +173,91 @@ function loadCurrentSignals() {
 }
 
 /**
- * Update the signals display in the UI with a rectangular box layout
+ * Update the signals display in the UI with a simple table layout, no cards
  * @param {Array} signals - List of signal objects
  */
 function updateSignalsTable(signals) {
     // Try to find the signals container
     let container = document.getElementById('signals-container');
     
-    // If not found, check if we have a signals list in other containers
     if (!container) {
-        console.log('Primary signals container not found, checking alternatives...');
-        // Try to find any container with signals-list class
-        const signalsList = document.querySelector('.signals-list');
-        if (signalsList) {
-            container = signalsList;
-            console.log('Using alternative signals container');
-        } else {
-            console.error('No signals container found. Unable to display signals.');
-            return;
-        }
+        console.error('Signals container not found. Unable to display signals.');
+        return;
     }
     
     // Clear existing content
     container.innerHTML = '';
     
-    // Create header
-    const header = document.createElement('div');
-    header.className = 'signals-list-header';
-    header.innerHTML = `
-        <h5 class="m-0">Latest Signals</h5>
-        <a href="/signals" class="text-white">View All</a>
-    `;
-    container.appendChild(header);
-    
-    // Create signals container
-    const signalsContainer = document.createElement('div');
-    signalsContainer.className = 'signals-container';
-    container.appendChild(signalsContainer);
-    
     if (signals.length === 0) {
         // Show no signals message
         const emptyMessage = document.createElement('div');
-        emptyMessage.className = 'p-3 text-center w-100';
+        emptyMessage.className = 'alert alert-info';
         emptyMessage.textContent = 'No active signals';
-        signalsContainer.appendChild(emptyMessage);
+        container.appendChild(emptyMessage);
         return;
     }
     
     // Sort signals by created_at in descending order (newest first)
     signals.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     
-    // Add signals as rectangular boxes
+    // Create a table for the signals
+    const table = document.createElement('table');
+    table.className = 'table table-dark table-striped table-hover';
+    
+    // Create table header
+    const tableHead = document.createElement('thead');
+    tableHead.innerHTML = `
+        <tr>
+            <th>Symbol</th>
+            <th>Action</th>
+            <th>Entry</th>
+            <th>SL</th>
+            <th>TP</th>
+            <th>Confidence</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Actions</th>
+        </tr>
+    `;
+    table.appendChild(tableHead);
+    
+    // Create table body
+    const tableBody = document.createElement('tbody');
+    
+    // Add signals to table
     signals.forEach(signal => {
-        // Format action badge class
-        let actionClass = '';
-        switch (signal.action) {
-            case 'BUY_NOW':
-                actionClass = 'action-buy-now';
-                break;
-            case 'SELL_NOW':
-                actionClass = 'action-sell-now';
-                break;
-            case 'ANTICIPATED_LONG':
-                actionClass = 'action-anticipated-long';
-                break;
-            case 'ANTICIPATED_SHORT':
-                actionClass = 'action-anticipated-short';
-                break;
-        }
-        
         // Format date
         const date = new Date(signal.created_at);
-        const dateStr = `${date.getMonth()+1}/${date.getDate()}/${date.getFullYear()}, ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')} ${date.getHours() >= 12 ? 'PM' : 'AM'}`;
+        const dateStr = `${date.getMonth()+1}/${date.getDate()}/${date.getFullYear()}, ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
         
         // Format confidence class
-        const confidenceClass = signal.confidence > 0.8 ? 'confidence-high' : 
-                              signal.confidence > 0.6 ? 'confidence-medium' : 'confidence-low';
+        const confidenceClass = signal.confidence > 0.8 ? 'text-success' : 
+                              signal.confidence > 0.6 ? 'text-warning' : 'text-danger';
         
-        // Create signal card
-        const card = document.createElement('div');
-        card.className = 'signal-card';
-        card.setAttribute('data-action', signal.action);
+        // Create row
+        const row = document.createElement('tr');
         
-        card.innerHTML = `
-            <div class="signal-header">
-                <div class="signal-symbol">${signal.symbol.replace('_', '')}</div>
-                <span class="action-badge ${actionClass}">${signal.action.replace('_', ' ')}</span>
-                ${signal.status === 'ERROR' ? '<span class="status-badge status-error">ERROR</span>' : ''}
-            </div>
-            
-            <div class="signal-details-grid">
-                <div class="signal-detail-item">
-                    <div class="signal-detail-label">Entry</div>
-                    <div class="signal-detail-value">${signal.entry || '--'}</div>
-                </div>
-                <div class="signal-detail-item">
-                    <div class="signal-detail-label">Stop Loss</div>
-                    <div class="signal-detail-value">${signal.sl || '--'}</div>
-                </div>
-                <div class="signal-detail-item">
-                    <div class="signal-detail-label">Take Profit</div>
-                    <div class="signal-detail-value">${signal.tp || '--'}</div>
-                </div>
-            </div>
-            
-            <div class="signal-detail-item" style="margin-bottom: 8px;">
-                <div class="signal-detail-label">Confidence</div>
-                <div class="signal-detail-value ${confidenceClass}">${Math.round(signal.confidence * 100)}%</div>
-            </div>
-            
-            <div class="signal-footer">
-                <div class="signal-timestamp">${dateStr}</div>
-                <div class="signal-actions">
-                    <button class="signal-execute-button" onclick="executeSignal(${signal.id});">Execute</button>
-                    <button class="signal-chart-button" onclick="viewSignalChart(${signal.id});">View Chart</button>
-                </div>
-            </div>
+        // Add row content
+        row.innerHTML = `
+            <td>${signal.symbol.replace('_', '')}</td>
+            <td>${signal.action.replace('_', ' ')}</td>
+            <td>${signal.entry || '--'}</td>
+            <td>${signal.sl || '--'}</td>
+            <td>${signal.tp || '--'}</td>
+            <td class="${confidenceClass}">${Math.round(signal.confidence * 100)}%</td>
+            <td>${signal.status}${signal.status === 'ERROR' ? ' ⚠️' : ''}</td>
+            <td>${dateStr}</td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="executeSignal(${signal.id});">Execute</button>
+                <button class="btn btn-sm btn-info" onclick="viewSignalChart(${signal.id});">Chart</button>
+            </td>
         `;
         
-        signalsContainer.appendChild(card);
+        tableBody.appendChild(row);
     });
+    
+    table.appendChild(tableBody);
+    container.appendChild(table);
 }
 
 /**
