@@ -472,14 +472,18 @@ def get_signals():
                 else:
                     signal.context_json = json.dumps(signal_context)
                     
-                # Create a log entry for the rejected signal
+                # Create a log entry for the rejected signal - but skip the context due to database schema issues
                 try:
-                    Log.add(
-                        level=LogLevel.INFO,
-                        source="signal_scoring",
-                        message=f"Signal {signal.id} ({signal.symbol} {signal.action.name}) rejected: {scoring_details['reason']}",
-                        context=scoring_details
-                    )
+                    # Just log to console instead of database since the logs table might not have context_json column
+                    logger.info(f"Signal {signal.id} ({signal.symbol} {signal.action.name}) rejected: {scoring_details['reason']}")
+                    
+                    # If you want to add to database without context:
+                    # Log.add(
+                    #    level=LogLevel.INFO,
+                    #    source="signal_scoring",
+                    #    message=f"Signal {signal.id} ({signal.symbol} {signal.action.name}) rejected: {scoring_details['reason']}",
+                    #    context=None  # Skip context to avoid errors
+                    # )
                 except Exception as log_error:
                     logger.error(f"Error creating log entry: {log_error}")
                 
