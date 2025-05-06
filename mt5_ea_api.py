@@ -812,7 +812,10 @@ def update_trades():
                     
                     # Map open_price to entry and exit_price to exit
                     entry_value = float(trade_info.get('open_price', 0)) if trade_info.get('open_price') else None
-                    exit_value = float(trade_info.get('exit_price', 0)) if trade_info.get('exit_price') else None
+                    # Handle empty string in exit_price
+                    exit_value = None
+                    if trade_info.get('exit_price') and trade_info.get('exit_price') != '':
+                        exit_value = float(trade_info.get('exit_price', 0))
                     
                     # Handle other fields
                     symbol = trade_info.get('symbol', '')
@@ -910,7 +913,7 @@ def update_trades():
                 # Handle open_price and exit_price mapping
                 if 'open_price' in trade_info:
                     trade.entry = float(trade_info['open_price'])
-                if 'exit_price' in trade_info:
+                if 'exit_price' in trade_info and trade_info['exit_price'] and trade_info['exit_price'] != '':
                     trade.exit = float(trade_info['exit_price'])
                 
                 # Update opened_at timestamp if it's in the incoming data and missing in our record
