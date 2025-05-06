@@ -30,7 +30,8 @@ document.addEventListener('DOMContentLoaded', function() {
  * Initialize price charts for tracked symbols
  */
 function initializeCharts() {
-    const symbols = ['XAUUSD', 'GBPJPY', 'GBPUSD', 'EURUSD', 'AAPL', 'NAS100', 'BTCUSD'];
+    // Focus on our 5 supported forex and metals assets
+    const symbols = ['XAUUSD', 'GBPJPY', 'GBPUSD', 'EURUSD', 'USDJPY'];
     const chartContainer = document.getElementById('charts-container');
     
     // Create chart containers
@@ -373,6 +374,9 @@ function updateSignalsTable(signals) {
     // Sort signals by created_at in descending order (newest first)
     signals.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     
+    // Log all available signals for debugging
+    console.log('Available signals:', signals.map(s => s.symbol));
+    
     // Add signals as rectangular boxes
     signals.forEach(signal => {
         // Format action badge class
@@ -405,9 +409,12 @@ function updateSignalsTable(signals) {
         card.className = 'signal-card';
         card.setAttribute('data-action', signal.action);
         
+        // Get properly formatted symbol for display (remove underscore)
+        const displaySymbol = signal.symbol.replace('_', '');
+        
         card.innerHTML = `
             <div class="signal-header">
-                <div class="signal-symbol">${signal.symbol.replace('_', '')}</div>
+                <div class="signal-symbol">${displaySymbol}</div>
                 <span class="action-badge ${actionClass}">${signal.action.replace('_', ' ')}</span>
                 ${signal.status === 'ERROR' ? '<span class="status-badge status-error">ERROR</span>' : ''}
             </div>
