@@ -11,11 +11,106 @@ from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.sql import func
 from sqlalchemy import and_
 
-# Configure logging
+# Configure logging with custom filter for important INFO logs
+class ImportantInfoFilter(logging.Filter):
+    """Filter that allows only important INFO logs through"""
+    def filter(self, record):
+        # Always allow WARNING, ERROR, CRITICAL, etc.
+        if record.levelno >= logging.WARNING:
+            return True
+            
+        # Keep these important INFO logs
+        important_patterns = [
+            "signal", "trade", "update", "created", "sent", "received", 
+            "market data", "connected", "connection", "starting", "completed", 
+            "success", "error", "warning", "fatal", "critical",
+            "executed", "processed", "filtered", "analyzing", "completed", "generated"
+        ]
+        
+        # Filter out these verbose INFO logs
+        excessive_patterns = [
+            "Using original closed_at time", 
+            "Found null character in the request data", 
+            "Successfully parsed cleaned JSON",
+            "heartbeat",
+            "Account status update",
+            "Account status updated",
+            "Processed signal IDs"
+        ]
+        
+        # Special case for mt5_ea_api - only keep certain important logs
+        if record.name == 'mt5_ea_api' and record.levelno == logging.INFO:
+            # Always filter out these specific message patterns
+            if "Using original closed_at time from MT5" in record.getMessage():
+                return False
+            if "Processed signal IDs:" in record.getMessage():
+                return False
+            if "Account status update" in record.getMessage():
+                return False
+            if "Found null character" in record.getMessage():
+                return False
+            if "Successfully parsed cleaned JSON" in record.getMessage():
+                return False
+                
+            # Filter out other excessive logs
+            for pattern in excessive_patterns:
+                if pattern in record.getMessage():
+                    return False
+                    
+            # Check if message contains an important pattern
+            for pattern in important_patterns:
+                if pattern in record.getMessage().lower():
+                    return True
+                    
+            # For mt5_ea_api, default to filtering out INFO unless explicitly allowed
+            return False
+            
+        # For all other loggers, keep INFO logs by default
+        return True
+
+# Configure main logging
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,  # Changed from DEBUG to INFO
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
+
+# Apply custom filter to root logger
+root_logger = logging.getLogger()
+root_logger.addFilter(ImportantInfoFilter())
+
+# Set higher log level for specific loggers with excessive output
+mt5_logger = logging.getLogger('mt5_ea_api')
+
+# Create a handler that ensures important MT5 logs are still captured
+mt5_handler = logging.StreamHandler()
+mt5_handler.setLevel(logging.INFO)
+
+# Define custom filter for MT5 logs that only allows important INFO messages
+class MT5ImportantFilter(logging.Filter):
+    def filter(self, record):
+        # Always allow WARNING and above
+        if record.levelno >= logging.WARNING:
+            return True
+            
+        # Filter for important MT5 activities
+        important_mt5_patterns = [
+            "signal", "trade", "execution", "force_execution", 
+            "request from MT5", "response to MT5", "ticket",
+            "opened", "closed", "triggered"
+        ]
+        
+        # Check if message contains any important patterns
+        for pattern in important_mt5_patterns:
+            if pattern in record.getMessage().lower():
+                return True
+                
+        # Otherwise, filter it out
+        return False
+
+# Add filter and handler to MT5 logger
+mt5_handler.addFilter(MT5ImportantFilter())
+mt5_logger.addHandler(mt5_handler)
+
 logger = logging.getLogger(__name__)
 
 # Initialize Flask app
