@@ -183,12 +183,12 @@ class Signal(db.Model):
         return {
             "id": self.id,
             "symbol": self.symbol,
-            "action": self.action.value,
+            "action": self.action.value if isinstance(self.action, SignalAction) else self.action,
             "entry": self.entry,
             "sl": self.sl,
             "tp": self.tp,
             "confidence": self.confidence,
-            "status": self.status.value,
+            "status": self.status if isinstance(self.status, str) else (self.status.value if self.status else 'UNKNOWN'),
             "context": self.context,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
@@ -234,14 +234,14 @@ class Trade(db.Model):
             "signal_id": self.signal_id,
             "ticket": self.ticket,
             "symbol": self.symbol,
-            "side": self.side.value,
+            "side": self.side.value if isinstance(self.side, TradeSide) else self.side,
             "lot": self.lot,
             "entry": self.entry,
             "exit": self.exit,
             "sl": self.sl,
             "tp": self.tp,
             "pnl": self.pnl,
-            "status": self.status.value,
+            "status": self.status.value if isinstance(self.status, TradeStatus) else self.status,
             "opened_at": self.opened_at.isoformat() if self.opened_at else None,
             "closed_at": self.closed_at.isoformat() if self.closed_at else None,
             "context": self.context,
@@ -871,11 +871,13 @@ def get_trades_stats():
 @app.route('/api/signals/current', methods=['GET'])
 def get_current_signals():
     # By default, show PENDING, ACTIVE, and ERROR signals from the last 24 hours
+    # Using string values instead of Enum to match the database values
     signals = db.session.query(Signal).filter(
-        Signal.status.in_([SignalStatus.PENDING, SignalStatus.ACTIVE, SignalStatus.ERROR]),
+        Signal.status.in_(['PENDING', 'ACTIVE', 'ERROR']),
         Signal.created_at >= (datetime.now() - timedelta(days=1))
     ).order_by(Signal.created_at.desc()).all()
     
+    logger.info(f"Found {len(signals)} current signals")
     return jsonify([signal.to_dict() for signal in signals])
 
 @app.route('/api/signals/<int:signal_id>/cancel', methods=['POST'])
@@ -884,7 +886,8 @@ def cancel_signal(signal_id):
     if not signal:
         return jsonify({"status": "error", "message": f"Signal with ID {signal_id} not found"}), 404
         
-    signal.status = SignalStatus.CANCELLED
+    # Use string value for db compatibility
+    signal.status = "CANCELLED"
     db.session.commit()
     
     return jsonify({"status": "success", "message": f"Signal {signal_id} cancelled successfully"})
