@@ -716,9 +716,22 @@ def trade_report():
                 sl=float(stop_loss) if stop_loss else None,
                 tp=float(take_profit) if take_profit else None,
                 status=TradeStatus.OPEN,
-                opened_at=datetime.strptime(execution_time, "%Y-%m-%d %H:%M:%S") if execution_time else datetime.now(),
+                opened_at=None,
                 context={'account_id': account_id, 'execution_message': message}
             )
+            
+            # Try both date formats that might come from MT5
+            if execution_time:
+                try:
+                    trade.opened_at = datetime.strptime(execution_time, '%Y.%m.%d %H:%M:%S')
+                except ValueError:
+                    try:
+                        trade.opened_at = datetime.strptime(execution_time, '%Y-%m-%d %H:%M:%S')
+                    except Exception as e:
+                        logger.warning(f"Failed to parse execution_time: {e}")
+                        trade.opened_at = datetime.now()
+            else:
+                trade.opened_at = datetime.now()
             
             db.session.add(trade)
             db.session.commit()
