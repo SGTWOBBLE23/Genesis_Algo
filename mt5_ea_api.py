@@ -385,67 +385,105 @@ def get_signals():
         signals = filtered_signals  # Use the filtered list for formatting
         
         # Check if this terminal ID has any pending signals from direct execute requests
-        terminal_id = account_to_terminal.get(account_id)  # Use account_id as terminal_id for simplicity
-        if not terminal_id:
-            return jsonify({"status": "success", "signals": []})
+        # ─────────────────────────────────────────────────────────────────────
+        #  PENDING-SIGNAL QUEUE  —  dedupe   ·   stale-filter   ·   one-shot
+        # ─────────────────────────────────────────────────────────────────────
+        terminal_id = account_to_terminal.get(account_id)      # acct-id ≈ terminal-id
+        if terminal_id and active_terminals.get(terminal_id, {}).get("pending_signals"):
 
-        if terminal_id in active_terminals \
-           and active_terminals[terminal_id].get('pending_signals'):
-
-            # ------------------------------------------------------------------
-            # 1.  Deduplicate by ID (keep latest copy if somehow queued twice)
-            # ------------------------------------------------------------------
-            raw_queue = active_terminals[terminal_id]['pending_signals']
-            unique_by_id = {sig['id']: sig for sig in raw_queue}
-            pending_signals = list(unique_by_id.values())
-
-            logger.info(f"Found {len(pending_signals)} unique pending signals for terminal {terminal_id}")
+            raw_queue = active_terminals[terminal_id]["pending_signals"][:]
 
             # ------------------------------------------------------------------
-            # 2.  Drop stale ones (> STALE_SECONDS in queue)
+            # 1️⃣  Dedup by exact DB id
             # ------------------------------------------------------------------
-            now_ts = datetime.now()
-            fresh_signals = []
+            by_id = {}
+            for s in raw_queue:
+                if s and s.get("id") not in by_id:
+                    by_id[s["id"]] = s
+            pending_signals = list(by_id.values())
+
+            # ------------------------------------------------------------------
+            # 2️⃣  Dedup “same trade idea”
+            #     (symbol  + action  + entry rounded to tolerance)
+            # ------------------------------------------------------------------
+            def pip_tolerance(sym: str) -> float:
+                """Return ~10 pips in price terms for the instrument."""
+                if sym.startswith(("XAU", "XAG")):         # metals (quoted in dollars)
+                    return 1.0                             # $1.00  ≈ 10 ‘pipettes’
+                if sym.endswith("JPY"):                    # JPY pairs quoted to 3 decimals
+                    return 0.10                            # 0.10   ≈ 10 pips
+                return 0.001                               # 0.0010 ≈ 10 pips on 4-dec FX
+                                                           # (use 0.00010 for 5-dec pairs)
+
+            unique = []
+            last_price = {}        # (symbol, action) → last entry price we kept
+
             for sig in pending_signals:
-                ts_str = sig.get("execution_timestamp")
-                if not ts_str:
-                    fresh_signals.append(sig)                      # no timestamp → keep
+                # symbol might live in 'symbol' or asset['symbol']
+                sym   = sig.get("symbol") or sig.get("asset", {}).get("symbol", "")
+                act   = sig.get("action")
+                price = float(sig.get("entry_price") or sig.get("entry", 0))
+
+                key = (sym, act)
+                tol = pip_tolerance(sym)
+
+                # keep the signal only if no prior one, or price is > tol away
+                if key not in last_price or abs(price - last_price[key]) > tol:
+                    unique.append(sig)
+                    last_price[key] = price
+                else:
+                    logger.info(
+                        f"Terminal {terminal_id}: skipping near-duplicate "
+                        f"{sig.get('id')} {sym} {act} {price} (≦ {tol} diff)"
+                    )
+
+            pending_signals = unique
+            logger.info(f"Terminal {terminal_id}: {len(pending_signals)} unique pending signal(s) after 10-pip filter")
+
+            # ------------------------------------------------------------------
+            # 3️⃣  Drop stale (> STALE_SECONDS)
+            # ------------------------------------------------------------------
+            fresh = []
+            now_ts = datetime.now()
+            for sig in pending_signals:
+                ts = sig.get("execution_timestamp")
+                if not ts:
+                    fresh.append(sig)
                     continue
                 try:
-                    queued_at = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
-                    if (now_ts - queued_at).total_seconds() <= STALE_SECONDS:
-                        fresh_signals.append(sig)
+                    if (now_ts - datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")).total_seconds() <= STALE_SECONDS:
+                        fresh.append(sig)
                     else:
-                        logger.info(f"Skipping stale signal {sig.get('id')} queued at {ts_str}")
+                        logger.info(f"Skipping stale signal {sig.get('id')} queued {ts}")
                 except ValueError:
-                    fresh_signals.append(sig)                      # bad ts → keep anyway
-
-            pending_signals = fresh_signals
-
-            # ------------------------------------------------------------------
-            # 3.  Force-execution flag so EA fires immediately
-            # ------------------------------------------------------------------
-            if pending_signals:
-                for sig in pending_signals:
-                    sig['force_execution'] = True
+                    fresh.append(sig)        # bad ts → keep anyway
+            pending_signals = fresh
 
             # ------------------------------------------------------------------
-            # 4.  Record “sent” so we never send the same ID twice to this terminal
+            # 4️⃣  Force execution flag
+            # ------------------------------------------------------------------
+            for sig in pending_signals:
+                sig["force_execution"] = True
+
+            # ------------------------------------------------------------------
+            # 5️⃣  Persist “sent” so we never re-send this id to this terminal
             # ------------------------------------------------------------------
             for sig in pending_signals:
                 try:
-                    db.session.merge(SentSignal(terminal_id=str(terminal_id),
-                                                signal_id=sig['id']))
+                    db.session.merge(
+                        SentSignal(terminal_id=str(terminal_id), signal_id=sig["id"])
+                    )
                 except Exception as e:
-                    logger.warning(f"SentSignal merge failed for {sig['id']}: {e}")
+                    logger.warning(f"SentSignal merge failed for {sig.get('id')}: {e}")
             db.session.commit()
 
             # ------------------------------------------------------------------
-            # 5.  Flush the in-memory queue so they’re only sent once
+            # 6️⃣  Flush in-memory queue  →  signals go out only once
             # ------------------------------------------------------------------
-            active_terminals[terminal_id]['pending_signals'] = []
+            active_terminals[terminal_id]["pending_signals"].clear()
 
             return jsonify({"status": "success", "signals": pending_signals})
+        # ─────────────────────────────────────────────────────────────────────
 
         
         # Format signals for MT5 EA

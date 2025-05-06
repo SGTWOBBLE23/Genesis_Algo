@@ -5,10 +5,14 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Tuple, Union
+from matplotlib.gridspec import GridSpec
+import matplotlib.dates as mdates
 
 # Import mplfinance for candlestick charts
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+from matplotlib.dates import ConciseDateFormatter        # ⬅ new
+from matplotlib.gridspec import GridSpec                  # ⬅ new
 import mplfinance as mpf
 from PIL import Image
 
@@ -26,7 +30,7 @@ class ChartGenerator:
         # Default chart size - high resolution for clear ChatGPT Vision analysis
         # Updated to 1080p (19.2 x 10.8) for better legibility
         self.fig_width = 19.2
-        self.fig_height = 10.8
+        self.fig_height = 14.4
         self.dpi = 100  # 1920x1080 resolution
         
         # Store signal action for positioning marker appropriately
@@ -226,6 +230,13 @@ class ChartGenerator:
             # Updated height ratios to make price chart much larger relative to indicators
             fig, axes = plt.subplots(5, 1, figsize=(self.fig_width, self.fig_height), 
                                    gridspec_kw={'height_ratios': [8, 1, 1.5, 1.5, 1]})
+            for ax in axes:                            # axes = [price_ax, vol_ax, ...]
+                ax.tick_params(axis='x',
+                               labelsize=8,            # smaller font
+                               pad=2,                  # pull ticks closer to frame
+                               rotation=0)
+
+            plt.subplots_adjust(hspace=0.07)           # reduce vertical gaps
             
             # Set background color
             fig.patch.set_facecolor(self.colors['bg'])
