@@ -9,6 +9,11 @@ from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, send_file
 from app import db, Signal, Trade, SignalAction, TradeStatus, TradeSide, Settings, SignalStatus
 
+# Configure logging for this module
+logger = logging.getLogger(__name__)
+# Explicitly set level to WARNING to reduce noise
+logger.setLevel(logging.WARNING)
+
 STALE_SECONDS = 30
 
 from config import MT5_ASSETS as DEFAULT_SYMBOLS   # single source
@@ -913,7 +918,7 @@ def update_trades():
                     try:
                         # Try MT5 format first (YYYY.MM.DD HH:MM:SS)
                         trade.opened_at = datetime.strptime(trade_info['opened_at'], '%Y.%m.%d %H:%M:%S')
-                        logger.info(f"Using original opened_at time from MT5: {trade.opened_at}")
+                        logger.debug(f"Using original opened_at time from MT5: {trade.opened_at}")
                     except ValueError:
                         try:
                             # Try ISO format as fallback (YYYY-MM-DD HH:MM:SS)
@@ -931,7 +936,7 @@ def update_trades():
                             try:
                                 # Try MT5 format first (YYYY.MM.DD HH:MM:SS)
                                 trade.closed_at = datetime.strptime(trade_info['closed_at'], '%Y.%m.%d %H:%M:%S')
-                                logger.info(f"Using original closed_at time from MT5: {trade.closed_at}")
+                                logger.debug(f"Using original closed_at time from MT5: {trade.closed_at}")
                             except ValueError:
                                 try:
                                     # Try ISO format as fallback (YYYY-MM-DD HH:MM:SS)
@@ -1214,7 +1219,7 @@ def account_status():
                 # Use Flask's built-in parser if no null characters
                 data = request.json
                 
-            logger.info(f"Account status update received: {data}")
+            logger.debug(f"Account status update received: {data}")
         except Exception as json_err:
             logger.error(f"Error parsing JSON: {str(json_err)}")
             return jsonify({"status": "error", "message": f"Invalid JSON: {str(json_err)}"}), 400
