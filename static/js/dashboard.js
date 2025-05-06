@@ -208,7 +208,7 @@ function loadActiveTrades() {
             return response.json();
         })
         .then(data => {
-            activeTrades = data.data || [];
+            activeTrades = data.data;
             updateTradesTable();
         })
         .catch(error => {
@@ -329,13 +329,11 @@ function loadCurrentSignals() {
             }
             return response.json();
         })
-        .then(data => {
-            // Check if the response has the new paginated format
-            const signals = data.data || data;
+        .then(signals => {
             updateSignalsTable(signals);
         })
         .catch(error => {
-            console.error('Error fetching signals data:', error);
+            console.error('Error fetching signals:', error);
         });
 }
 

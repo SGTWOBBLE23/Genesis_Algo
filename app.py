@@ -713,21 +713,20 @@ def get_trades():
             Trade.updated_at
         ]
         
-        # Build the filter conditions separately so we can apply them to both queries
-        filter_conditions = []
+        query = db.session.query(*columns)
         
         # Apply filters if provided
         if status:
             try:
-                filter_conditions.append(Trade.status == TradeStatus(status))
+                query = query.filter(Trade.status == TradeStatus(status))
             except ValueError:
                 # If invalid status, just ignore this filter
                 pass
         if symbol:
-            filter_conditions.append(Trade.symbol == symbol)
+            query = query.filter(Trade.symbol == symbol)
         if side:
             try:
-                filter_conditions.append(Trade.side == TradeSide(side))
+                query = query.filter(Trade.side == TradeSide(side))
             except ValueError:
                 # If invalid side, just ignore this filter
                 pass
@@ -736,7 +735,7 @@ def get_trades():
         if start_date:
             try:
                 start_date_obj = datetime.fromisoformat(start_date)
-                filter_conditions.append(Trade.opened_at >= start_date_obj)
+                query = query.filter(Trade.opened_at >= start_date_obj)
             except (ValueError, TypeError):
                 # Invalid date format, ignore
                 pass
@@ -744,27 +743,31 @@ def get_trades():
         if end_date:
             try:
                 end_date_obj = datetime.fromisoformat(end_date)
-                filter_conditions.append(Trade.opened_at <= end_date_obj)
+                query = query.filter(Trade.opened_at <= end_date_obj)
             except (ValueError, TypeError):
                 # Invalid date format, ignore
                 pass
         
-        # Get total count for pagination (with all filters)
+        # Get total count for pagination
         total_query = db.session.query(func.count(Trade.id))
-        for condition in filter_conditions:
-            total_query = total_query.filter(condition)
+        if status:
+            try:
+                total_query = total_query.filter(Trade.status == TradeStatus(status))
+            except ValueError:
+                pass
+        if symbol:
+            total_query = total_query.filter(Trade.symbol == symbol)
+        if side:
+            try:
+                total_query = total_query.filter(Trade.side == TradeSide(side))
+            except ValueError:
+                pass
         
         total = total_query.scalar() or 0
         pages = (total + limit - 1) // limit if limit > 0 else 1
         
-        # Build and execute the main query with pagination
-        query = db.session.query(*columns)
-        for condition in filter_conditions:
-            query = query.filter(condition)
-            
-        # Apply pagination efficiently
-        offset = (page - 1) * limit
-        trades = query.order_by(Trade.created_at.desc()).limit(limit).offset(offset).all()
+        # Apply pagination
+        trades = query.order_by(Trade.created_at.desc()).limit(limit).offset((page - 1) * limit).all()
         
         # Convert to dictionaries - manually create the dict since the to_dict method might use columns not in our select
         trade_list = []
@@ -965,36 +968,13 @@ def get_trades_stats():
 def get_current_signals():
     # By default, show PENDING, ACTIVE, and ERROR signals from the last 24 hours
     # Using string values instead of Enum to match the database values
-    
-    # Get pagination parameters
-    page = request.args.get('page', 1, type=int)
-    limit = request.args.get('limit', 50, type=int)
-    
-    # Build the filter
-    query_filter = [
+    signals = db.session.query(Signal).filter(
         Signal.status.in_(['PENDING', 'ACTIVE', 'ERROR']),
         Signal.created_at >= (datetime.now() - timedelta(days=1))
-    ]
+    ).order_by(Signal.created_at.desc()).all()
     
-    # Get total count for pagination
-    total = db.session.query(func.count(Signal.id)).filter(*query_filter).scalar() or 0
-    
-    # Get paginated results
-    offset = (page - 1) * limit
-    signals = db.session.query(Signal).filter(
-        *query_filter
-    ).order_by(Signal.created_at.desc()).limit(limit).offset(offset).all()
-    
-    logger.info(f"Found {total} current signals, showing {len(signals)} for page {page}")
-    
-    # Return with pagination metadata
-    return jsonify({
-        'data': [signal.to_dict() for signal in signals],
-        'page': page,
-        'limit': limit,
-        'total': total,
-        'pages': (total + limit - 1) // limit if limit > 0 else 1
-    })
+    logger.info(f"Found {len(signals)} current signals")
+    return jsonify([signal.to_dict() for signal in signals])
 
 @app.route('/api/signals/<int:signal_id>/cancel', methods=['POST'])
 def cancel_signal(signal_id):
