@@ -6,8 +6,6 @@
 let activeCharts = {};
 let activeTrades = [];
 let priceData = {};
-let nextCursor = null;          // ← new
-const pageSize = 25;  
 
 // Initialize Dashboard when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
@@ -22,11 +20,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Connect to WebSocket for real-time updates
     connectWebSocket();
-
-    const loadMoreBtn = document.getElementById('load-more-button');
-    if (loadMoreBtn) {
-        loadMoreBtn.addEventListener('click', () => loadCurrentSignals(true));
-    }
 
     // Set up interval updates
     setInterval(updateTradePnL, 5000); // Update P&L every 5 seconds
@@ -324,60 +317,50 @@ function showAlert(message, type = 'info') {
 }
 
 
+
 /**
- * Load current signals from the API (cursor‑based pagination)
- * @param {boolean} append - when true, appends to the existing list
+ * Load current signals from the API
  */
-function loadCurrentSignals(append = false) {
-    const qs = new URLSearchParams({
-        limit: pageSize,
-        ...(append && nextCursor ? { cursor: nextCursor } : {})
-    });
-
-    fetch(`/api/signals/current?${qs}`)
-        .then(r => r.json())
-        .then(data => {
-            nextCursor = data.nextCursor;
-
-            const btn = document.getElementById('load-more-button');
-            if (btn) btn.classList.toggle('d-none', !data.hasMore);
-
-            updateSignalsTable(data.signals, append);
+function loadCurrentSignals() {
+    fetch('/api/signals/current')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
         })
-        .catch(err => console.error('Error fetching signals:', err));
+        .then(signals => {
+            updateSignalsTable(signals);
+        })
+        .catch(error => {
+            console.error('Error fetching signals:', error);
+        });
 }
 
 /**
  * Update the signals display in the UI with a rectangular box layout
  * @param {Array} signals - List of signal objects
  */
-function updateSignalsTable(signals, append = false) {
+function updateSignalsTable(signals) {
     const container = document.getElementById('signals-container');
     if (!container) return;
 
-    // Clear only on full refresh
-    if (!append) {
-        container.innerHTML = '';
-    }
+    // Clear existing content
+    container.innerHTML = '';
 
-    // Create header only if not present (or on full refresh)
-    if (!append) {
-        const header = document.createElement('div');
-        header.className = 'signals-list-header';
-        header.innerHTML = `
-            <h5 class="m-0">Latest Signals</h5>
-            <a href="/signals" class="text-white">View All</a>
-        `;
-        container.appendChild(header);
-    }
+    // Create header
+    const header = document.createElement('div');
+    header.className = 'signals-list-header';
+    header.innerHTML = `
+        <h5 class="m-0">Latest Signals</h5>
+        <a href="/signals" class="text-white">View All</a>
+    `;
+    container.appendChild(header);
 
-    // Re‑use signals container if it already exists
-    let signalsContainer = container.querySelector('.signals-container');
-    if (!signalsContainer) {
-        signalsContainer = document.createElement('div');
-        signalsContainer.className = 'signals-container';
-        container.appendChild(signalsContainer);
-    }
+    // Create signals container
+    const signalsContainer = document.createElement('div');
+    signalsContainer.className = 'signals-container';
+    container.appendChild(signalsContainer);
 
     if (signals.length === 0) {
         // Show no signals message

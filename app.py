@@ -965,26 +965,13 @@ def get_trades_stats():
 
 @app.route('/api/signals/current', methods=['GET'])
 def get_current_signals():
-    # ----- cursor params -------------------------------------------------
-    limit  = min(request.args.get("limit", 25, int), 100)   # hard-cap
-    cursor = request.args.get("cursor", type=int)           # id of *last* row client has
+    # By default, show PENDING, ACTIVE, and ERROR signals from the last 24 hours
+    signals = db.session.query(Signal).filter(
+        Signal.status.in_([SignalStatus.PENDING, SignalStatus.ACTIVE, SignalStatus.ERROR]),
+        Signal.created_at >= (datetime.now() - timedelta(days=1))
+    ).order_by(Signal.created_at.desc()).all()
 
-    q = (db.session.query(Signal)
-            .filter(Signal.status.notin_([SignalStatus.EXPIRED, SignalStatus.CANCELLED, SignalStatus.ERROR])))
-
-    if cursor:                               # “load more” call
-        q = q.filter(Signal.id < cursor)     # everything *older* than the last id
-
-    rows = q.order_by(Signal.id.desc()).limit(limit + 1).all()   # fetch one extra
-    has_more   = len(rows) > limit
-    nextCursor = rows[-1].id if has_more else None
-    rows       = rows[:limit]                                   # strip the extra row
-
-    return jsonify({
-        "signals":   [r.to_dict() for r in rows],
-        "hasMore":   has_more,
-        "nextCursor": nextCursor
-    })
+    return jsonify([signal.to_dict() for signal in signals])
 
 @app.route('/api/signals/<int:signal_id>/cancel', methods=['POST'])
 def cancel_signal(signal_id):
