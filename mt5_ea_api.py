@@ -67,7 +67,7 @@ def heartbeat():
     try:
         # Debug the raw request data
         raw_data = request.data
-        logger.info(f"Received raw heartbeat data: {raw_data}")
+        logger.debug(f"Received raw heartbeat data: {raw_data}")
         
         # Clean the input data by removing null bytes
         try:
@@ -81,7 +81,7 @@ def heartbeat():
                 # Use Flask's built-in parser if no null characters
                 data = request.json
                 
-            logger.info(f"Heartbeat received: {data}")
+            logger.debug(f"Heartbeat received: {data}")
         except Exception as json_err:
             logger.error(f"Error parsing JSON: {str(json_err)}")
             return jsonify({"status": "error", "message": f"Invalid JSON: {str(json_err)}"}), 400
@@ -117,7 +117,7 @@ def heartbeat():
         # Store most recent account id
         Settings.set_value('mt5', 'last_account_id', account_id)
         
-        logger.info(f"Heartbeat received from MT5 terminal {terminal_id} for account {account_id}")
+        logger.debug(f"Heartbeat received from MT5 terminal {terminal_id} for account {account_id}")
         
         return jsonify({
             "status": "success",
@@ -135,7 +135,7 @@ def get_signals():
     try:
         # Debug the raw request data
         raw_data = request.data
-        logger.info(f"Received raw signals request data: {raw_data}")
+        logger.debug(f"Received raw signals request data: {raw_data}")
         
         # Clean the input data by removing null bytes
         try:
@@ -165,7 +165,7 @@ def get_signals():
         logger.info(f"MT5 EA requesting signals for account {account_id}, last_signal_id={last_signal_id}")
         
         # Log the raw data for debugging
-        logger.info(f"Raw data from MT5: {data}")
+        logger.debug(f"Raw data from MT5: {data}")
         
         # Check if forex market is open
         now = datetime.now()
@@ -966,7 +966,10 @@ def update_trades():
         
         if updated_count > 0 or created_count > 0:
             db.session.commit()
-            logger.info(f"Updated {updated_count} and created {created_count} trades for account {account_id}")
+            logger.debug(f"Updated {updated_count} and created {created_count} trades for account {account_id}")
+        # Log a summary message at info level if significant changes
+        if updated_count > 0 or created_count > 0:
+            logger.info(f"Trade update summary: {updated_count} updated, {created_count} created for account {account_id}")
         
         return jsonify({
             "status": "success",
