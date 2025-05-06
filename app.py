@@ -78,6 +78,39 @@ logging.basicConfig(
 root_logger = logging.getLogger()
 root_logger.addFilter(ImportantInfoFilter())
 
+# Set higher log level for specific loggers with excessive output
+mt5_logger = logging.getLogger('mt5_ea_api')
+
+# Create a handler that ensures important MT5 logs are still captured
+mt5_handler = logging.StreamHandler()
+mt5_handler.setLevel(logging.INFO)
+
+# Define custom filter for MT5 logs that only allows important INFO messages
+class MT5ImportantFilter(logging.Filter):
+    def filter(self, record):
+        # Always allow WARNING and above
+        if record.levelno >= logging.WARNING:
+            return True
+            
+        # Filter for important MT5 activities
+        important_mt5_patterns = [
+            "signal", "trade", "execution", "force_execution", 
+            "request from MT5", "response to MT5", "ticket",
+            "opened", "closed", "triggered"
+        ]
+        
+        # Check if it's an important message
+        for pattern in important_mt5_patterns:
+            if pattern in record.getMessage().lower():
+                return True
+                
+        # Filter out everything else at INFO level
+        return False
+
+mt5_handler.addFilter(MT5ImportantFilter())
+mt5_logger.addHandler(mt5_handler)
+mt5_logger.setLevel(logging.WARNING)  # Default level WARNING, but important INFOs still go through
+
 # Get logger for this module
 logger = logging.getLogger(__name__)
 
