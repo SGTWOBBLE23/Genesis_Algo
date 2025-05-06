@@ -139,12 +139,10 @@ function loadTrades() {
         .then(data => {
             console.log('Received trade data:', data);
             
-            // Use data directly from the API
-            trades = data.data || [];
-            
-            // Update pagination info from the server response
-            totalTrades = data.total || 0;
-            totalPages = data.pages || 0;
+            // Filter out duplicate tickets and sort by date
+            trades = filterAndSortTrades(data.data);
+            totalTrades = trades.length;
+            totalPages = Math.ceil(totalTrades / pageSize);
             currentPage = Math.min(currentPage, totalPages || 1);
             
             // Update UI
