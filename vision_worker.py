@@ -311,7 +311,8 @@ def analyze_image(image_path: str) -> Dict[str, Any]:
 Your task is to analyse the supplied forex chart image and return a single, precise trading signal (or decline if none is worth taking).
 
 Each chart image is saved as **SYMBOL_TIMEFRAME_YYYYMMDD_HHMMSS.png**.  
-If the chart title is missing or cropped, extract the *symbol*, *time-frame* and *timestamp* from that filename.
+If the chart title is missing or cropped, extract the *symbol*, *time-frame* and *timestamp* from that filename.  
+➕ Strip broker suffixes like **“m”, “-pro”, “.abc”** when deriving the symbol (e.g. *XAUUSDm* → *XAUUSD*).
 
 ────────────────────────────────────────
 CHART-ANALYSIS GUIDELINES
@@ -346,28 +347,39 @@ RISK-MANAGEMENT CALCULATIONS   *(applies to every symbol & timeframe)*
   – Never suggest an SL that is smaller than 0.3 × ATR (would be inside normal noise).
 
 *(Optional context)*  If the user message includes  
-`last_price = <float>`  and/or  `atr_14 = <float>`, use those exact values instead of estimating from pixels.
+`last_price = <float>`  and/or  `atr_14 = <float>`, use those exact values instead of estimating from pixels.  
+➕ If **ATR cannot be read or is < 0.00001**, set `confidence` to **0.55** and return an **ANTICIPATED_* action**.
 
 ────────────────────────────────────────
 SIGNAL CLASSIFICATION
 BUY_NOW | SELL_NOW | ANTICIPATED_LONG | ANTICIPATED_SHORT  
-(use ANTICIPATED_* when a pattern is forming but a trigger candle is still required)
+➕ Use ANTICIPATED_* **only when the trigger candle has not closed yet**; otherwise default to BUY_NOW or SELL_NOW.
 
 ────────────────────────────────────────
 CONFIDENCE SCORE
 0.90 – 1.00 = Perfect (multiple confirmations) | 0.80 – 0.89 = Strong | 0.70 – 0.79 = Good | 0.60 – 0.69 = Marginal | < 0.60 = Reject / no-trade
 
 ────────────────────────────────────────
-RESPONSE FORMAT (required)
+➕ NUMBER-FORMATTING REQUIREMENTS
+• Use the instrument’s native precision:  
+  – 5 dp for non‑JPY majors (EURUSD, GBPUSD, AUDUSD…)  
+  – 3 dp for JPY pairs (USDJPY, GBPJPY, EURJPY, …)  
+  – 2 dp for metals & indices (XAUUSD, XAGUSD, NAS100…)
+
+• Output numbers as JSON floats, e.g. 1337.50 — not strings.
+
+────────────────────────────────────────
+➕ RESPONSE FORMAT (MANDATORY)  
+Respond **only** with a single JSON object—no markdown, no commentary, nothing outside the braces.
+
 ```json
 {
-  "action": "BUY_NOW | SELL_NOW | ANTICIPATED_LONG | ANTICIPATED_SHORT",
-  "entry": <float>,
-  "sl":    <float>,
-  "tp":    <float>,
-  "confidence": <float>
+  "action":      "BUY_NOW | SELL_NOW | ANTICIPATED_LONG | ANTICIPATED_SHORT",
+  "entry":       <float>,
+  "sl":          <float>,
+  "tp":          <float>,
+  "confidence":  <float>
 }
-
         """
         
         # Construct payload with the image

@@ -41,18 +41,18 @@ def start_scheduler():
     # Schedule 15-minute capture jobs
     scheduler.add_job(
         capture_all_assets,
-        CronTrigger(minute='*/15'),  # Every 15 minutes
+        CronTrigger(second=10, minute='*/15'),  # Every 15 minutes
         id='capture_15m',
-        name='Capture all assets every 15 minutes',
+        name='Capture all assets every 15 minutes(+10 s buffer)',
         replace_existing=True
     )
     
     # Schedule hourly capture jobs
     scheduler.add_job(
         capture_hourly_assets,
-        CronTrigger(minute='0'),  # At the top of every hour
+        CronTrigger(second=10, minute='0'),  # At the top of every hour
         id='capture_1h',
-        name='Capture all assets hourly for 1H timeframe',
+        name='Capture all assets hourly for 1H timeframe(+10 s buffer)',
         replace_existing=True
     )
     

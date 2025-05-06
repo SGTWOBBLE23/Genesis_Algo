@@ -6,21 +6,28 @@
 let activeCharts = {};
 let activeTrades = [];
 let priceData = {};
+let nextCursor = null;          // ← new
+const pageSize = 25;  
 
 // Initialize Dashboard when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize the charts
     initializeCharts();
-    
+
     // Load active trades (functions available but not displayed in UI)
     loadActiveTrades();
-    
+
     // Load current signals
     loadCurrentSignals();
-    
+
     // Connect to WebSocket for real-time updates
     connectWebSocket();
-    
+
+    const loadMoreBtn = document.getElementById('load-more-button');
+    if (loadMoreBtn) {
+        loadMoreBtn.addEventListener('click', () => loadCurrentSignals(true));
+    }
+
     // Set up interval updates
     setInterval(updateTradePnL, 5000); // Update P&L every 5 seconds
     setInterval(loadCurrentSignals, 60000); // Update signals every minute
@@ -33,7 +40,7 @@ function initializeCharts() {
     // Focus on our 5 supported forex and metals assets
     const symbols = ['XAUUSD', 'GBPJPY', 'GBPUSD', 'EURUSD', 'USDJPY'];
     const chartContainer = document.getElementById('charts-container');
-    
+
     // Create chart containers
     symbols.forEach(symbol => {
         // Create card for chart
@@ -57,12 +64,12 @@ function initializeCharts() {
                 Waiting for signals...
             </div>
         `;
-        
+
         chartContainer.appendChild(card);
-        
+
         // Initialize chart
         const ctx = document.getElementById(`chart-${symbol}`).getContext('2d');
-        
+
         activeCharts[symbol] = new Chart(ctx, {
             type: 'candlestick', // Using candlestick chart type for OHLC data
             data: {
@@ -113,11 +120,11 @@ function initializeCharts() {
                 }
             }
         });
-        
+
         // Fetch initial chart data
         fetchChartData(symbol);
     });
-    
+
     console.log("Charts initialized");
 }
 
@@ -152,7 +159,7 @@ function updateChart(symbol, candles) {
         console.error(`Chart for ${symbol} not found`);
         return;
     }
-    
+
     // Format data for chart.js bar chart
     const chartData = candles.map(candle => ({
         x: new Date(candle.time).getTime(),
@@ -163,33 +170,33 @@ function updateChart(symbol, candles) {
         l: candle.low,
         c: candle.close
     }));
-    
+
     // Set bar colors based on price movement (green for up, red for down)
     activeCharts[symbol].data.datasets[0].backgroundColor = chartData.map((d, i) => {
         if (i === 0) return '#00c851'; // Default to green for first bar
         return chartData[i].y > chartData[i-1].y ? '#00c851' : '#ff3547'; // Green for up, red for down
     });
-    
+
     // Update chart
     activeCharts[symbol].data.datasets[0].data = chartData;
     activeCharts[symbol].update();
-    
+
     // Update latest prices
     if (chartData.length > 0) {
         const latest = chartData[chartData.length - 1];
-        
+
         // Calculate bid/ask spread for display (simplified)
         const spread = 0.0002 * latest.c; // 2 pips spread (example)
         const bid = (latest.c - spread/2).toFixed(5);
         const ask = (latest.c + spread/2).toFixed(5);
-        
+
         // Store price data
         priceData[symbol] = {
             bid: parseFloat(bid),
             ask: parseFloat(ask),
             timestamp: new Date().toISOString()
         };
-        
+
         // Update UI
         document.getElementById(`${symbol}-bid`).textContent = bid;
         document.getElementById(`${symbol}-ask`).textContent = ask;
@@ -225,7 +232,7 @@ function updateTradesTable() {
     // We just log that trades data is being processed but not displayed
     console.log('Trade data processed but UI display removed as requested');
     return;
-    
+
     /* Original implementation hidden to prevent trades display */
 }
 
@@ -236,12 +243,12 @@ function updateTradePnL() {
     if (activeTrades.length === 0 || Object.keys(priceData).length === 0) {
         return; // No trades or no price data
     }
-    
+
     // Update P&L for each trade based on current prices
     activeTrades.forEach(trade => {
         const symbolPrice = priceData[trade.symbol];
         if (!symbolPrice) return;
-        
+
         // Calculate P&L (simplified)
         let currentPrice;
         if (trade.side === 'BUY') {
@@ -252,7 +259,7 @@ function updateTradePnL() {
             trade.pnl = (trade.entry - currentPrice) * trade.lot * 100000; // Example calculation
         }
     });
-    
+
     // Update table with new P&L
     updateTradesTable();
 }
@@ -265,7 +272,7 @@ function closeTrade(tradeId) {
     if (!confirm('Are you sure you want to close this trade?')) {
         return;
     }
-    
+
     fetch(`/api/trade/${tradeId}/close`, {
         method: 'POST',
         headers: {
@@ -282,7 +289,7 @@ function closeTrade(tradeId) {
         // Remove trade from active trades
         activeTrades = activeTrades.filter(trade => trade.id !== tradeId);
         updateTradesTable();
-        
+
         // Show success message
         showAlert('Trade closed successfully', 'success');
     })
@@ -299,16 +306,16 @@ function closeTrade(tradeId) {
  */
 function showAlert(message, type = 'info') {
     const alertsContainer = document.getElementById('alerts-container');
-    
+
     const alert = document.createElement('div');
     alert.className = `alert alert-${type} alert-dismissible fade show`;
     alert.innerHTML = `
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     `;
-    
+
     alertsContainer.appendChild(alert);
-    
+
     // Auto-dismiss after 5 seconds
     setTimeout(() => {
         alert.classList.remove('show');
@@ -317,51 +324,61 @@ function showAlert(message, type = 'info') {
 }
 
 
-
 /**
- * Load current signals from the API
+ * Load current signals from the API (cursor‑based pagination)
+ * @param {boolean} append - when true, appends to the existing list
  */
-function loadCurrentSignals() {
-    fetch('/api/signals/current')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return response.json();
+function loadCurrentSignals(append = false) {
+    const qs = new URLSearchParams({
+        limit: pageSize,
+        ...(append && nextCursor ? { cursor: nextCursor } : {})
+    });
+
+    fetch(`/api/signals/current?${qs}`)
+        .then(r => r.json())
+        .then(data => {
+            nextCursor = data.nextCursor;
+
+            const btn = document.getElementById('load-more-button');
+            if (btn) btn.classList.toggle('d-none', !data.hasMore);
+
+            updateSignalsTable(data.signals, append);
         })
-        .then(signals => {
-            updateSignalsTable(signals);
-        })
-        .catch(error => {
-            console.error('Error fetching signals:', error);
-        });
+        .catch(err => console.error('Error fetching signals:', err));
 }
 
 /**
  * Update the signals display in the UI with a rectangular box layout
  * @param {Array} signals - List of signal objects
  */
-function updateSignalsTable(signals) {
+function updateSignalsTable(signals, append = false) {
     const container = document.getElementById('signals-container');
     if (!container) return;
-    
-    // Clear existing content
-    container.innerHTML = '';
-    
-    // Create header
-    const header = document.createElement('div');
-    header.className = 'signals-list-header';
-    header.innerHTML = `
-        <h5 class="m-0">Latest Signals</h5>
-        <a href="/signals" class="text-white">View All</a>
-    `;
-    container.appendChild(header);
-    
-    // Create signals container
-    const signalsContainer = document.createElement('div');
-    signalsContainer.className = 'signals-container';
-    container.appendChild(signalsContainer);
-    
+
+    // Clear only on full refresh
+    if (!append) {
+        container.innerHTML = '';
+    }
+
+    // Create header only if not present (or on full refresh)
+    if (!append) {
+        const header = document.createElement('div');
+        header.className = 'signals-list-header';
+        header.innerHTML = `
+            <h5 class="m-0">Latest Signals</h5>
+            <a href="/signals" class="text-white">View All</a>
+        `;
+        container.appendChild(header);
+    }
+
+    // Re‑use signals container if it already exists
+    let signalsContainer = container.querySelector('.signals-container');
+    if (!signalsContainer) {
+        signalsContainer = document.createElement('div');
+        signalsContainer.className = 'signals-container';
+        container.appendChild(signalsContainer);
+    }
+
     if (signals.length === 0) {
         // Show no signals message
         const emptyMessage = document.createElement('div');
@@ -370,13 +387,13 @@ function updateSignalsTable(signals) {
         signalsContainer.appendChild(emptyMessage);
         return;
     }
-    
+
     // Sort signals by created_at in descending order (newest first)
     signals.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    
+
     // Log all available signals for debugging
     console.log('Available signals:', signals.map(s => s.symbol));
-    
+
     // Add signals as rectangular boxes
     signals.forEach(signal => {
         // Format action badge class
@@ -395,30 +412,30 @@ function updateSignalsTable(signals) {
                 actionClass = 'action-anticipated-short';
                 break;
         }
-        
+
         // Format date
         const date = new Date(signal.created_at);
         const dateStr = `${date.getMonth()+1}/${date.getDate()}/${date.getFullYear()}, ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')} ${date.getHours() >= 12 ? 'PM' : 'AM'}`;
-        
+
         // Format confidence class
         const confidenceClass = signal.confidence > 0.8 ? 'confidence-high' : 
                               signal.confidence > 0.6 ? 'confidence-medium' : 'confidence-low';
-        
+
         // Create signal card
         const card = document.createElement('div');
         card.className = 'signal-card';
         card.setAttribute('data-action', signal.action);
-        
+
         // Get properly formatted symbol for display (remove underscore)
         const displaySymbol = signal.symbol.replace('_', '');
-        
+
         card.innerHTML = `
             <div class="signal-header">
                 <div class="signal-symbol">${displaySymbol}</div>
                 <span class="action-badge ${actionClass}">${signal.action.replace('_', ' ')}</span>
                 ${signal.status === 'ERROR' ? '<span class="status-badge status-error">ERROR</span>' : ''}
             </div>
-            
+
             <div class="signal-details-grid">
                 <div class="signal-detail-item">
                     <div class="signal-detail-label">Entry</div>
@@ -433,12 +450,12 @@ function updateSignalsTable(signals) {
                     <div class="signal-detail-value">${signal.tp || '--'}</div>
                 </div>
             </div>
-            
+
             <div class="signal-detail-item" style="margin-bottom: 8px;">
                 <div class="signal-detail-label">Confidence</div>
                 <div class="signal-detail-value ${confidenceClass}">${Math.round(signal.confidence * 100)}%</div>
             </div>
-            
+
             <div class="signal-footer">
                 <div class="signal-timestamp">${dateStr}</div>
                 <div class="signal-actions">
@@ -447,7 +464,7 @@ function updateSignalsTable(signals) {
                 </div>
             </div>
         `;
-        
+
         signalsContainer.appendChild(card);
     });
 }
@@ -471,14 +488,14 @@ function executeSignal(signalId) {
     if (!confirm('Are you sure you want to execute this signal? This will send the trade to your connected MT5 terminal for execution.')) {
         return;
     }
-    
+
     // Show loading state by changing the button text and style
     const button = document.querySelector(`button[onclick="executeSignal(${signalId});"]`);
     const originalText = button.textContent;
     button.textContent = 'Sending...';
     button.disabled = true;
     button.style.opacity = '0.7';
-    
+
     // Send request to execute the signal
     fetch(`/api/signals/${signalId}/execute`, {
         method: 'POST',
@@ -491,7 +508,7 @@ function executeSignal(signalId) {
         // Reset button
         button.disabled = false;
         button.style.opacity = '1';
-        
+
         if (data.status === 'success') {
             // Show success message
             showAlert(`Signal ${signalId} executed successfully. Trade sent to MT5.`, 'success');
@@ -499,7 +516,7 @@ function executeSignal(signalId) {
             button.classList.remove('signal-execute-button');
             button.classList.add('signal-executed-button');
             button.disabled = true;
-            
+
             // Reload trades after a short delay
             setTimeout(loadActiveTrades, 2000);
         } else {
@@ -522,16 +539,16 @@ function executeSignal(signalId) {
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/api/signals/ws`;
-    
+
     const socket = new WebSocket(wsUrl);
-    
+
     socket.onopen = function(e) {
         console.log('WebSocket connection established');
     };
-    
+
     socket.onmessage = function(event) {
         const data = JSON.parse(event.data);
-        
+
         if (data.type === 'price_update') {
             // Update price data
             const symbol = data.data.symbol;
@@ -540,38 +557,38 @@ function connectWebSocket() {
                 ask: data.data.ask,
                 timestamp: data.data.timestamp
             };
-            
+
             // Update UI
             document.getElementById(`${symbol}-bid`).textContent = data.data.bid.toFixed(5);
             document.getElementById(`${symbol}-ask`).textContent = data.data.ask.toFixed(5);
-            
+
         } else if (data.type === 'new_signal') {
             // Reload all signals
             loadCurrentSignals();
-            
+
             // Show alert
             showAlert(`New signal for ${data.data.symbol}: ${data.data.action}`, 'info');
-            
+
         } else if (data.type === 'new_trade') {
             // Add new trade
             loadActiveTrades(); // Reload all trades
-            
+
             // Show alert
             showAlert(`New trade opened: ${data.data.symbol} ${data.data.side}`, 'success');
         }
     };
-    
+
     socket.onclose = function(event) {
         if (event.wasClean) {
             console.log(`WebSocket connection closed cleanly, code=${event.code}, reason=${event.reason}`);
         } else {
             console.log('WebSocket connection died');
         }
-        
+
         // Try to reconnect after 5 seconds
         setTimeout(connectWebSocket, 5000);
     };
-    
+
     socket.onerror = function(error) {
         console.error(`WebSocket error: ${error.message}`);
     };
