@@ -460,10 +460,12 @@ def get_signals():
             pending_signals = fresh
 
             # ------------------------------------------------------------------
-            # 4️⃣  Force execution flag
+            # 4️⃣  Set force execution flag based on signal type
             # ------------------------------------------------------------------
             for sig in pending_signals:
-                sig["force_execution"] = True
+                # Only set force_execution=True for BUY_NOW and SELL_NOW signals
+                action = sig.get('action', '')
+                sig["force_execution"] = action in ['BUY_NOW', 'SELL_NOW']
 
             # ------------------------------------------------------------------
             # 5️⃣  Persist “sent” so we never re-send this id to this terminal
@@ -533,7 +535,7 @@ def get_signals():
                 "take_profit": float(signal.tp) if signal.tp else 0.0,
                 "confidence": float(signal.confidence),
                 "position_size": 0.1,  # Default lot size
-                "force_execution": True  # Force immediate execution for all signals
+                "force_execution": True if action in ['BUY_NOW', 'SELL_NOW'] else False  # Only force execution for immediate action signals
             }
             
             # Get additional context from signal if available
@@ -1031,7 +1033,7 @@ def execute_signal(signal_id):
             "take_profit": float(signal.tp) if signal.tp else 0.0,
             "confidence": float(signal.confidence),
             "position_size": 0.1,  # Default lot size
-            "force_execution": True,  # Force immediate execution
+            "force_execution": True if action in ['BUY_NOW', 'SELL_NOW'] else False,  # Only force immediate action signals
             "execution_timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         
