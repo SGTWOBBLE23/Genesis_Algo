@@ -1,16 +1,55 @@
-import json
-import time
-import logging
 import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+
+import json, time, logging
 from datetime import datetime, timedelta
+
+
+import matplotlib.pyplot as plt
+
 from flask import Blueprint, request, jsonify, send_file
-from app import db, Signal, Trade, SignalAction, TradeStatus, TradeSide, Settings, SignalStatus
-from config import MT5_ASSETS as DEFAULT_SYMBOLS 
+
+from app import (
+    db,
+    Signal, Trade, SignalAction, TradeStatus, TradeSide,
+    Settings, SignalStatus
+)
+from config import MT5_ASSETS as DEFAULT_SYMBOLS
 from chart_utils import pip_tolerance, is_price_too_close, generate_chart
 from sqlalchemy import Text, cast
+# ────────────────────────────────────────────────────────────
+
+
+# ─── 2. RISK-LIMIT CONSTANTS (Task #4) ──────────────────────
+MAX_TRADES_PER_SYMBOL   = 3       # live positions allowed
+MIN_FREE_MARGIN_RATIO   = 0.30    # 30 % of balance
+# -----------------------------------------------------------
+
+
+# ─── 3. HELPER: _risk_guard() ───────────────────────────────
+def _risk_guard(symbol: str) -> tuple[bool, str]:
+    """
+    Returns (is_allowed, reason) for opening another position on `symbol`.
+    """
+    # a) count open trades for this symbol
+    open_trades = (
+        db.session.query(Trade)
+        .filter(Trade.symbol == symbol, Trade.status == TradeStatus.OPEN)
+        .count()
+    )
+    if open_trades >= MAX_TRADES_PER_SYMBOL:
+        return False, f"{open_trades} open {symbol} trades (max {MAX_TRADES_PER_SYMBOL})"
+
+    # b) margin buffer
+    balance     = Settings.get_value("mt5_account", "balance",     0.0) or 0.0
+    free_margin = Settings.get_value("mt5_account", "free_margin", 0.0) or 0.0
+    if balance and (free_margin / balance) < MIN_FREE_MARGIN_RATIO:
+        pct = round(100 * free_margin / balance, 1)
+        return False, f"Free-margin {pct}% < {int(100*MIN_FREE_MARGIN_RATIO)}%"
+
+    return True, "pass"
 
 # Configure logging for this module
 logger = logging.getLogger(__name__)
@@ -491,7 +530,15 @@ def get_signals():
             return jsonify({"status": "success", "signals": pending_signals})
         # ─────────────────────────────────────────────────────────────────────
 
-        
+        for signal in signals:
+            # ── Risk-limit check ─────────────────────────────────────
+            ok, reason = _risk_guard(signal.symbol)
+            if not ok:
+                logger.info(f"Signal {signal.id} blocked: {reason}")
+                continue
+            # ---------------------------------------------------------
+
+            action = signal.action.value if hasattr(signal.action, 'value') else str(signal.action)
         # Format signals for MT5 EA
         formatted_signals = []
         for signal in signals:
