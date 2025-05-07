@@ -7,74 +7,80 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 import capture_job
-from config import ASSETS  
-from utils import capture_job# 👈 unified list
+from config import ASSETS              # 👈 unified list
 
 logger = logging.getLogger(__name__)
 
 
-def capture_all_assets():
-    """Run capture job for all configured assets"""
-    logger.info(f"Running capture job for all {len(ASSETS)} assets")
+# ────────────────────────────────────────────────────────────────
+#  Job wrappers
+# ────────────────────────────────────────────────────────────────
+def capture_all_assets() -> None:
+    """Capture 15-minute charts (M15) for every configured asset."""
+    logger.info("Running M15 capture for %d assets", len(ASSETS))
     for symbol in ASSETS:
         try:
-            logger.info(f"Capturing {symbol}")
-            capture_job.run(symbol)
-        except Exception as e:
-            logger.error(f"Error capturing {symbol}: {str(e)}")
+            logger.info("Capturing %s (M15)", symbol)
+            capture_job.run(symbol, timeframe="M15")   # ← key change
+        except Exception as exc:
+            logger.error("Error capturing %s (M15): %s", symbol, exc)
 
 
-def capture_hourly_assets():
-    """Run capture job for all assets at top of the hour (for 1H timeframe)"""
-    logger.info(f"Running hourly capture job for all {len(ASSETS)} assets")
+def capture_hourly_assets() -> None:
+    """Capture hourly charts (H1) for every configured asset."""
+    logger.info("Running H1 capture for %d assets", len(ASSETS))
     for symbol in ASSETS:
         try:
-            logger.info(f"Capturing hourly chart for {symbol}")
-            capture_job.run(symbol, datetime.now())
-        except Exception as e:
-            logger.error(f"Error capturing hourly chart for {symbol}: {str(e)}")
+            logger.info("Capturing %s (H1)", symbol)
+            capture_job.run(symbol, timeframe="H1")    # ← key change
+        except Exception as exc:
+            logger.error("Error capturing %s (H1): %s", symbol, exc)
 
 
-def start_scheduler():
-    """Start the background scheduler"""
+# ────────────────────────────────────────────────────────────────
+#  Scheduler setup
+# ────────────────────────────────────────────────────────────────
+def start_scheduler() -> BackgroundScheduler:
+    """Create and start the background scheduler with two cron jobs."""
     scheduler = BackgroundScheduler()
-    
-    # Schedule 15-minute capture jobs
+
+    # Every 15 minutes at ss = 10  (00:10, 15:10, 30:10, 45:10)
     scheduler.add_job(
         capture_all_assets,
-        CronTrigger(second=10, minute='*/15'),  # Every 15 minutes
-        id='capture_15m',
-        name='Capture all assets every 15 minutes(+10 s buffer)',
-        replace_existing=True
+        CronTrigger(second=10, minute="*/15"),
+        id="capture_15m",
+        name="Capture all assets every 15 min (+10 s buffer)",
+        replace_existing=True,
     )
-    
-    # Schedule hourly capture jobs
+
+    # Hourly at HH:00:10
     scheduler.add_job(
         capture_hourly_assets,
-        CronTrigger(second=10, minute='0'),  # At the top of every hour
-        id='capture_1h',
-        name='Capture all assets hourly for 1H timeframe(+10 s buffer)',
-        replace_existing=True
+        CronTrigger(second=10, minute="0"),
+        id="capture_1h",
+        name="Capture all assets hourly (+10 s buffer)",
+        replace_existing=True,
     )
-    
+
     scheduler.start()
-    logger.info("Scheduler started with 15-minute and hourly capture jobs")
-    
+    logger.info("Scheduler started (15-minute & hourly jobs)")
     return scheduler
 
 
+# ────────────────────────────────────────────────────────────────
+#  CLI entry-point (run locally for a quick smoke test)
+# ────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    # Test the scheduler
     logging.basicConfig(level=logging.INFO)
-    scheduler = start_scheduler()
-    
+    sched = start_scheduler()
+
     try:
-        # Run once for testing
-        logger.info("Running a test capture")
+        # Manual smoke-test
+        logger.info("Running one immediate M15 capture")
         capture_all_assets()
-        
-        # Keep the script running to allow scheduled jobs to execute
+
+        # Keep the process alive so APScheduler’s background threads keep running
         while True:
-            pass
+            time.sleep(1)
     except (KeyboardInterrupt, SystemExit):
-        scheduler.shutdown()
+        sched.shutdown()

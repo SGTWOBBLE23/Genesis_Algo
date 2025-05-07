@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, send_file
 from app import db, Signal, Trade, SignalAction, TradeStatus, TradeSide, Settings, SignalStatus
+from config import MT5_ASSETS as DEFAULT_SYMBOLS 
+from chart_utils import pip_tolerance, is_price_too_close, generate_chart
+from sqlalchemy import text
 
 # Configure logging for this module
 logger = logging.getLogger(__name__)
@@ -16,7 +19,6 @@ logger.setLevel(logging.WARNING)
 
 STALE_SECONDS = 30
 
-from config import MT5_ASSETS as DEFAULT_SYMBOLS   # single source
 
 # Define Symbol Mapping model for local use in this module
 class SymbolMapping(db.Model):
@@ -28,7 +30,7 @@ class SymbolMapping(db.Model):
     mt5_symbol = db.Column(db.String(30), nullable=False)
     description = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
-from chart_utils import generate_chart
+    
 
 class SentSignal(db.Model):
     __tablename__ = "sent_signals"
@@ -409,19 +411,14 @@ def get_signals():
 
             # ------------------------------------------------------------------
             # 2️⃣  Dedup “same trade idea”
-            #     (symbol  + action  + entry rounded to tolerance)
+            #     (symbol + action + entry within 10-pip tolerance)
             # ------------------------------------------------------------------
-            def pip_tolerance(sym: str) -> float:
-                """Return ~10 pips in price terms for the instrument."""
-                if sym.startswith(("XAU", "XAG")):         # metals (quoted in dollars)
-                    return 1.0                             # $1.00  ≈ 10 ‘pipettes’
-                if sym.endswith("JPY"):                    # JPY pairs quoted to 3 decimals
-                    return 0.10                            # 0.10   ≈ 10 pips
-                return 0.001                               # 0.0010 ≈ 10 pips on 4-dec FX
-                                                           # (use 0.00010 for 5-dec pairs)
+            from chart_utils import pip_tolerance, is_price_too_close   # make sure this import
+                                                                        # sits near your other
+                                                                        # imports at top of file
 
-            unique = []
-            last_price = {}        # (symbol, action) → last entry price we kept
+            unique      = []
+            last_price  = {}          # key = (symbol, action) → last entry price kept
 
             for sig in pending_signals:
                 # symbol might live in 'symbol' or asset['symbol']
@@ -430,20 +427,21 @@ def get_signals():
                 price = float(sig.get("entry_price") or sig.get("entry", 0))
 
                 key = (sym, act)
-                tol = pip_tolerance(sym)
 
-                # keep the signal only if no prior one, or price is > tol away
-                if key not in last_price or abs(price - last_price[key]) > tol:
+                if key not in last_price or not is_price_too_close(sym, price, last_price[key]):
                     unique.append(sig)
                     last_price[key] = price
                 else:
                     logger.info(
                         f"Terminal {terminal_id}: skipping near-duplicate "
-                        f"{sig.get('id')} {sym} {act} {price} (≦ {tol} diff)"
+                        f"{sig.get('id')} {sym} {act} {price} (≤ {pip_tolerance(sym)} diff)"
                     )
 
             pending_signals = unique
-            logger.info(f"Terminal {terminal_id}: {len(pending_signals)} unique pending signal(s) after 10-pip filter")
+            logger.info(
+                f"Terminal {terminal_id}: {len(pending_signals)} unique pending signal(s) "
+                f"after 10-pip filter"
+            )
 
             # ------------------------------------------------------------------
             # 3️⃣  Drop stale (> STALE_SECONDS)
@@ -1104,14 +1102,8 @@ def signal_chart(signal_id):
         # within a ~10‑pip tolerance of the most‑recent processed trade
         # for the same symbol + side.
         # ------------------------------------------------------------------
-        def _pip_tol(sym: str) -> float:
-            if sym.startswith(("XAU", "XAG")):    # metals, quoted in dollars
-                return 1.0                       # $1.00  ≈ 10 ‘pipettes’
-            if sym.endswith("JPY"):              # 3‑dp JPY pairs
-                return 0.10                      # 0.10   ≈ 10 pips
-            return 0.001                         # 0.0010 ≈ 10 pips on 4‑dp FX
-        
-        tol = _pip_tol(signal.symbol)
+        tol = pip_tolerance(signal.symbol)
+
         last = (
             db.session.query(Signal)
             .filter(
@@ -1122,21 +1114,31 @@ def signal_chart(signal_id):
             .order_by(Signal.updated_at.desc())
             .first()
         )
-        
-        if last and last.entry and signal.entry \
-           and abs(float(signal.entry) - float(last.entry)) <= tol:
+
+        if last and last.entry and signal.entry and is_price_too_close(
+            signal.symbol, float(signal.entry), float(last.entry)
+        ):
             logger.info(
-                f"Duplicate guard: skipping {signal.symbol} "
-                f"{signal.action.name} @ {signal.entry} "
-                f"(≤{tol} from prior {last.entry})"
+                "Duplicate guard: skipping %s %s @ %s (≤ %s from prior %s)",
+                signal.symbol,
+                signal.action.name,
+                signal.entry,
+                tol,
+                last.entry,
             )
-            return jsonify({
-                "status": "error",
-                "message": (
-                    f"Duplicate {signal.symbol} {signal.action.name} within "
-                    f"{tol} ({last.entry} vs {signal.entry}) – execution rejected"
-                )
-            }), 409
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "message": (
+                            f"Duplicate {signal.symbol} {signal.action.name} "
+                            f"within {tol} ({last.entry} vs {signal.entry}) – "
+                            f"execution rejected"
+                        ),
+                    }
+                ),
+                409,
+            )
         
         logger.info(f"Found signal: {signal.symbol}, action: {signal.action}, status: {signal.status}")
             

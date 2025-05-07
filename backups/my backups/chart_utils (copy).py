@@ -173,25 +173,3 @@ def generate_chart_bytes(symbol: str, timeframe: str = "H1", count: int = 300,
     except Exception as e:
         logger.error(f"Error generating chart bytes for {symbol}: {str(e)}")
         return b""
-
-# ────────────────────────────────────────────────────────────────
-#  Shared “10-pip tolerance” helpers
-# ────────────────────────────────────────────────────────────────
-def pip_tolerance(symbol: str) -> float:
-    """
-    ≈10 pips expressed in the instrument’s quote units.
-
-    • Metals (XAU/XAG) are quoted to 2 dp → 1.00  
-    • JPY pairs are quoted to 3 dp     → 0.10  
-    • Everything else (5-dp majors)    → 0.001
-    """
-    if symbol.startswith(("XAU", "XAG")):
-        return 1.0
-    if symbol.endswith("JPY"):
-        return 0.10
-    return 0.001
-
-
-def is_price_too_close(symbol: str, price_a: float, price_b: float) -> bool:
-    """True if the two prices sit inside the instrument’s 10-pip band."""
-    return abs(price_a - price_b) <= pip_tolerance(symbol)
