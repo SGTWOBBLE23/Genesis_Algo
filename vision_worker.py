@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import time
+import os
 from typing import Dict, Any
 from datetime import datetime
 from config import ASSETS        # new
@@ -9,8 +10,6 @@ from sqlalchemy import func
 
 import redis
 import requests
-import backoff
-from requests.exceptions import HTTPError
 
 logger = logging.getLogger(__name__)
 
@@ -23,24 +22,6 @@ VISION_MODEL = "gpt-4o"  # Updated to gpt-4o which has vision capabilities
 MAX_RETRIES = 3
 REQUEST_TIMEOUT = 60  # seconds
 
-# --- Helper: OpenAI Vision API POST with backoff for rate limits ---
-def _is_rate_limit(exc: Exception) -> bool:  # Allow broader Exception type
-    """Return True only for 429‑rate‑limit responses so backoff keeps retrying."""
-    return isinstance(exc, HTTPError) and exc.response is not None and exc.response.status_code == 429
-
-
-@backoff.on_exception(backoff.expo, HTTPError, max_tries=5, giveup=lambda e: not _is_rate_limit(e))
-def _post_openai(json_payload: dict, headers: dict) -> dict:
-    """POST to the OpenAI Vision endpoint with exponential back‑off on HTTP‑429."""
-    resp = requests.post(
-        VISION_API_URL,
-        headers=headers,
-        json=json_payload,
-        timeout=REQUEST_TIMEOUT,
-    )
-    resp.raise_for_status()
-    return resp.json()
-
 # Setup a direct approach without Redis
 from app import db, Signal, SignalAction, SignalStatus, app
 
@@ -49,7 +30,7 @@ redis_client = None
 
 class DirectVisionPipeline:
     """A direct approach to vision processing without Redis"""
-
+    
     @staticmethod
     def process_chart(symbol, image_path):
         """Process a chart image directly"""
@@ -59,19 +40,19 @@ class DirectVisionPipeline:
             if not os.path.exists(image_path):
                 logger.error(f"Image file does not exist: {image_path}")
                 return False
-
+            
             # Analyze with Vision API
             logger.info(f"Sending chart to OpenAI Vision API for {symbol}")
             vision_result = analyze_image(image_path)
-
+            
             if not vision_result or 'action' not in vision_result:
                 logger.error(f"Failed to analyze chart for {symbol} - Vision API returned invalid result")
                 return False
-
+                
             # Create a signal directly in the database
             signal = Signal(
                 symbol=symbol,
-                action=SignalAction[vision_result['action']],
+                action=vision_result['action'],
                 entry=vision_result.get('entry'),
                 sl=vision_result.get('sl'),
                 tp=vision_result.get('tp'),
@@ -83,13 +64,13 @@ class DirectVisionPipeline:
                     'processed_at': datetime.now().isoformat()
                 })
             )
-
+            
             db.session.add(signal)
             db.session.commit()
-
+            
             logger.info(f"Created signal for {symbol} with action {vision_result['action']}")
             return True
-
+            
         except Exception as e:
             logger.error(f"Error in direct vision pipeline: {str(e)}")
             import traceback
@@ -98,15 +79,15 @@ class DirectVisionPipeline:
 
 def generate_technical_signal(symbol: str, image_path: str) -> Dict[str, Any]:
     """Generate a trading signal using local technical analysis rules
-
+    
     This function serves as a fallback when OpenAI Vision API is unavailable.
     It uses the chart image path to extract the symbol and generates realistic
     trading signals based on the current price data from OANDA.
-
+    
     Args:
         symbol: The trading symbol (e.g., 'EUR_USD')
         image_path: Path to the chart image (not actually used for analysis, just logging)
-
+    
     Returns:
         Dict with trading signal information (action, entry, sl, tp, confidence)
     """
@@ -116,19 +97,19 @@ def generate_technical_signal(symbol: str, image_path: str) -> Dict[str, Any]:
     import json
     import os
     from config import mt5_to_oanda
-
+    
     logger.info(f"Generating local technical signal for {symbol} (fallback method)")
-
+    
     # Ensure symbol is in OANDA format (with underscore)
     if '_' not in symbol:
         symbol = mt5_to_oanda(symbol)
-
+    
     # Generate a random signal based on the current time
     # This is deterministic for a given symbol in a given hour
     current_hour = datetime.now().hour
     seed = int(f"{current_hour}{ord(symbol[0])}{ord(symbol[-1])}")
     random.seed(seed)
-
+    
     # Try to get current price from OANDA for realistic entry
     try:
         # If we have OANDA credentials, get real price
@@ -149,7 +130,7 @@ def generate_technical_signal(symbol: str, image_path: str) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error getting price from OANDA: {str(e)}")
         current_price = get_default_price_for_symbol(symbol)
-
+    
     # Generate a signal type weighted toward anticipatory signals
     r = random.random()
     if r < 0.3:  # 30% chance of a BUY_NOW
@@ -176,10 +157,10 @@ def generate_technical_signal(symbol: str, image_path: str) -> Dict[str, Any]:
         entry = round(current_price * 1.002, 5)  # 0.2% above current
         sl = round(entry * 1.005, 5)  # 0.5% above entry
         tp = round(entry * 0.990, 5)  # 1.0% below entry
-
+    
     # Generate a realistic confidence score
     confidence = round(random.uniform(0.65, 0.85), 2)
-
+    
     # Round values to 5 decimal places for forex pairs
     if symbol != 'XAU_USD':
         entry = round(entry, 5)
@@ -189,7 +170,7 @@ def generate_technical_signal(symbol: str, image_path: str) -> Dict[str, Any]:
         entry = round(entry, 2)
         sl = round(sl, 2)
         tp = round(tp, 2)
-
+    
     signal = {
         'action': action,
         'entry': entry,
@@ -197,7 +178,7 @@ def generate_technical_signal(symbol: str, image_path: str) -> Dict[str, Any]:
         'tp': tp,
         'confidence': confidence
     }
-
+    
     logger.info(f"Generated technical signal for {symbol}: {signal}")
     return signal
 
@@ -212,7 +193,7 @@ def get_default_price_for_symbol(symbol: str) -> float:
         'XAU_USD': 3260.00,
         'GBP_JPY': 194.20
     }
-
+    
     return defaults.get(symbol, 1.0000)  # Default fallback if symbol not found
 
 
@@ -222,9 +203,9 @@ def analyze_image(image_path: str) -> Dict[str, Any]:
         if not OPENAI_API_KEY:
             logger.error("OpenAI API key not found in environment variables")
             return {}
-
+            
         logger.info(f"Sending request to OpenAI Vision API")
-
+        
         # --- Get raw bytes for the supplied image_s3/local path ----------
         import base64, os
         try:
@@ -246,7 +227,7 @@ def analyze_image(image_path: str) -> Dict[str, Any]:
                         raise FileNotFoundError(f"Cannot find image file: {image_path}")
                 else:
                     raise FileNotFoundError(f"Cannot find image file: {image_path}")
-
+                
             logger.info(f"Reading image file from: {local_path}")
             with open(local_path, "rb") as f:
                 image_bytes = f.read()
@@ -254,7 +235,7 @@ def analyze_image(image_path: str) -> Dict[str, Any]:
             logger.warning(f"Failed to read image from path {image_path}: {str(e)}")
             # Fallback: regenerate a fresh chart on-the-fly
             from chart_utils import generate_chart_bytes
-
+            
             # Extract the symbol from the path, usually in format static/charts/SYMBOL/...
             try:
                 parts = image_path.split('/')
@@ -275,7 +256,7 @@ def analyze_image(image_path: str) -> Dict[str, Any]:
                     symbol = "EUR_USD"  # Default
             except Exception:
                 symbol = "EUR_USD"  # Default if parsing fails
-
+                
             logger.info(f"Generating fresh chart for {symbol}")
             try:
                 image_bytes = generate_chart_bytes(symbol, count=100)
@@ -296,7 +277,7 @@ def analyze_image(image_path: str) -> Dict[str, Any]:
                     )
 
         image_base64 = base64.b64encode(image_bytes).decode("utf-8")
-
+        
         # Extract symbol from the path for better context
         try:
             # Format is typically static/charts/SYMBOL/filename.png
@@ -317,13 +298,13 @@ def analyze_image(image_path: str) -> Dict[str, Any]:
         except Exception as e:
             logger.warning(f"Could not extract symbol from path: {e}")
             symbol = "UNKNOWN"
-
+        
         # Build request for OpenAI API
         headers = {
             'Authorization': f'Bearer {OPENAI_API_KEY}',
             'Content-Type': 'application/json'
         }
-
+        
         # Construct a detailed prompt for the vision model
         system_prompt = """
         You are **GENESIS**, an expert forex-trading analyst and professional chart-pattern-recognition system.  
@@ -400,7 +381,7 @@ Respond **only** with a single JSON object—no markdown, no commentary, nothing
   "confidence":  <float>
 }
         """
-
+        
         # Construct payload with the image
         payload = {
             "model": VISION_MODEL,
@@ -427,20 +408,24 @@ Respond **only** with a single JSON object—no markdown, no commentary, nothing
             ],
             "response_format": {"type": "json_object"}
         }
-
-        # Send to OpenAI Vision API with automatic retry / back‑off
+        
+        # Send to OpenAI Vision API with a timeout
         logger.info(f"Sending request to OpenAI Vision API using model: {VISION_MODEL}")
         try:
-            result = _post_openai(payload, headers)
+            response = requests.post(VISION_API_URL, headers=headers, json=payload, timeout=REQUEST_TIMEOUT)
+            response.raise_for_status()
         except requests.exceptions.Timeout:
             logger.error(f"OpenAI API request timed out after {REQUEST_TIMEOUT} seconds")
             raise Exception("Vision API request timed out")
-        except HTTPError as e:
+        except requests.exceptions.RequestException as e:
             logger.error(f"OpenAI API request failed: {e}")
             raise Exception(f"Vision API request failed: {e}")
+        
+        # Parse the response
+        result = response.json()
         if 'choices' in result and len(result['choices']) > 0:
             content = result['choices'][0]['message']['content']
-
+            
             # Extract JSON from the response
             import json
             try:
@@ -454,7 +439,7 @@ Respond **only** with a single JSON object—no markdown, no commentary, nothing
                     logger.error(f"Missing required fields in response: {content}")
             except json.JSONDecodeError:
                 logger.error(f"Could not parse JSON from response: {content}")
-
+        
         logger.error(f"Unexpected response format from OpenAI: {result}")
         return {}
 
@@ -482,12 +467,12 @@ def process_charts_directory():
     import glob
     import time
     from datetime import datetime
-
+    
     try:
         logger.info("Starting direct charts processing...")
-
+        
         symbols = ASSETS
-
+        
         # Create app context for database operations
         with app.app_context():
             # Ensure static/charts directory exists
@@ -495,7 +480,7 @@ def process_charts_directory():
             if not os.path.exists(charts_dir):
                 os.makedirs(charts_dir)
                 logger.info(f"Created charts directory: {charts_dir}")
-
+                
             # Create directories for each symbol if they don't exist
             for symbol in symbols:
                 mt5_symbol = symbol.replace('_', '')
@@ -512,34 +497,34 @@ def process_charts_directory():
                         logger.error(f"Failed to generate test chart for {symbol}")
                     # Wait a bit to not overwhelm the API
                     time.sleep(1)
-
+            
             # Process the charts
             pipeline = DirectVisionPipeline()
             for symbol in symbols:
                 # Look for the most recent chart for this symbol
                 mt5_symbol = symbol.replace('_', '')
                 chart_dir = f"{charts_dir}/{mt5_symbol}"
-
+                
                 # Get all PNG files in the directory, sorted by modification time (newest first)
                 chart_files = glob.glob(f"{chart_dir}/*.png")
                 if not chart_files:
                     logger.warning(f"No chart files found in {chart_dir}")
                     continue
-
+                    
                 chart_files.sort(key=os.path.getmtime, reverse=True)
                 latest_chart = chart_files[0]
-
+                
                 logger.info(f"Processing latest chart for {symbol}: {latest_chart}")
                 success = pipeline.process_chart(symbol, latest_chart)
-
+                
                 if success:
                     logger.info(f"Successfully processed chart for {symbol}")
                 else:
                     logger.error(f"Failed to process chart for {symbol}")
-
+                    
                 # Wait a bit to not overwhelm the OpenAI API
                 time.sleep(1)
-
+                    
     except Exception as e:
         logger.error(f"Error in process_charts_directory: {str(e)}")
         import traceback
@@ -552,18 +537,18 @@ if __name__ == "__main__":
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     logger.info("Starting Vision Worker with more verbose logging...")
-
+    
     # Check OpenAI API key
     if not OPENAI_API_KEY:
         logger.error("No OpenAI API key found! Vision analysis will fail.")
     else:
         logger.info("OpenAI API key found.")
-
+    
     # Since Redis is not available, use direct processing
     logger.info("Redis not available, using direct chart processing instead")
-
+    
     # Import datetime here for use in the log
     from datetime import datetime
-
+    
     # Process all charts in the directory
     process_charts_directory()

@@ -9,25 +9,18 @@ from apscheduler.triggers.cron import CronTrigger
 import capture_job
 from config import ASSETS              # 👈 unified list
 
-import time
-
 logger = logging.getLogger(__name__)
-
-CAPTURE_DELAY = 7  # seconds between Vision calls to avoid 429s
 
 
 def capture_all_assets():
-    """Run capture job for all configured assets, throttled to avoid API 429"""
+    """Run capture job for all configured assets"""
     logger.info(f"Running capture job for all {len(ASSETS)} assets")
-    for idx, symbol in enumerate(ASSETS):
+    for symbol in ASSETS:
         try:
             logger.info(f"Capturing {symbol}")
             capture_job.run(symbol)
         except Exception as e:
             logger.error(f"Error capturing {symbol}: {str(e)}")
-        # Throttle unless we're on the final asset
-        if idx < len(ASSETS) - 1:
-            time.sleep(CAPTURE_DELAY)
 
 
 def capture_hourly_assets():
@@ -44,7 +37,7 @@ def capture_hourly_assets():
 def start_scheduler():
     """Start the background scheduler"""
     scheduler = BackgroundScheduler()
-
+    
     # Schedule 15-minute capture jobs
     scheduler.add_job(
         capture_all_assets,
@@ -53,19 +46,19 @@ def start_scheduler():
         name='Capture all assets every 15 minutes(+10 s buffer)',
         replace_existing=True
     )
-
+    
     # Schedule hourly capture jobs
     scheduler.add_job(
         capture_hourly_assets,
-        CronTrigger(second=20, minute='0'),  # At the top of every hour
+        CronTrigger(second=10, minute='0'),  # At the top of every hour
         id='capture_1h',
         name='Capture all assets hourly for 1H timeframe(+10 s buffer)',
         replace_existing=True
     )
-
+    
     scheduler.start()
     logger.info("Scheduler started with 15-minute and hourly capture jobs")
-
+    
     return scheduler
 
 
@@ -73,12 +66,12 @@ if __name__ == "__main__":
     # Test the scheduler
     logging.basicConfig(level=logging.INFO)
     scheduler = start_scheduler()
-
+    
     try:
         # Run once for testing
         logger.info("Running a test capture")
         capture_all_assets()
-
+        
         # Keep the script running to allow scheduled jobs to execute
         while True:
             pass
