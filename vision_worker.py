@@ -7,6 +7,9 @@ from typing import Dict, Any
 from datetime import datetime
 from config import ASSETS        # new
 from sqlalchemy import func
+from chart_utils import is_price_too_close
+from app import db, Signal, SignalAction, SignalStatus, app
+from signal_scoring import signal_scorer
 
 import redis
 import requests
@@ -22,59 +25,127 @@ VISION_MODEL = "gpt-4o"  # Updated to gpt-4o which has vision capabilities
 MAX_RETRIES = 3
 REQUEST_TIMEOUT = 60  # seconds
 
-# Setup a direct approach without Redis
-from app import db, Signal, SignalAction, SignalStatus, app
+
 
 # Redis will be mocked since it's not available
 redis_client = None
 
 class DirectVisionPipeline:
     """A direct approach to vision processing without Redis"""
-    
+
     @staticmethod
-    def process_chart(symbol, image_path):
-        """Process a chart image directly"""
+    def process_chart(symbol: str, image_path: str) -> bool:
+        """
+        Analyse a chart image with OpenAI Vision, translate the result
+        into a Signal, and store it—unless an almost-identical idea
+        (< 10 pips away) was already stored.
+
+        Returns:
+            True  → new Signal inserted
+            False → duplicate or error
+        """
         try:
-            logger.info(f"Processing chart for {symbol} at {image_path}")
-            # Check if the image file exists
+            logger.info("Processing chart for %s (%s)", symbol, image_path)
+
+            # ------------------------------------------------------------------
+            # 0. Sanity-check image exists
+            # ------------------------------------------------------------------
             if not os.path.exists(image_path):
-                logger.error(f"Image file does not exist: {image_path}")
+                logger.error("Image file does not exist: %s", image_path)
                 return False
-            
-            # Analyze with Vision API
-            logger.info(f"Sending chart to OpenAI Vision API for {symbol}")
+
+            # ------------------------------------------------------------------
+            # 1. Analyse with Vision API
+            # ------------------------------------------------------------------
             vision_result = analyze_image(image_path)
-            
-            if not vision_result or 'action' not in vision_result:
-                logger.error(f"Failed to analyze chart for {symbol} - Vision API returned invalid result")
+            if not vision_result or "action" not in vision_result:
+                logger.error(
+                    "Vision API returned invalid result for %s: %s",
+                    symbol, vision_result
+                )
                 return False
-                
-            # Create a signal directly in the database
+
+            # ------------------------------------------------------------------
+            # 2. Convert action string → SignalAction enum
+            # ------------------------------------------------------------------
+            try:
+                action_enum = SignalAction[vision_result["action"].upper()]
+            except KeyError:
+                logger.error(
+                    "Unknown action '%s' from Vision API for %s",
+                    vision_result["action"], symbol
+                )
+                return False
+
+            entry_price = float(vision_result.get("entry", 0.0))
+
+            # ------------------------------------------------------------------
+            # 3. Duplicate guard – skip if a recent idea is within 10 pips
+            # ------------------------------------------------------------------
+            last = (
+                db.session.query(Signal)
+                .filter(
+                    Signal.symbol == symbol,
+                    Signal.action == action_enum
+                )
+                .order_by(Signal.id.desc())
+                .first()
+            )
+
+            if last and last.entry and is_price_too_close(
+                symbol, entry_price, float(last.entry)
+            ):
+                logger.info(
+                    "Vision worker: skipping duplicate %s %s @ %.5f "
+                    "(≤ 10-pip diff from %.5f)",
+                    symbol, action_enum.name, entry_price, float(last.entry)
+                )
+                return False
+
+            # ------------------------------------------------------------------
+            # 4. Create and commit the new Signal
+            # ------------------------------------------------------------------
             signal = Signal(
                 symbol=symbol,
-                action=vision_result['action'],
-                entry=vision_result.get('entry'),
-                sl=vision_result.get('sl'),
-                tp=vision_result.get('tp'),
-                confidence=vision_result.get('confidence', 0.5),
+                action=action_enum,
+                entry=entry_price,
+                sl=vision_result.get("sl"),
+                tp=vision_result.get("tp"),
+                confidence=vision_result.get("confidence", 0.5),
                 status=SignalStatus.PENDING,
                 context_json=json.dumps({
-                    'source': 'openai_vision',
-                    'image_path': image_path,
-                    'processed_at': datetime.now().isoformat()
+                    "source": "openai_vision",
+                    "image_path": image_path,
+                    "processed_at": datetime.now().isoformat()
                 })
             )
-            
+
             db.session.add(signal)
+            should_execute, scoring_info = signal_scorer.should_execute_signal(signal)
+            # Attach the full scoring breakdown to context for later audits
+            ctx = signal.context          # helper property turns JSON ➜ dict
+            ctx["scoring"] = scoring_info
+            signal.context = ctx          # setter re-serialises JSON
+
+            # Either keep the signal alive or kill it right here
+            if should_execute:
+                signal.status = SignalStatus.PENDING        # stays in the queue
+            else:
+                signal.status = SignalStatus.CANCELLED      # tag as rejected immediately
+
+
+            
             db.session.commit()
-            
-            logger.info(f"Created signal for {symbol} with action {vision_result['action']}")
+            logger.info(
+                "Created Vision signal for %s: %s @ %.5f",
+                symbol, action_enum.name, entry_price
+            )
             return True
-            
+
         except Exception as e:
-            logger.error(f"Error in direct vision pipeline: {str(e)}")
-            import traceback
-            logger.error(traceback.format_exc())
+            logger.error("Error in direct vision pipeline for %s: %s", symbol, e)
+            logger.exception(e)
+            db.session.rollback()
             return False
 
 def generate_technical_signal(symbol: str, image_path: str) -> Dict[str, Any]:

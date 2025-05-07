@@ -15,47 +15,16 @@ import json
 import logging
 import pandas as pd
 import numpy as np
-import time
-from models import db
 from typing import Dict, List, Any, Optional, Tuple, Union
 from datetime import datetime, timedelta
-from pathlib import Path
 from app import db, Signal, Trade, SignalAction, SignalStatus, TradeStatus, TradeSide, Log, LogLevel
 from chart_utils import fetch_candles
-from sqlalchemy import text, and_
-import logging
+from sqlalchemy import text
 import re
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-CONFIG_PATH = Path(__file__).resolve().parent / "config" / "signal_weights.json"
-
-class _WeightCache:
-    def __init__(self):
-        self._mtime   = 0
-        self._weights = {}
-
-    def get(self) -> Dict[str, float]:
-        try:
-            stat = CONFIG_PATH.stat()
-            if stat.st_mtime > self._mtime:
-                with open(CONFIG_PATH, "r") as f:
-                    data = json.load(f)
-                self._weights = data.get("factors", {})
-                self._default = data.get("default_weight", 1.0)
-                self._mtime   = stat.st_mtime
-                logger.info(f"Reloaded weights (v{data.get('version')})")
-        except FileNotFoundError:
-            logger.warning("Weight table missing; using defaults")
-            self._weights, self._default = {}, 1.0
-        return self._weights
-
-    def weight(self, key: str) -> float:
-        return self.get().get(key, self._default)
-
-weight_cache = _WeightCache()
 
 class SignalScorer:
     """Signal scoring system to filter trading signals through multiple layers of validation"""
@@ -108,73 +77,6 @@ class SignalScorer:
             SignalAction.ANTICIPATED_LONG: TradeSide.BUY,
             SignalAction.ANTICIPATED_SHORT: TradeSide.SELL
         }
-
-    def merge_or_update(self, signal: "Signal") -> bool:
-        """
-        If an open signal of the **same symbol + action** exists and the
-        entry prices are within a small tolerance, roll this new evidence
-        into the existing one instead of keeping a duplicate.
-
-        Returns True  ↠  We *kept* the new signal (no merge)
-                False ↠  We *merged* and deleted the newcomer
-        """
-        def _pip_tol(sym: str) -> float:
-            if sym.startswith(("XAU", "XAG")):           # metals
-                return 1.0                               # $1 ≈ 10 ‘pipettes’
-            if sym.endswith("JPY"):                      # 3-dp JPY pairs
-                return 0.10                              # 0.10 ≈ 10 pips
-            return 0.001                                 # 0.0010 ≈ 10 pips (4-dp FX)
-
-        tol   = _pip_tol(signal.symbol)
-        price = float(signal.entry or 0)
-
-        # Look for the *latest* PENDING / ACTIVE sibling
-        sibling = (
-            db.session.query(Signal)
-            .filter(
-                Signal.id != signal.id,                       # not itself
-                Signal.symbol == signal.symbol,
-                Signal.action == signal.action,
-                Signal.status.in_([SignalStatus.PENDING,
-                                   SignalStatus.ACTIVE])
-            )
-            .order_by(Signal.created_at.desc())
-            .first()
-        )
-
-        if not sibling:
-            return True   # nothing to merge with
-
-        sib_price = float(sibling.entry or 0)
-
-        if abs(price - sib_price) > tol:
-            return True   # far enough apart → keep both
-
-        # ── Merge logic ───────────────────────────────────────────────
-        #
-        # Combined confidence  = 1 − ∏(1 − cᵢ)
-        # (probabilistic union of independent confirmations)
-        #
-        combined = 1 - (1 - sibling.confidence) * (1 - signal.confidence)
-        sibling.confidence = round(combined, 4)
-
-        # Append provenance for audit
-        ctx = sibling.context
-        merged = ctx.get("merged_ids", [])
-        merged.append(signal.id)
-        ctx["merged_ids"] = merged
-        sibling.context = ctx
-
-        # Soft-delete the newcomer (CANCELLED → keeps the row for traceability)
-        signal.status = SignalStatus.CANCELLED
-        signal.context = {"reason": "merged_into", "target_id": sibling.id}
-
-        db.session.commit()
-        logger.info(
-            f"Merged signal {signal.id} into {sibling.id}; "
-            f"new confidence {sibling.confidence:.2f}"
-        )
-        return False
     
     def _calculate_rsi(self, prices, period=14):
         """Calculate Relative Strength Index"""
@@ -202,175 +104,210 @@ class SignalScorer:
         """Calculate Exponential Moving Average"""
         return prices.ewm(span=period, adjust=False).mean()
     
-    def evaluate_technical_conditions(
-        self,
-        symbol: str,
-        action: SignalAction,
-        entry_price: float | None
-    ) -> Tuple[float, Dict]:
-
-        """
-        Evaluate technical conditions for a symbol / action.
+    def evaluate_technical_conditions(self, symbol: str, action: SignalAction, 
+                                     entry_price: float = None) -> Tuple[float, Dict]:
+        """Evaluate technical conditions for the symbol and proposed action
         
+        Args:
+            symbol: Trading symbol (e.g., "EURUSD")
+            action: Signal action (BUY_NOW, SELL_NOW, etc.)
+            entry_price: Optional entry price for validation
+            
         Returns:
-            (technical_score, details_dict)
+            Tuple of (technical_score, details_dict)
         """
         try:
-            # ── 1. Symbol format for OANDA ──────────────────────────────────
+            # Get necessary OANDA format
             oanda_symbol = symbol
             if '_' not in symbol:
+                # Convert MT5 format to OANDA format (e.g., EURUSD to EUR_USD)
                 oanda_symbol = re.sub(r'([A-Z]{3})([A-Z]{3})', r'\1_\2', symbol)
-        
-            # ── 2. Fetch last 100 H1 candles ────────────────────────────────
+            
+            # Fetch candle data
             candles = fetch_candles(oanda_symbol, timeframe="H1", count=100)
             if not candles:
-                logger.warning(f"No candle data for {symbol}")
-                return 0.5, {"error": "no_candles"}
-        
-            df = pd.DataFrame(
+                logger.warning(f"No candle data available for {symbol}, using default score")
+                return 0.5, {"error": "No candle data available"}
+            
+            # Convert to pandas DataFrame
+            df = pd.DataFrame([
                 {
-                    "time":    c["time"],
-                    "open":    float(c["mid"]["o"]),
-                    "high":    float(c["mid"]["h"]),
-                    "low":     float(c["mid"]["l"]),
-                    "close":   float(c["mid"]["c"]),
-                    "volume":  float(c.get("volume", 0)),
-                }
-                for c in candles
-            )
-        
+                    'time': candle['time'],
+                    'open': float(candle['mid']['o']),
+                    'high': float(candle['mid']['h']),
+                    'low': float(candle['mid']['l']),
+                    'close': float(candle['mid']['c']),
+                    'volume': float(candle['volume']) if 'volume' in candle else 0
+                } for candle in candles
+            ])
+            
             if df.empty:
-                logger.warning(f"Empty DataFrame for {symbol}")
-                return 0.5, {"error": "empty_df"}
-        
-            df["time"] = pd.to_datetime(df["time"])
-            df.set_index("time", inplace=True)
-        
-            # ── 3. Indicators ───────────────────────────────────────────────
-            df["rsi"]       = self._calculate_rsi(df["close"])
-            df["macd"], df["signal"], df["histogram"] = self._calculate_macd(df["close"])
-            df["ema20"]     = self._calculate_ema(df["close"], 20)
-            df["ema50"]     = self._calculate_ema(df["close"], 50)
-            df["ema200"]    = self._calculate_ema(df["close"], 200)
-        
+                logger.warning(f"Empty DataFrame for {symbol}, using default score")
+                return 0.5, {"error": "Empty price data"}
+            
+            df['time'] = pd.to_datetime(df['time'])
+            df.set_index('time', inplace=True)
+            
+            # Calculate technical indicators
+            df['rsi'] = self._calculate_rsi(df['close'])
+            df['macd'], df['signal'], df['histogram'] = self._calculate_macd(df['close'])
+            df['ema20'] = self._calculate_ema(df['close'], 20)
+            df['ema50'] = self._calculate_ema(df['close'], 50)
+            df['ema200'] = self._calculate_ema(df['close'], 200)
+            
+            # Prepare scores for different technical aspects
+            scores = {}
+            details = {}
+            
+            # Get latest values
             latest = df.iloc[-1]
-            prev   = df.iloc[-2] if len(df) > 1 else latest
-        
-            # ── 4. Build factor-level scores (unchanged logic) ─────────────
-            scores: dict[str, float] = {}
-            details: dict[str, float | str | dict] = {
-                "current_price": float(latest["close"]),
-                "rsi":           float(latest["rsi"]),
-                "macd":          float(latest["macd"]),
-                "signal":        float(latest["signal"]),
-                "ema20":         float(latest["ema20"]),
-                "ema50":         float(latest["ema50"]),
-                "ema200":        float(latest["ema200"]),
-            }
-        
-            # 4-A. RSI
-            if action in (SignalAction.BUY_NOW, SignalAction.ANTICIPATED_LONG):
-                if latest["rsi"] < 30:
-                    scores["rsi"] = 1.0;  details["rsi_evaluation"] = "oversold"
-                elif 30 <= latest["rsi"] < 50:
-                    scores["rsi"] = 0.8;  details["rsi_evaluation"] = "rising_from_oversold"
-                elif 50 <= latest["rsi"] < 70:
-                    scores["rsi"] = 0.6;  details["rsi_evaluation"] = "neutral_to_bullish"
+            prev = df.iloc[-2] if len(df) > 1 else latest
+            
+            # Store current technical levels
+            details["current_price"] = float(latest['close'])
+            details["rsi"] = float(latest['rsi'])
+            details["macd"] = float(latest['macd'])
+            details["signal"] = float(latest['signal'])
+            details["ema20"] = float(latest['ema20'])
+            details["ema50"] = float(latest['ema50'])
+            details["ema200"] = float(latest['ema200'])
+            
+            # 1. RSI conditions
+            if action in [SignalAction.BUY_NOW, SignalAction.ANTICIPATED_LONG]:
+                # For buy signals, prefer RSI not overbought and preferably rising from oversold
+                if latest['rsi'] < 30:  # Oversold condition
+                    scores['rsi'] = 1.0
+                    details["rsi_evaluation"] = "oversold"
+                elif 30 <= latest['rsi'] < 50:  # Rising from oversold
+                    scores['rsi'] = 0.8
+                    details["rsi_evaluation"] = "rising_from_oversold"
+                elif 50 <= latest['rsi'] < 70:  # Neutral to bullish
+                    scores['rsi'] = 0.6
+                    details["rsi_evaluation"] = "neutral_to_bullish"
+                else:  # Overbought
+                    scores['rsi'] = 0.3
+                    details["rsi_evaluation"] = "overbought"
+            else:  # SELL signals
+                # For sell signals, prefer RSI not oversold and preferably falling from overbought
+                if latest['rsi'] > 70:  # Overbought condition
+                    scores['rsi'] = 1.0
+                    details["rsi_evaluation"] = "overbought"
+                elif 50 < latest['rsi'] <= 70:  # Falling from overbought
+                    scores['rsi'] = 0.8
+                    details["rsi_evaluation"] = "falling_from_overbought"
+                elif 30 < latest['rsi'] <= 50:  # Neutral to bearish
+                    scores['rsi'] = 0.6
+                    details["rsi_evaluation"] = "neutral_to_bearish"
+                else:  # Oversold
+                    scores['rsi'] = 0.3
+                    details["rsi_evaluation"] = "oversold"
+            
+            # 2. MACD conditions
+            macd_crossover = (prev['macd'] < prev['signal'] and latest['macd'] > latest['signal'])  # Bullish crossover
+            macd_crossunder = (prev['macd'] > prev['signal'] and latest['macd'] < latest['signal'])  # Bearish crossover
+            
+            if action in [SignalAction.BUY_NOW, SignalAction.ANTICIPATED_LONG]:
+                if macd_crossover:
+                    scores['macd'] = 1.0
+                    details["macd_evaluation"] = "bullish_crossover"
+                elif latest['macd'] > latest['signal']:
+                    scores['macd'] = 0.8
+                    details["macd_evaluation"] = "bullish_momentum"
+                elif latest['macd'] < 0 and latest['histogram'] > prev['histogram']:  # Improving while below zero
+                    scores['macd'] = 0.6
+                    details["macd_evaluation"] = "improving_below_zero"
                 else:
-                    scores["rsi"] = 0.3;  details["rsi_evaluation"] = "overbought"
-            else:
-                if latest["rsi"] > 70:
-                    scores["rsi"] = 1.0;  details["rsi_evaluation"] = "overbought"
-                elif 50 < latest["rsi"] <= 70:
-                    scores["rsi"] = 0.8;  details["rsi_evaluation"] = "falling_from_overbought"
-                elif 30 < latest["rsi"] <= 50:
-                    scores["rsi"] = 0.6;  details["rsi_evaluation"] = "neutral_to_bearish"
+                    scores['macd'] = 0.4
+                    details["macd_evaluation"] = "bearish_momentum"
+            else:  # SELL signals
+                if macd_crossunder:
+                    scores['macd'] = 1.0
+                    details["macd_evaluation"] = "bearish_crossover"
+                elif latest['macd'] < latest['signal']:
+                    scores['macd'] = 0.8
+                    details["macd_evaluation"] = "bearish_momentum"
+                elif latest['macd'] > 0 and latest['histogram'] < prev['histogram']:  # Deteriorating while above zero
+                    scores['macd'] = 0.6
+                    details["macd_evaluation"] = "deteriorating_above_zero"
                 else:
-                    scores["rsi"] = 0.3;  details["rsi_evaluation"] = "oversold"
-        
-            # 4-B. MACD
-            macd_cross = prev["macd"] < prev["signal"] < latest["macd"] > latest["signal"]
-            macd_under = prev["macd"] > prev["signal"] > latest["macd"] < latest["signal"]
-        
-            if action in (SignalAction.BUY_NOW, SignalAction.ANTICIPATED_LONG):
-                if macd_cross:
-                    scores["macd"] = 1.0; details["macd_evaluation"] = "bullish_crossover"
-                elif latest["macd"] > latest["signal"]:
-                    scores["macd"] = 0.8; details["macd_evaluation"] = "bullish_momentum"
-                elif latest["macd"] < 0 and latest["histogram"] > prev["histogram"]:
-                    scores["macd"] = 0.6; details["macd_evaluation"] = "improving_below_zero"
+                    scores['macd'] = 0.4
+                    details["macd_evaluation"] = "bullish_momentum"
+            
+            # 3. Trend following (EMA conditions)
+            if action in [SignalAction.BUY_NOW, SignalAction.ANTICIPATED_LONG]:
+                # For buys, price above EMAs is bullish
+                if latest['close'] > latest['ema20'] > latest['ema50'] > latest['ema200']:
+                    scores['trend'] = 1.0
+                    details["trend_evaluation"] = "strong_uptrend"
+                elif latest['close'] > latest['ema20'] and latest['ema20'] > latest['ema50']:
+                    scores['trend'] = 0.8
+                    details["trend_evaluation"] = "moderate_uptrend"
+                elif latest['close'] > latest['ema20']:
+                    scores['trend'] = 0.6
+                    details["trend_evaluation"] = "weak_uptrend"
                 else:
-                    scores["macd"] = 0.4; details["macd_evaluation"] = "bearish_momentum"
-            else:
-                if macd_under:
-                    scores["macd"] = 1.0; details["macd_evaluation"] = "bearish_crossover"
-                elif latest["macd"] < latest["signal"]:
-                    scores["macd"] = 0.8; details["macd_evaluation"] = "bearish_momentum"
-                elif latest["macd"] > 0 and latest["histogram"] < prev["histogram"]:
-                    scores["macd"] = 0.6; details["macd_evaluation"] = "deteriorating_above_zero"
+                    scores['trend'] = 0.3
+                    details["trend_evaluation"] = "downtrend"
+            else:  # SELL signals
+                # For sells, price below EMAs is bearish
+                if latest['close'] < latest['ema20'] < latest['ema50'] < latest['ema200']:
+                    scores['trend'] = 1.0
+                    details["trend_evaluation"] = "strong_downtrend"
+                elif latest['close'] < latest['ema20'] and latest['ema20'] < latest['ema50']:
+                    scores['trend'] = 0.8
+                    details["trend_evaluation"] = "moderate_downtrend"
+                elif latest['close'] < latest['ema20']:
+                    scores['trend'] = 0.6
+                    details["trend_evaluation"] = "weak_downtrend"
                 else:
-                    scores["macd"] = 0.4; details["macd_evaluation"] = "bullish_momentum"
-        
-            # 4-C. Trend (EMA stack)
-            if action in (SignalAction.BUY_NOW, SignalAction.ANTICIPATED_LONG):
-                if latest["close"] > latest["ema20"] > latest["ema50"] > latest["ema200"]:
-                    scores["trend"] = 1.0; details["trend_evaluation"] = "strong_uptrend"
-                elif latest["close"] > latest["ema20"] > latest["ema50"]:
-                    scores["trend"] = 0.8; details["trend_evaluation"] = "moderate_uptrend"
-                elif latest["close"] > latest["ema20"]:
-                    scores["trend"] = 0.6; details["trend_evaluation"] = "weak_uptrend"
-                else:
-                    scores["trend"] = 0.3; details["trend_evaluation"] = "downtrend"
-            else:
-                if latest["close"] < latest["ema20"] < latest["ema50"] < latest["ema200"]:
-                    scores["trend"] = 1.0; details["trend_evaluation"] = "strong_downtrend"
-                elif latest["close"] < latest["ema20"] < latest["ema50"]:
-                    scores["trend"] = 0.8; details["trend_evaluation"] = "moderate_downtrend"
-                elif latest["close"] < latest["ema20"]:
-                    scores["trend"] = 0.6; details["trend_evaluation"] = "weak_downtrend"
-                else:
-                    scores["trend"] = 0.3; details["trend_evaluation"] = "uptrend"
-        
-            # 4-D. Entry-price sanity check
+                    scores['trend'] = 0.3
+                    details["trend_evaluation"] = "uptrend"
+            
+            # 4. Entry price validation (if provided)
             if entry_price is not None:
-                diff = abs(entry_price - latest["close"]) / latest["close"]
-                if diff < 0.001:
-                    scores["entry_price"] = 1.0; details["entry_price_evaluation"] = "excellent"
-                elif diff < 0.005:
-                    scores["entry_price"] = 0.8; details["entry_price_evaluation"] = "good"
-                elif diff < 0.01:
-                    scores["entry_price"] = 0.6; details["entry_price_evaluation"] = "acceptable"
-                else:
-                    scores["entry_price"] = 0.2; details["entry_price_evaluation"] = "poor"
-        
-            # ── 5. Weighted aggregation using the JSON table ────────────────
-            if not scores:
-                logger.warning(f"No tech scores for {symbol}")
-                return 0.5, {"error": "no_scores"}
-        
-            # Pull live weights (falls back to 1.0 if key absent)
-            weights_live = {
-                k: weight_cache.weight(k if k != "entry_price" else "price_distance_to_ema20")
-                for k in scores
-            }
-        
-            # Normalise so they sum to 1
-            total_w = sum(weights_live.values())
-            weights_norm = {k: v / total_w for k, v in weights_live.items()}
-        
-            technical_score = round(
-                sum(scores[k] * weights_norm[k] for k in scores), 4
-            )
-        
-            details["component_scores"] = scores
-            details["weights_used"]     = weights_norm
-            details["final_technical_score"] = technical_score
-        
-            return technical_score, details
-        
-        except Exception as exc:  # pylint: disable=broad-except
-            logger.error("Technical eval error: %s", exc, exc_info=True)
-            return 0.5, {"error": str(exc)}
+                # Check if entry price is reasonable compared to current price
+                current_price = latest['close']
+                price_diff_pct = abs(entry_price - current_price) / current_price
+                
+                if price_diff_pct < 0.001:  # Very close to current price (< 0.1%)
+                    scores['entry_price'] = 1.0
+                    details["entry_price_evaluation"] = "excellent"
+                elif price_diff_pct < 0.005:  # Within 0.5% of current price
+                    scores['entry_price'] = 0.8
+                    details["entry_price_evaluation"] = "good"
+                elif price_diff_pct < 0.01:  # Within 1% of current price
+                    scores['entry_price'] = 0.6
+                    details["entry_price_evaluation"] = "acceptable"
+                else:  # More than 1% away
+                    scores['entry_price'] = 0.2
+                    details["entry_price_evaluation"] = "poor"
+            
+            # Calculate final technical score with weightings
+            if len(scores) > 0:
+                weights = {
+                    'rsi': 0.25,
+                    'macd': 0.30,
+                    'trend': 0.35,
+                    'entry_price': 0.10  # Lower weight since not always available
+                }
+                
+                # Normalize weights based on available scores
+                available_weights = {k: v for k, v in weights.items() if k in scores}
+                total_weight = sum(available_weights.values())
+                normalized_weights = {k: v/total_weight for k, v in available_weights.items()}
+                
+                # Calculate weighted score
+                technical_score = sum(scores[k] * normalized_weights[k] for k in scores)
+                details["component_scores"] = scores
+                details["final_technical_score"] = technical_score
+                return technical_score, details
+            else:
+                logger.warning(f"No technical scores calculated for {symbol}, using default")
+                return 0.5, {"error": "No technical scores calculated"}
+                
+        except Exception as e:
+            logger.error(f"Error in technical evaluation: {str(e)}")
+            return 0.5, {"error": str(e)}  # Default to neutral score on error
     
     def evaluate_performance_adjustment(self, symbol: str, action: SignalAction) -> Tuple[float, Dict]:
         """Evaluate past performance to adjust confidence threshold
@@ -543,7 +480,6 @@ class SignalScorer:
             return True, {"error": str(e)}  # Allow trade on error
     
     def should_execute_signal(self, signal: Signal) -> Tuple[bool, Dict]:
-        
         """Evaluate whether a signal should be executed based on all scoring layers
         
         Args:
@@ -553,9 +489,6 @@ class SignalScorer:
             Tuple of (should_execute, details_dict)
         """
         try:
-
-            if not self.merge_or_update(signal):
-                return False, {"decision": "merged_into_existing"}
             result = {"signal_id": signal.id, "symbol": signal.symbol, "action": signal.action.name}
             
             # Step 1: Technical Filter Layer

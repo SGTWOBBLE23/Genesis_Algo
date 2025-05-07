@@ -6,12 +6,15 @@ import time
 from datetime import datetime
 from typing import Dict, Any, Optional
 from pathlib import Path
+from config import ASSETS, CHARTS_DIR, DEFAULT_TIMEFRAME, mt5_to_oanda, oanda_to_mt5
+
+from oanda_api import OandaAPI
+from app import app
 
 # Configure logging first
 logger = logging.getLogger(__name__)
 
-# Import configuration from config.py
-from config import ASSETS, CHARTS_DIR, DEFAULT_TIMEFRAME, mt5_to_oanda, oanda_to_mt5
+
 
 # Use try/except for dependencies that might not be available
 try:
@@ -30,8 +33,6 @@ except ImportError:
     REDIS_AVAILABLE = False
     logger.info("redis not available, queue functionality disabled")
 
-from oanda_api import OandaAPI
-from app import app  # Import Flask app for context
 
 # Redis connection - only try if Redis is available
 redis_client = None

@@ -6,6 +6,9 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
 
+from oanda_api import OandaAPI
+from chart_generator_basic import ChartGenerator
+
 # ---------- global light theme ----------
 plt.style.use("seaborn-v0_8-white")
 rcParams["figure.facecolor"] = "white"
@@ -18,8 +21,6 @@ rcParams["xtick.color"]      = "#111111"
 rcParams["ytick.color"]      = "#111111"
 rcParams["font.size"]        = 11              # bump base font
 
-from oanda_api import OandaAPI
-from chart_generator_basic import ChartGenerator
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

@@ -10,7 +10,7 @@ from flask import Blueprint, request, jsonify, send_file
 from app import db, Signal, Trade, SignalAction, TradeStatus, TradeSide, Settings, SignalStatus
 from config import MT5_ASSETS as DEFAULT_SYMBOLS 
 from chart_utils import pip_tolerance, is_price_too_close, generate_chart
-from sqlalchemy import text
+from sqlalchemy import Text, cast
 
 # Configure logging for this module
 logger = logging.getLogger(__name__)
@@ -475,9 +475,10 @@ def get_signals():
             # ------------------------------------------------------------------
             for sig in pending_signals:
                 try:
-                    db.session.merge(
-                        SentSignal(terminal_id=str(terminal_id), signal_id=sig["id"])
-                    )
+                    sent_signal = SentSignal()
+                    sent_signal.terminal_id = str(terminal_id)
+                    sent_signal.signal_id = sig["id"]
+                    db.session.merge(sent_signal)
                 except Exception as e:
                     logger.warning(f"SentSignal merge failed for {sig.get('id')}: {e}")
             db.session.commit()
@@ -1003,6 +1004,33 @@ def execute_signal(signal_id):
         
         # Log the execution request
         logger.info(f"Executing signal {signal_id} for {signal.symbol} ({signal.action}) via terminal {terminal_id} (account {account_id})")
+
+        if signal.entry:  # Only do the check if we have an entry price
+            entry_price = float(signal.entry)
+            similar_signals = db.session.query(Signal).filter(
+                Signal.symbol == signal.symbol,
+                Signal.action == signal.action,
+                Signal.status == SignalStatus.ACTIVE,
+                Signal.id != signal_id  # Don't compare with self
+            ).all()
+
+            # Check if any active signal is too close (within 10 pips)
+            for existing in similar_signals:
+                if existing.entry and is_price_too_close(
+                    signal.symbol, entry_price, float(existing.entry)
+                ):
+                    logger.warning(
+                        f"Signal {signal_id} too similar to existing signal {existing.id}: "
+                        f"{signal.symbol} {signal.action.name} @ {entry_price:.5f} "
+                        f"(≤ 10-pip diff from {float(existing.entry):.5f})"
+                    )
+                    return jsonify({
+                        "status": "error",
+                        "message": f"Too similar to existing signal {existing.id} (within 10 pips)",
+                        "existing_signal_id": existing.id
+                    }), 409  # HTTP 409 Conflict
+
+
         
         # Change the signal status to ACTIVE if it's PENDING
         if signal.status.name == 'PENDING':
@@ -1109,7 +1137,7 @@ def signal_chart(signal_id):
             .filter(
                 Signal.symbol == signal.symbol,
                 Signal.action == signal.action,
-                Signal.context_json.like('%"mt5_processed": true%')
+                cast(Signal.context_json, Text).ilike('%"mt5_processed": true%')
             )
             .order_by(Signal.updated_at.desc())
             .first()
