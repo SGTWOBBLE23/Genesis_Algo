@@ -530,15 +530,6 @@ def get_signals():
             return jsonify({"status": "success", "signals": pending_signals})
         # ─────────────────────────────────────────────────────────────────────
 
-        for signal in signals:
-            # ── Risk-limit check ─────────────────────────────────────
-            ok, reason = _risk_guard(signal.symbol)
-            if not ok:
-                logger.info(f"Signal {signal.id} blocked: {reason}")
-                continue
-            # ---------------------------------------------------------
-
-            action = signal.action.value if hasattr(signal.action, 'value') else str(signal.action)
         # Format signals for MT5 EA
         formatted_signals = []
         for signal in signals:
