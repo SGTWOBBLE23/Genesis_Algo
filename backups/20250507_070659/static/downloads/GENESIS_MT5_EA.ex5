@@ -1,0 +1,117 @@
+//+------------------------------------------------------------------+
+//|                                             GENESIS_MT5_EA.mq5 |
+//|                                  Copyright 2025, GENESIS Team |
+//|                                         https://genesis.trade |
+//+------------------------------------------------------------------+
+#property copyright "Copyright 2025, GENESIS Team"
+#property link      "https://genesis.trade"
+#property version   "1.05"
+#property strict
+
+// Input Parameters
+input string   ApiEndpoint = "http://localhost:5500/api/v1"; // API Endpoint URL
+input string   ApiToken    = "";                          // API Authentication Token
+input int      Interval    = 5;                           // Update Interval (seconds)
+input bool     SyncTrades  = true;                        // Sync Trades with Platform
+input bool     AutoTrade   = true;                        // Execute Signals Automatically
+
+//+------------------------------------------------------------------+
+//| Expert initialization function                                   |
+//+------------------------------------------------------------------+
+int OnInit()
+{
+   // Initialize connection to GENESIS Trading Platform
+   Print("GENESIS MT5 EA initialized with endpoint: ", ApiEndpoint);
+   
+   // Set up timer for regular updates
+   EventSetTimer(Interval);
+   
+   return(INIT_SUCCEEDED);
+}
+
+//+------------------------------------------------------------------+
+//| Expert deinitialization function                                 |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+{
+   // Clean up
+   EventKillTimer();
+   Print("GENESIS MT5 EA stopped");
+}
+
+//+------------------------------------------------------------------+
+//| Timer function                                                   |
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+   // Synchronize data with platform
+   SynchronizeWithPlatform();
+   
+   // Check for new signals if auto trading is enabled
+   if(AutoTrade)
+   {
+      CheckForSignals();
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Trade function                                                   |
+//+------------------------------------------------------------------+
+void OnTrade()
+{
+   // Update trade status when trades change
+   if(SyncTrades)
+   {
+      UpdateTradeStatus();
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Synchronize with GENESIS Trading Platform                         |
+//+------------------------------------------------------------------+
+void SynchronizeWithPlatform()
+{
+   // Send account information
+   SendAccountInfo();
+   
+   // Send open positions
+   SendPositions();
+}
+
+//+------------------------------------------------------------------+
+//| Send account information to platform                              |
+//+------------------------------------------------------------------+
+void SendAccountInfo()
+{
+   // Get account info
+   double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+   double margin = AccountInfoDouble(ACCOUNT_MARGIN);
+   
+   // Send to platform
+   // Implementation details...
+}
+
+//+------------------------------------------------------------------+
+//| Send open positions to platform                                   |
+//+------------------------------------------------------------------+
+void SendPositions()
+{
+   // Implementation details...
+}
+
+//+------------------------------------------------------------------+
+//| Check for trading signals from platform                           |
+//+------------------------------------------------------------------+
+void CheckForSignals()
+{
+   // Implementation details...
+}
+
+//+------------------------------------------------------------------+
+//| Update trade status on the platform                               |
+//+------------------------------------------------------------------+
+void UpdateTradeStatus()
+{
+   // Implementation details...
+}

@@ -1,0 +1,248 @@
+{% extends "layout.html" %}
+
+{% block title %}Technical Charts{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Technical Analysis Charts</h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <div class="btn-group mr-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="generateChartBtn">
+                    <i data-feather="refresh-cw"></i> Generate Chart
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="downloadChartBtn">
+                    <i data-feather="download"></i> Download
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Chart Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <form id="chartForm">
+                        <div class="form-group">
+                            <label for="symbol">Symbol</label>
+                            <select class="form-control" id="symbol" required>
+                                <option value="">Select Symbol</option>
+                                <option value="EUR_USD">EUR/USD</option>
+                                <option value="GBP_USD">GBP/USD</option>
+                                <option value="USD_JPY">USD/JPY</option>
+                                <option value="USD_CHF">USD/CHF</option>
+                                <option value="AUD_USD">AUD/USD</option>
+                                <option value="NZD_USD">NZD/USD</option>
+                                <option value="USD_CAD">USD/CAD</option>
+                                <option value="XAU_USD">GOLD</option>
+                                <option value="BTC_USD">BITCOIN</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="timeframe">Timeframe</label>
+                            <select class="form-control" id="timeframe">
+                                <option value="M5">5 Minutes</option>
+                                <option value="M15">15 Minutes</option>
+                                <option value="M30">30 Minutes</option>
+                                <option value="H1" selected>1 Hour</option>
+                                <option value="H4">4 Hours</option>
+                                <option value="D">Daily</option>
+                                <option value="W">Weekly</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="count">Number of Candles</label>
+                            <input type="number" class="form-control" id="count" value="100" min="20" max="200">
+                        </div>
+                        
+                        <hr>
+                        <h6>Trade Annotations (Optional)</h6>
+                        
+                        <div class="form-group">
+                            <label for="entryTime">Entry Time (UTC)</label>
+                            <input type="datetime-local" class="form-control" id="entryTime">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="entryPrice">Entry Price</label>
+                            <input type="number" class="form-control" id="entryPrice" step="0.00001">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="stopLoss">Stop Loss</label>
+                            <input type="number" class="form-control" id="stopLoss" step="0.00001">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="takeProfit">Take Profit</label>
+                            <input type="number" class="form-control" id="takeProfit" step="0.00001">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="result">Trade Result</label>
+                            <select class="form-control" id="result">
+                                <option value="">None</option>
+                                <option value="win">Win</option>
+                                <option value="loss">Loss</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0" id="chartTitle">Technical Chart</h5>
+                </div>
+                <div class="card-body" id="chartContainer">
+                    <div class="text-center py-5" id="placeholder">
+                        <h5 class="text-muted">Configure and generate a chart</h5>
+                        <p>Set parameters on the left panel and click Generate Chart</p>
+                    </div>
+                    <img id="chartImage" class="img-fluid d-none" alt="Technical Chart">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Feather icons
+        feather.replace();
+        
+        // Get elements
+        const generateBtn = document.getElementById('generateChartBtn');
+        const downloadBtn = document.getElementById('downloadChartBtn');
+        const symbolSelect = document.getElementById('symbol');
+        const timeframeSelect = document.getElementById('timeframe');
+        const countInput = document.getElementById('count');
+        const entryTimeInput = document.getElementById('entryTime');
+        const entryPriceInput = document.getElementById('entryPrice');
+        const stopLossInput = document.getElementById('stopLoss');
+        const takeProfitInput = document.getElementById('takeProfit');
+        const resultSelect = document.getElementById('result');
+        const chartImage = document.getElementById('chartImage');
+        const placeholder = document.getElementById('placeholder');
+        const chartTitle = document.getElementById('chartTitle');
+        
+        // Function to get form values
+        function getFormValues() {
+            return {
+                symbol: symbolSelect.value,
+                timeframe: timeframeSelect.value,
+                count: countInput.value,
+                entryTime: entryTimeInput.value,
+                entryPrice: entryPriceInput.value,
+                stopLoss: stopLossInput.value,
+                takeProfit: takeProfitInput.value,
+                result: resultSelect.value
+            };
+        }
+        
+        // Function to build query string
+        function buildQueryString() {
+            const values = getFormValues();
+            const params = new URLSearchParams();
+            
+            params.append('timeframe', values.timeframe);
+            params.append('count', values.count);
+            
+            if (values.entryTime && values.entryPrice) {
+                // Format entry time as ISO string
+                const entryDate = new Date(values.entryTime);
+                params.append('entry_time', entryDate.toISOString());
+                params.append('entry_price', values.entryPrice);
+            }
+            
+            if (values.stopLoss) {
+                params.append('sl', values.stopLoss);
+            }
+            
+            if (values.takeProfit) {
+                params.append('tp', values.takeProfit);
+            }
+            
+            if (values.result) {
+                params.append('result', values.result);
+            }
+            
+            return params.toString();
+        }
+        
+        // Generate chart button event
+        generateBtn.addEventListener('click', function() {
+            const values = getFormValues();
+            
+            if (!values.symbol) {
+                alert('Please select a symbol');
+                return;
+            }
+            
+            // Build the query string
+            const queryString = buildQueryString();
+            const chartUrl = `/api/charts/${values.symbol}?${queryString}`;
+            
+            // Update chart image
+            chartImage.src = chartUrl;
+            chartImage.classList.remove('d-none');
+            placeholder.classList.add('d-none');
+            
+            // Update chart title
+            const displaySymbol = values.symbol.replace('_', '/');
+            chartTitle.innerText = `${displaySymbol} (${values.timeframe}) Chart`;
+        });
+        
+        // Download chart button event
+        downloadBtn.addEventListener('click', function() {
+            const values = getFormValues();
+            
+            if (!values.symbol) {
+                alert('Please select a symbol');
+                return;
+            }
+            
+            if (chartImage.classList.contains('d-none')) {
+                alert('Please generate a chart first');
+                return;
+            }
+            
+            // Build the query string
+            const queryString = buildQueryString();
+            
+            // Create and click a temporary download link
+            const downloadUrl = `/api/charts/download/${values.symbol}?${queryString}`;
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = `${values.symbol.replace('_', '')}_${values.timeframe}_chart.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+        
+        // Handle chart image load error
+        chartImage.addEventListener('error', function() {
+            placeholder.classList.remove('d-none');
+            chartImage.classList.add('d-none');
+            placeholder.innerHTML = '<h5 class="text-danger">Error generating chart</h5><p>Check the console for details or try different parameters</p>';
+        });
+        
+        // Handle chart image load success
+        chartImage.addEventListener('load', function() {
+            if (chartImage.naturalWidth === 0) {
+                // Image failed to load properly
+                placeholder.classList.remove('d-none');
+                chartImage.classList.add('d-none');
+                placeholder.innerHTML = '<h5 class="text-danger">Error generating chart</h5><p>The server returned an invalid image</p>';
+            }
+        });
+    });
+</script>
+{% endblock %}
