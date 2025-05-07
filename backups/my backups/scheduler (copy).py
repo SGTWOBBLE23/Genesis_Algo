@@ -7,8 +7,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 import capture_job
-from config import ASSETS  
-from utils import capture_job# 👈 unified list
+from config import ASSETS              # 👈 unified list
 
 logger = logging.getLogger(__name__)
 
