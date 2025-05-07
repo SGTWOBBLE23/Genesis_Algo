@@ -1096,6 +1096,47 @@ def signal_chart(signal_id):
         if not signal:
             logger.error(f"Signal with ID {signal_id} not found")
             return jsonify({"status": "error", "message": f"Signal with ID {signal_id} not found"}), 404
+
+
+
+        # ------------------------------------------------------------------
+        # Early duplicate guard – reject manual executions that are
+        # within a ~10‑pip tolerance of the most‑recent processed trade
+        # for the same symbol + side.
+        # ------------------------------------------------------------------
+        def _pip_tol(sym: str) -> float:
+            if sym.startswith(("XAU", "XAG")):    # metals, quoted in dollars
+                return 1.0                       # $1.00  ≈ 10 ‘pipettes’
+            if sym.endswith("JPY"):              # 3‑dp JPY pairs
+                return 0.10                      # 0.10   ≈ 10 pips
+            return 0.001                         # 0.0010 ≈ 10 pips on 4‑dp FX
+        
+        tol = _pip_tol(signal.symbol)
+        last = (
+            db.session.query(Signal)
+            .filter(
+                Signal.symbol == signal.symbol,
+                Signal.action == signal.action,
+                Signal.context_json.like('%"mt5_processed": true%')
+            )
+            .order_by(Signal.updated_at.desc())
+            .first()
+        )
+        
+        if last and last.entry and signal.entry \
+           and abs(float(signal.entry) - float(last.entry)) <= tol:
+            logger.info(
+                f"Duplicate guard: skipping {signal.symbol} "
+                f"{signal.action.name} @ {signal.entry} "
+                f"(≤{tol} from prior {last.entry})"
+            )
+            return jsonify({
+                "status": "error",
+                "message": (
+                    f"Duplicate {signal.symbol} {signal.action.name} within "
+                    f"{tol} ({last.entry} vs {signal.entry}) – execution rejected"
+                )
+            }), 409
         
         logger.info(f"Found signal: {signal.symbol}, action: {signal.action}, status: {signal.status}")
             
