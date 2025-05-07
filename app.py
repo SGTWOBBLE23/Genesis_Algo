@@ -1232,6 +1232,58 @@ def get_capture_status():
         logger.error(f"Error getting capture status: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+@app.route("/environment", methods=["GET"])
+def environment_page():
+    """Environment switcher page"""
+    # Determine if we're in the test environment
+    is_test = os.path.basename(os.getcwd()) == "dev_environment"
+    return render_template("environment.html", is_test=is_test)
+
+@app.route("/api/switch-environment", methods=["POST"])
+def switch_environment():
+    """API endpoint to switch between environments"""
+    try:
+        data = request.json
+        target = data.get("target")
+        
+        if not target or target not in ["production", "test"]:
+            return jsonify({"success": False, "message": "Invalid target environment"}), 400
+        
+        # Get current directory
+        current_dir = os.getcwd()
+        is_test = os.path.basename(current_dir) == "dev_environment"
+        
+        # Check if we're already in the requested environment
+        if (target == "production" and not is_test) or (target == "test" and is_test):
+            return jsonify({
+                "success": True, 
+                "message": f"Already in {target.upper()} environment",
+                "current_dir": current_dir
+            })
+        
+        result = {"success": False, "message": "Failed to switch environment"}
+        
+        # Actually switching environments requires running a shell script externally
+        # We'll just return instructions to use the switch_environment.sh script
+        if target == "production" and is_test:
+            result = {
+                "success": True,
+                "message": "To switch to PRODUCTION: Exit the current server and run './start.sh' from the parent directory",
+                "instructions": "cd .. && ./start.sh"
+            }
+        elif target == "test" and not is_test:
+            result = {
+                "success": True,
+                "message": "To switch to TEST: Exit the current server and run './dev_environment/start_test_server.sh'",
+                "instructions": "cd dev_environment && ./start_test_server.sh"
+            }
+            
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error switching environment: {str(e)}")
+        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
+
 # Initialize tables and run app
 with app.app_context():
     try:
