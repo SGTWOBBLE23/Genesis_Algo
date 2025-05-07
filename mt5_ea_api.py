@@ -3,11 +3,11 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-import json, time, logging
+import json 
+import time 
+import logging
 from datetime import datetime, timedelta
 
-
-import matplotlib.pyplot as plt
 
 from flask import Blueprint, request, jsonify, send_file
 
@@ -532,113 +532,84 @@ def get_signals():
 
         # Format signals for MT5 EA
         formatted_signals = []
+
         for signal in signals:
-            # Convert SignalAction enum to string
-            action = signal.action.value if hasattr(signal.action, 'value') else str(signal.action)
-            
-            # Format signal data for MT5 EA, matching expected format
-            # Simple symbol mapping without using db query
-            mt5_symbol = signal.symbol
-            
-            # Basic symbol format conversion from internal (with underscore) to MT5 (no underscore)
-            if '_' in mt5_symbol:
-                mt5_symbol = mt5_symbol.replace('_', '')
-                logger.info(f"Basic symbol mapping: {signal.symbol} -> {mt5_symbol}")
-                
-            # Manual mapping for any special cases
+
+            # ‣ RISK-LIMIT GUARD  (max 3 trades / symbol  &  ≥30 % free-margin)
+            ok, reason = _risk_guard(signal.symbol)
+            if not ok:
+                logger.info(f"Signal {signal.id} blocked: {reason}")
+                continue               # skip this signal entirely
+
+            # Convert SignalAction enum → string
+            action = signal.action.value if hasattr(signal.action, "value") else str(signal.action)
+
+            # --- Symbol mapping ------------------------------------------------
+            mt5_symbol = signal.symbol.replace("_", "") if "_" in signal.symbol else signal.symbol
             symbol_map = {
-           
-                # Metals
-                'XAU_USD': 'XAUUSD',
-                'XAG_USD': 'XAGUSD',
-                
-                # Major forex pairs
-                'EUR_USD': 'EURUSD',
-                'GBP_USD': 'GBPUSD',
-                'USD_JPY': 'USDJPY',
-                
-                # Cross pairs
-                'EUR_JPY': 'EURJPY',
-                'GBP_JPY': 'GBPJPY',
+                "XAU_USD": "XAUUSD", "XAG_USD": "XAGUSD",
+                "EUR_USD": "EURUSD", "GBP_USD": "GBPUSD", "USD_JPY": "USDJPY",
+                "EUR_JPY": "EURJPY", "GBP_JPY": "GBPJPY",
             }
-            
-            if signal.symbol in symbol_map:
-                mt5_symbol = symbol_map[signal.symbol]
-                logger.info(f"Using map dictionary: {signal.symbol} -> {mt5_symbol}")
-            
+            mt5_symbol = symbol_map.get(signal.symbol, mt5_symbol)
+            # -------------------------------------------------------------------
+
             formatted_signal = {
-                "id": signal.id,
-                "asset": {
-                    "symbol": mt5_symbol  # Use the mapped symbol if available
-                },
-                "action": action,
-                "entry_price": float(signal.entry) if signal.entry else 0.0,
-                "stop_loss": float(signal.sl) if signal.sl else 0.0,
-                "take_profit": float(signal.tp) if signal.tp else 0.0,
-                "confidence": float(signal.confidence),
-                "position_size": 0.1,  # Default lot size
-                "force_execution": True if action in ['BUY_NOW', 'SELL_NOW'] else False  # Only force execution for immediate action signals
+                "id":            signal.id,
+                "asset":         {"symbol": mt5_symbol},
+                "action":        action,
+                "entry_price":   float(signal.entry) if signal.entry else 0.0,
+                "stop_loss":     float(signal.sl) if signal.sl else 0.0,
+                "take_profit":   float(signal.tp) if signal.tp else 0.0,
+                "confidence":    float(signal.confidence),
+                "position_size": 0.1,                           # (Task #5 will replace)
+                "force_execution": action in ("BUY_NOW", "SELL_NOW"),
             }
-            
-            # Get additional context from signal if available
-            # Try to get context from either context or context_json
-            signal_context = None
-            if hasattr(signal, 'context') and signal.context:
-                signal_context = signal.context
-            elif hasattr(signal, 'context_json') and signal.context_json:
+
+            # -------- Context overrides (optional) -----------------------------
+            ctx = None
+            if getattr(signal, "context_json", None):
                 try:
-                    signal_context = json.loads(signal.context_json)
-                    logger.info(f"Loaded context from context_json: {signal_context}")
-                    
-                    # Check if context contains MT5 symbol - override the mapping if it does
-                    if isinstance(signal_context, dict) and 'mt5_symbol' in signal_context:
-                        mt5_symbol = signal_context['mt5_symbol']
-                        logger.info(f"Using MT5 symbol from context_json: {mt5_symbol}")
-                        # Update the formatted signal with the context-provided symbol
-                        formatted_signal['asset']['symbol'] = mt5_symbol
+                    ctx = json.loads(signal.context_json)
                 except Exception as e:
-                    logger.error(f"Error parsing context_json: {e}")
-                    
-            # Include any additional context data MT5 might need
-            if isinstance(signal_context, dict):
-                if 'position_size' in signal_context:
-                    formatted_signal["position_size"] = float(signal_context['position_size'])
-                    logger.info(f"Using position_size from context: {formatted_signal['position_size']}")
-                if 'force_execution' in signal_context:
-                    formatted_signal["force_execution"] = bool(signal_context['force_execution'])
-                    logger.info(f"Using force_execution from context: {formatted_signal['force_execution']}")
-                if 'timeframe' in signal_context:
-                    formatted_signal["timeframe"] = signal_context['timeframe']
-                    logger.info(f"Using timeframe from context: {formatted_signal['timeframe']}")
-            
+                    logger.error(f"Context JSON parse error for {signal.id}: {e}")
+
+            if isinstance(ctx, dict):
+                if ctx.get("mt5_symbol"):
+                    formatted_signal["asset"]["symbol"] = ctx["mt5_symbol"]
+                if ctx.get("position_size") is not None:
+                    formatted_signal["position_size"] = float(ctx["position_size"])
+                if ctx.get("force_execution") is not None:
+                    formatted_signal["force_execution"] = bool(ctx["force_execution"])
+                if ctx.get("timeframe"):
+                    formatted_signal["timeframe"] = ctx["timeframe"]
+            # -------------------------------------------------------------------
+
             formatted_signals.append(formatted_signal)
-            
-            # Mark all signals as processed by adding them to a processed_signals table
-            # or by setting a flag in the signal itself
-            if not hasattr(signal, 'mt5_processed') or not signal.mt5_processed:
-                # Only update signals that haven't been processed by MT5 yet
-                # This prevents the same signal from being sent multiple times
-                # First, check if the signal has a context_json field to store this info
-                if hasattr(signal, 'context_json') and signal.context_json:
+
+            # -------- Mark as processed so we don’t re-send it ------------------
+            if not getattr(signal, "mt5_processed", False):
+                if getattr(signal, "context_json", None):
                     try:
-                        context = json.loads(signal.context_json)
-                        context['mt5_processed'] = True
-                        signal.context_json = json.dumps(context)
-                        logger.info(f"Marked signal {signal.id} as processed by MT5")
+                        ctx = json.loads(signal.context_json) if ctx is None else ctx
+                        ctx["mt5_processed"] = True
+                        signal.context_json = json.dumps(ctx)
                     except Exception as e:
-                        # If we can't update the context, just set the status
-                        logger.error(f"Error updating signal context: {str(e)}")
-                        signal.status = 'ACTIVE'
+                        logger.warning(f"Couldn’t update context for {signal.id}: {e}")
+                        signal.status = "ACTIVE"
                 else:
-                    # No context exists, just set the status
-                    signal.status = 'ACTIVE'
-            
+                    signal.status = "ACTIVE"
+            # -------------------------------------------------------------------
+
+        # ──────────────────────────────────────────────────────────────
+        # 8️⃣  Commit & return
+        # ──────────────────────────────────────────────────────────────
         if formatted_signals:
-            db.session.commit()  # Save the status changes
-            logger.info(f"Sending {len(formatted_signals)} signals to MT5 terminal for account {account_id}")
+            db.session.commit()
+            logger.info(f"Sending {len(formatted_signals)} signal(s) to MT5 for account {account_id}")
         else:
-            logger.info(f"No signals to send to MT5 terminal for account {account_id}")
-        
+            logger.info(f"No eligible signals to send to MT5 for account {account_id}")
+
         return jsonify({
             "status": "success",
             "signals": formatted_signals
