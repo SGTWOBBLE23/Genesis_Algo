@@ -986,6 +986,17 @@ def get_current_signals():
 
     return jsonify([signal.to_dict() for signal in signals])
 
+def get_all_signals():
+    """
+    Dashboard-only endpoint: returns every signal from the last 24 h,
+    no status filter, newest first.
+    """
+    rows = ( db.session.query(Signal)
+               .filter(Signal.created_at >= datetime.now() - timedelta(days=1))
+               .order_by(Signal.created_at.desc())
+               .all() )
+    return jsonify([s.to_dict() for s in rows])
+
 @app.route('/api/signals/<int:signal_id>/cancel', methods=['POST'])
 def cancel_signal(signal_id):
     signal = db.session.query(Signal).get(signal_id)

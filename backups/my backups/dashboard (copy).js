@@ -322,7 +322,7 @@ function showAlert(message, type = 'info') {
  * Load current signals from the API
  */
 function loadCurrentSignals() {
-    fetch('/api/signals/all')
+    fetch('/api/signals/current')
         .then(response => {
             if (!response.ok) {
                 throw new Error('Network response was not ok');
