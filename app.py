@@ -975,7 +975,7 @@ def get_current_signals():
               # plus rows that were cancelled ONLY because they were merged
               (
                   (Signal.status == SignalStatus.CANCELLED) &
-                  (Signal.context_json.cast(Text).contains('"reason":"merged_into_existing"'))
+                  Signal.context_json.cast(Text).contains('"reason":"merged_into_existing"')
               ),
               # still restrict to the last 24 h
               Signal.created_at >= (datetime.now() - timedelta(days=1))
