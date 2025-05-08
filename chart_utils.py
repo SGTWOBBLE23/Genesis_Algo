@@ -37,27 +37,29 @@ oanda_api = OandaAPI(
 
 def fetch_candles(symbol: str, timeframe: str = "H1", count: int = 300) -> List[Dict]:
     """Fetch candle data from OANDA API
-    
+
     Args:
         symbol: Trading symbol/instrument name (e.g., "EUR_USD")
         timeframe: Chart timeframe (e.g., "H1", "M15", "D")
         count: Number of candles to retrieve
-        
+
     Returns:
         List of candle dictionaries
     """
     try:
         # Request candles from OANDA
         candles = oanda_api.get_candles(symbol, timeframe, count)
-        
+
         if not candles:
             logger.error(f"Error fetching candles for {symbol}: No data returned")
             return []
-        
-        if isinstance(candles, dict) and 'error' in candles:
-            logger.error(f"Error fetching candles for {symbol}: {candles['error']}")
-            return []
-        
+
+        if isinstance(candles, dict):
+            error_msg = candles.get('error')
+            if error_msg:
+                logger.error(f"Error fetching candles for {symbol}: {error_msg}")
+                return []
+
         return candles
     except Exception as e:
         logger.error(f"Exception fetching candles for {symbol}: {str(e)}")
@@ -70,7 +72,7 @@ def generate_chart(symbol: str, timeframe: str = "H1", count: int = 300,
                   result: Optional[str] = None,
                   signal_action: Optional[str] = None) -> str:
     """Generate chart for a symbol with optional trade annotations
-    
+
     Args:
         symbol: Trading symbol/instrument name (e.g., "EUR_USD")
         timeframe: Chart timeframe (e.g., "H1", "M15", "D")
@@ -81,7 +83,7 @@ def generate_chart(symbol: str, timeframe: str = "H1", count: int = 300,
         result: Optional trade result ("win" or "loss")
         signal_action: Optional signal action type (e.g., "BUY_NOW", "SELL_NOW", "ANTICIPATED_LONG", "ANTICIPATED_SHORT")
             affecting how entry points are positioned
-        
+
     Returns:
         Path to saved chart image or empty string if error
     """
@@ -99,15 +101,15 @@ def generate_chart(symbol: str, timeframe: str = "H1", count: int = 300,
     try:
         # Fetch candles for the symbol
         candles = fetch_candles(symbol, timeframe, count)
-        
+
         if not candles:
             logger.error(f"No candle data available for {symbol}")
             return ""
-        
+
         # Create a chart generator with signal action
         from chart_generator_basic import ChartGenerator
         chart_gen = ChartGenerator(signal_action=signal_action)
-        
+
         # Generate and save chart
         chart_path = chart_gen.create_chart(
             candles=candles,
@@ -118,7 +120,7 @@ def generate_chart(symbol: str, timeframe: str = "H1", count: int = 300,
             take_profit=take_profit,
             result=result
         )
-        
+
         return chart_path
     except Exception as e:
         logger.error(f"Error generating chart for {symbol}: {str(e)}")
@@ -131,7 +133,7 @@ def generate_chart_bytes(symbol: str, timeframe: str = "H1", count: int = 300,
                        result: Optional[str] = None,
                        signal_action: Optional[str] = None) -> bytes:
     """Generate chart for a symbol and return as bytes
-    
+
     Args:
         symbol: Trading symbol/instrument name (e.g., "EUR_USD")
         timeframe: Chart timeframe (e.g., "H1", "M15", "D")
@@ -142,7 +144,7 @@ def generate_chart_bytes(symbol: str, timeframe: str = "H1", count: int = 300,
         result: Optional trade result ("win" or "loss")
         signal_action: Optional signal action type (e.g., "BUY_NOW", "SELL_NOW", "ANTICIPATED_LONG", "ANTICIPATED_SHORT")
             affecting how entry points are positioned
-        
+
     Returns:
         Chart as bytes or empty bytes if error
     """
@@ -150,15 +152,15 @@ def generate_chart_bytes(symbol: str, timeframe: str = "H1", count: int = 300,
     try:
         # Fetch candles for the symbol
         candles = fetch_candles(symbol, timeframe, count)
-        
+
         if not candles:
             logger.error(f"No candle data available for {symbol}")
             return b""
-        
+
         # Create a chart generator with signal action
         from chart_generator_basic import ChartGenerator
         chart_gen = ChartGenerator(signal_action=signal_action)
-        
+
         # Generate chart as bytes
         chart_bytes = chart_gen.create_chart_bytes(
             candles=candles,
@@ -169,7 +171,7 @@ def generate_chart_bytes(symbol: str, timeframe: str = "H1", count: int = 300,
             take_profit=take_profit,
             result=result
         )
-        
+
         return chart_bytes
     except Exception as e:
         logger.error(f"Error generating chart bytes for {symbol}: {str(e)}")
