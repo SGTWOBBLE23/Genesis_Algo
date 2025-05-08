@@ -7,6 +7,7 @@ import json
 import time 
 import logging
 from datetime import datetime, timedelta
+from models import SignalStatus
 
 
 from flask import Blueprint, request, jsonify, send_file
@@ -226,9 +227,18 @@ def get_signals():
             # Get all PENDING or ACTIVE signals that don't have the mt5_processed flag
             processed_signal_ids = []
             unprocessed_signals = []
-            all_signals = db.session.query(Signal).filter(
-                Signal.status.in_(['PENDING', 'ACTIVE'])
-            ).order_by(Signal.id.asc()).all()
+
+            all_signals = (
+                db.session.query(Signal)
+                .filter(
+                    Signal.status.in_([
+                        SignalStatus.PENDING.value,      # "PENDING"
+                        SignalStatus.ACTIVE.value        # "ACTIVE"
+                    ])
+                )
+                .order_by(Signal.id.asc())
+                .all()
+            )
             
             for signal in all_signals:
                 processed = False
@@ -254,10 +264,18 @@ def get_signals():
             # AND that haven't been processed yet
             processed_signal_ids = []
             unprocessed_signals = []
-            all_signals = db.session.query(Signal).filter(
-                Signal.id > last_signal_id,
-                Signal.status.in_(['PENDING', 'ACTIVE'])
-            ).order_by(Signal.id.asc()).all()
+
+            all_signals = (
+                db.session.query(Signal)
+                .filter(
+                    Signal.status.in_([
+                        SignalStatus.PENDING.value,      # "PENDING"
+                        SignalStatus.ACTIVE.value        # "ACTIVE"
+                    ])
+                )
+                .order_by(Signal.id.asc())
+                .all()
+            )
             
             for signal in all_signals:
                 processed = False
@@ -282,18 +300,34 @@ def get_signals():
             # If no new signals are found, check if we should send all current signals
             if not new_signals:
                 # Check if there are any active signals with lower IDs
-                any_active = db.session.query(Signal).filter(
-                    Signal.status.in_(['PENDING', 'ACTIVE'])
-                ).first() is not None
-                
+                any_active = (
+                    db.session.query(Signal)
+                    .filter(
+                        Signal.status.in_([
+                            SignalStatus.PENDING.value,     # "PENDING"
+                            SignalStatus.ACTIVE.value       # "ACTIVE"
+                        ])
+                    )
+                    .first()
+                ) is not None
+
                 if any_active:
                     logger.info(f"No new signals after ID {last_signal_id}, but found active signals with lower IDs")
                     # Return only unprocessed pending/active signals
                     processed_signal_ids = []
                     unprocessed_signals = []
-                    all_signals = db.session.query(Signal).filter(
-                        Signal.status.in_(['PENDING', 'ACTIVE'])
-                    ).order_by(Signal.id.asc()).all()
+
+                    all_signals = (
+                        db.session.query(Signal)
+                        .filter(
+                            Signal.status.in_([
+                                SignalStatus.PENDING.value,      # "PENDING"
+                                SignalStatus.ACTIVE.value        # "ACTIVE"
+                            ])
+                        )
+                        .order_by(Signal.id.asc())
+                        .all()
+                    )
                     
                     for signal in all_signals:
                         processed = False
@@ -324,9 +358,18 @@ def get_signals():
             # First request, return all unprocessed pending/active signals
             processed_signal_ids = []
             unprocessed_signals = []
-            all_signals = db.session.query(Signal).filter(
-                Signal.status.in_(['PENDING', 'ACTIVE'])
-            ).order_by(Signal.id.asc()).all()
+
+            all_signals = (
+                db.session.query(Signal)
+                .filter(
+                    Signal.status.in_([
+                        SignalStatus.PENDING.value,      # "PENDING"
+                        SignalStatus.ACTIVE.value        # "ACTIVE"
+                    ])
+                )
+                .order_by(Signal.id.asc())
+                .all()
+            )
             
             for signal in all_signals:
                 processed = False
@@ -1019,7 +1062,7 @@ def execute_signal(signal_id):
             similar_signals = db.session.query(Signal).filter(
                 Signal.symbol == signal.symbol,
                 Signal.action == signal.action,
-                Signal.status == SignalStatus.ACTIVE,
+                Signal.status == SignalStatus.ACTIVE.value,
                 Signal.id != signal_id  # Don't compare with self
             ).all()
 
@@ -1043,7 +1086,7 @@ def execute_signal(signal_id):
         
         # Change the signal status to ACTIVE if it's PENDING
         if signal.status.name == 'PENDING':
-            signal.status = SignalStatus.ACTIVE
+            signal.status = SignalStatus.ACTIVE.value
             db.session.commit()
             logger.info(f"Updated signal {signal_id} status to ACTIVE")
         
@@ -1189,11 +1232,11 @@ def signal_chart(signal_id):
         
         # Determine result type based on signal status
         result = "anticipated"
-        if signal.status == SignalStatus.TRIGGERED:
+        if signal.status == SignalStatus.TRIGGERED.value:
             result = "win" if signal.context and signal.context.get("pnl", 0) > 0 else "loss"
-        elif signal.status == SignalStatus.ACTIVE:
+        elif signal.status == SignalStatus.ACTIVE.value:
             result = "active"
-        elif signal.status == SignalStatus.PENDING:
+        elif signal.status == SignalStatus.PENDING.value:
             result = "pending"
         
         logger.info(f"Signal chart result type: {result}")

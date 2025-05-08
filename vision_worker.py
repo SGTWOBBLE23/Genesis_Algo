@@ -4,12 +4,13 @@ import logging
 import time
 import os
 from typing import Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from config import ASSETS        # new
 from sqlalchemy import func
 from chart_utils import is_price_too_close
-from app import db, Signal, SignalAction, SignalStatus, app
+from app import db, Signal, SignalAction, app
 from signal_scoring import signal_scorer
+from models import SignalStatus
 
 import redis
 import requests
@@ -82,14 +83,23 @@ class DirectVisionPipeline:
             # ------------------------------------------------------------------
             # 3. Duplicate guard – skip if a recent idea is within 10 pips
             # ------------------------------------------------------------------
+            cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)        # look back 4 h
+            live_statuses = [
+                SignalStatus.PENDING.value,      # "PENDING"
+                SignalStatus.ACTIVE.value,       # "ACTIVE"
+                SignalStatus.TRIGGERED.value     # "TRIGGERED"
+            ]     # actionable only
+
             last = (
                 db.session.query(Signal)
-                .filter(
-                    Signal.symbol == symbol,
-                    Signal.action == action_enum
-                )
-                .order_by(Signal.id.desc())
-                .first()
+                    .filter(
+                        Signal.symbol == symbol,
+                        Signal.action == action_enum,
+                        Signal.status.in_(live_statuses),          # NEW status filter
+                        Signal.created_at >= cutoff                # NEW time filter
+                    )
+                    .order_by(Signal.id.desc())
+                    .first()
             )
 
             if last and last.entry and is_price_too_close(
@@ -112,7 +122,7 @@ class DirectVisionPipeline:
                 sl=vision_result.get("sl"),
                 tp=vision_result.get("tp"),
                 confidence=vision_result.get("confidence", 0.5),
-                status=SignalStatus.PENDING,
+                status=SignalStatus.PENDING.value,
                 context_json=json.dumps({
                     "source": "openai_vision",
                     "image_path": image_path,
@@ -129,12 +139,10 @@ class DirectVisionPipeline:
 
             # Either keep the signal alive or kill it right here
             if should_execute:
-                signal.status = SignalStatus.PENDING        # stays in the queue
+                signal.status = SignalStatus.PENDING.value        # stays in the queue
             else:
-                signal.status = SignalStatus.CANCELLED      # tag as rejected immediately
+                signal.status = SignalStatus.CANCELLED.value      # tag as rejected immediately
 
-
-            
             db.session.commit()
             logger.info(
                 "Created Vision signal for %s: %s @ %.5f",

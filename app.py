@@ -970,11 +970,15 @@ def get_current_signals():
         db.session.query(Signal)
           .filter(
               # keep normal live rows
-              Signal.status.in_([SignalStatus.PENDING, SignalStatus.ACTIVE, SignalStatus.ERROR])
+              Signal.status.in_([
+                  SignalStatus.PENDING.value,
+                  SignalStatus.ACTIVE.value,
+                  SignalStatus.ERROR.value
+              ])
               |
               # plus rows that were cancelled ONLY because they were merged
               (
-                  (Signal.status == SignalStatus.CANCELLED) &
+                  (Signal.status == SignalStatus.CANCELLED.value) &
                   Signal.context_json.cast(Text).contains('"reason":"merged_into_existing"')
               ),
               # still restrict to the last 24 h
@@ -1003,7 +1007,7 @@ def cancel_signal(signal_id):
     if not signal:
         return jsonify({"status": "error", "message": f"Signal with ID {signal_id} not found"}), 404
 
-    signal.status = SignalStatus.CANCELLED
+    signal.status = SignalStatus.CANCELLED.value
     db.session.commit()
 
     return jsonify({"status": "success", "message": f"Signal {signal_id} cancelled successfully"})

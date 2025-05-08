@@ -189,10 +189,10 @@ def pip_tolerance(symbol: str) -> float:
     • Everything else (5-dp majors)    → 0.001
     """
     if symbol.startswith(("XAU", "XAG")):
-        return 0.50
+        return 0.20
     if symbol.endswith("JPY"):
-        return 0.05
-    return 0.0005
+        return 0.02
+    return 0.0002
 
 
 def is_price_too_close(symbol: str, price_a: float, price_b: float) -> bool:

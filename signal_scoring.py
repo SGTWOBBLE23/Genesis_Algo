@@ -62,7 +62,7 @@ class SignalScorer:
     
     def __init__(self):
         # Configuration settings
-        self.min_confidence_threshold = 0.65  # Base minimum confidence threshold
+        self.min_confidence_threshold = 0.55  # Base minimum confidence threshold
         self.min_technical_score = 0.60      # Minimum technical score required
         self.max_correlation_threshold = 0.75 # Maximum correlation allowed between pairs
         self.evaluation_period_days = 14     # Days of history to analyze for performance adjustment
@@ -110,6 +110,8 @@ class SignalScorer:
         }
 
     def merge_or_update(self, signal: "Signal") -> bool:
+
+        return True
         """
         If an open signal of the **same symbol + action** exists and the
         entry prices are within a small tolerance, roll this new evidence
@@ -135,8 +137,11 @@ class SignalScorer:
                 Signal.id != signal.id,                       # not itself
                 Signal.symbol == signal.symbol,
                 Signal.action == signal.action,
-                Signal.status.in_([SignalStatus.PENDING,
-                                   SignalStatus.ACTIVE])
+                Signal.status.in_([
+                    SignalStatus.PENDING.value,
+                    SignalStatus.ACTIVE.value,
+                    SignalStatus.TRIGGERED.value
+                ])
             )
             .order_by(Signal.created_at.desc())
             .first()
@@ -166,7 +171,7 @@ class SignalScorer:
         sibling.context = ctx
 
         # Soft-delete the newcomer (CANCELLED → keeps the row for traceability)
-        signal.status = SignalStatus.CANCELLED
+        signal.status = SignalStatus.CANCELLED.value
         signal.context = {"reason": "merged_into", "target_id": sibling.id}
 
         db.session.commit()
@@ -229,15 +234,15 @@ class SignalScorer:
         
             df = pd.DataFrame(
                 {
-                    "time":    c["time"],
-                    "open":    float(c["mid"]["o"]),
-                    "high":    float(c["mid"]["h"]),
-                    "low":     float(c["mid"]["l"]),
-                    "close":   float(c["mid"]["c"]),
-                    "volume":  float(c.get("volume", 0)),
+                    "time":      c.get("time", c["timestamp"]),   # ← safe access
+                    "open":      c["open"],
+                    "high":      c["high"],
+                    "low":       c["low"],
+                    "close":     c["close"],
                 }
                 for c in candles
             )
+
         
             if df.empty:
                 logger.warning(f"Empty DataFrame for {symbol}")
