@@ -9,7 +9,7 @@ from flask import Flask, render_template, request, jsonify, Response, redirect, 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.sql import func
-from sqlalchemy import and_
+from sqlalchemy import and_, cast, Text
 
 # Configure logging with custom filter for important INFO logs
 class ImportantInfoFilter(logging.Filter):
@@ -966,10 +966,23 @@ def get_trades_stats():
 @app.route('/api/signals/current', methods=['GET'])
 def get_current_signals():
     # By default, show PENDING, ACTIVE, and ERROR signals from the last 24 hours
-    signals = db.session.query(Signal).filter(
-        Signal.status.in_([SignalStatus.PENDING, SignalStatus.ACTIVE, SignalStatus.ERROR]),
-        Signal.created_at >= (datetime.now() - timedelta(days=1))
-    ).order_by(Signal.created_at.desc()).all()
+    signals = (
+        db.session.query(Signal)
+          .filter(
+              # keep normal live rows
+              Signal.status.in_([SignalStatus.PENDING, SignalStatus.ACTIVE, SignalStatus.ERROR])
+              |
+              # plus rows that were cancelled ONLY because they were merged
+              (
+                  (Signal.status == SignalStatus.CANCELLED) &
+                  (Signal.context_json.op('::')(Text).contains('"reason":"merged_into_existing"'))
+              ),
+              # still restrict to the last 24 h
+              Signal.created_at >= (datetime.now() - timedelta(days=1))
+          )
+          .order_by(Signal.created_at.desc())
+          .all()
+    )
 
     return jsonify([signal.to_dict() for signal in signals])
 
