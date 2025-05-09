@@ -1,0 +1,5 @@
+# runtime artefacts
+logs/*.csv
+static/charts/
+__pycache__/
+*.pyc
