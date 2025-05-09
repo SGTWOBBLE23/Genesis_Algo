@@ -65,7 +65,7 @@ class SignalScorer:
         self.min_confidence_threshold = 0.55  # Base minimum confidence threshold
         self.min_technical_score = 0.60      # Minimum technical score required
         self.max_correlation_threshold = 0.75 # Maximum correlation allowed between pairs
-        self.evaluation_period_days = 14     # Days of history to analyze for performance adjustment
+        self.evaluation_period_days = 90     # Days of history to analyze for performance adjustment (extended from 14)
         
         # Currency correlations - initial estimates, will be dynamically updated
         self.pair_correlations = {
@@ -399,6 +399,18 @@ class SignalScorer:
             # Get performance data from recent trades
             cutoff_date = datetime.now() - timedelta(days=self.evaluation_period_days)
             
+            logger.info(f"Looking for {symbol} {side.name} trades closed after {cutoff_date}")
+            
+            # First check if we have any trades at all for this symbol
+            total_trades_count = Trade.query.filter(
+                Trade.symbol == symbol,
+                Trade.side == side,
+                Trade.status == TradeStatus.CLOSED
+            ).count()
+            
+            logger.info(f"Found {total_trades_count} total {symbol} {side.name} trades in database")
+            
+            # Now get the trades within our evaluation period
             trades = Trade.query.filter(
                 Trade.symbol == symbol,
                 Trade.side == side,
@@ -406,9 +418,12 @@ class SignalScorer:
                 Trade.closed_at >= cutoff_date
             ).all()
             
+            trade_count = len(trades)
+            logger.info(f"Found {trade_count} {symbol} {side.name} trades within the {self.evaluation_period_days}-day evaluation period")
+            
             if not trades:
                 logger.info(f"No recent trade history for {symbol} {side.name}, using default adjustment")
-                return 1.0, {"reason": "No recent trade history"}
+                return 1.0, {"reason": "No recent trade history", "total_trades_in_db": total_trades_count}
             
             # Calculate performance metrics
             total_trades = len(trades)
@@ -589,6 +604,17 @@ class SignalScorer:
             adjusted_threshold = min(0.95, max(0.5, self.min_confidence_threshold * adjustment_factor))
             result["base_confidence_threshold"] = self.min_confidence_threshold
             result["adjusted_confidence_threshold"] = adjusted_threshold
+            
+            # Log detailed information about the adjustment
+            logger.info(f"Performance adjustment for {signal.symbol} {signal.action.name}: " +
+                       f"Base threshold {self.min_confidence_threshold:.2f} * Factor {adjustment_factor:.2f} = " +
+                       f"Adjusted threshold {adjusted_threshold:.2f}")
+            
+            # Log whether the signal passes the adjusted threshold
+            if signal.confidence >= adjusted_threshold:
+                logger.info(f"Signal confidence {signal.confidence:.2f} meets adjusted threshold {adjusted_threshold:.2f}")
+            else:
+                logger.info(f"Signal confidence {signal.confidence:.2f} below adjusted threshold {adjusted_threshold:.2f}")
             
             if signal.confidence < adjusted_threshold:
                 result["decision"] = "reject"
