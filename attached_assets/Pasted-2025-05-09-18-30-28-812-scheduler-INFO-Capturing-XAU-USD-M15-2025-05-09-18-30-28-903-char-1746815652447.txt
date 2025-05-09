@@ -1,0 +1,23 @@
+2025-05-09 18:30:28,812 - scheduler - INFO - Capturing XAU_USD (M15)
+2025-05-09 18:30:28,903 - chart_utils - INFO - Generating enhanced chart for XAU_USD (M15) with 100 candles
+2025-05-09 18:30:28,974 - chart_generator_basic - INFO - Initializing chart generator with signal action: None
+2025-05-09 18:30:28,974 - chart_generator_basic - INFO - Using chart output directory: /home/runner/workspace/static/charts
+2025-05-09 18:30:28,976 - root - INFO - Latest candle data: time=2025-05-09 18:15:00+00:00, close price=3339.65
+2025-05-09 18:30:29,511 - chart_generator_basic - INFO - Chart will be saved in directory: /home/runner/workspace/static/charts/XAUUSD
+2025-05-09 18:30:29,511 - chart_generator_basic - INFO - Chart will be saved as: XAUUSD_M15_20250509_183029.png
+2025-05-09 18:30:30,367 - chart_generator_basic - INFO - Chart saved to static/charts/XAUUSD/XAUUSD_M15_20250509_183029.png
+2025-05-09 18:30:30,367 - capture_job - INFO - Generated M15 chart for XAU_USD at static/charts/XAUUSD/XAUUSD_M15_20250509_183029.png (Vision path: charts/XAUUSD/XAUUSD_M15_20250509_183029.png)
+2025-05-09 18:30:30,473 - capture_job - INFO - Processing chart directly: static/charts/XAUUSD/XAUUSD_M15_20250509_183029.png
+2025-05-09 18:30:30,473 - vision_worker - INFO - Processing chart for XAU_USD (static/charts/XAUUSD/XAUUSD_M15_20250509_183029.png)
+2025-05-09 18:30:30,473 - vision_worker - INFO - Sending request to OpenAI Vision API
+2025-05-09 18:30:30,473 - vision_worker - INFO - Reading image file from: static/charts/XAUUSD/XAUUSD_M15_20250509_183029.png
+2025-05-09 18:30:30,473 - vision_worker - INFO - Sending request to OpenAI Vision API using model: gpt-4o
+2025-05-09 18:30:35,070 - vision_worker - INFO - Successfully analyzed chart: {'action': 'BUY_NOW', 'entry': 3339.65, 'sl': 3333.6, 'tp': 3348.0, 'confidence': 0.85}
+2025-05-09 18:30:35,296 - signal_scoring - WARNING - Weight table missing; using defaults
+2025-05-09 18:30:35,296 - signal_scoring - WARNING - Weight table missing; using defaults
+2025-05-09 18:30:35,296 - signal_scoring - WARNING - Weight table missing; using defaults
+2025-05-09 18:30:35,296 - signal_scoring - WARNING - Weight table missing; using defaults
+2025-05-09 18:30:35,353 - signal_scoring - INFO - No recent trade history for XAU_USD BUY, using default adjustment
+2025-05-09 18:30:35,466 - vision_worker - INFO - Created Vision signal for XAU_USD: BUY_NOW @ 3339.65000
+2025-05-09 18:30:35,466 - capture_job - INFO - Successfully processed chart for XAU_USD (M15) without Redis
+2025-05-09 18:30:35,467 - capture_job - INFO - Capture job completed for XAU_USD (M15), Redis not available - attempted direct vision processing

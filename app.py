@@ -8,9 +8,21 @@ from typing import Dict, Any, Optional, List, Union
 from flask import Flask, render_template, request, jsonify, Response, redirect, url_for, send_file, make_response
 from flask_sqlalchemy import SQLAlchemy
 
-db = SQLAlchemy()
+app = Flask(__name__)
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_pre_ping": True,   # ping before checkout
+    "pool_size": 2,          # keep 2 connections in pool (Replit-friendly)
+    "max_overflow": 0        # don’t create extra connections
+}
 
 from sqlalchemy.orm import DeclarativeBase
+class Base(DeclarativeBase):
+    pass
+
+db = SQLAlchemy(app, model_class=Base)
+
+
 from sqlalchemy.sql import func
 from sqlalchemy import and_, cast, Text
 from trade_logger import TradeLogger
@@ -119,23 +131,7 @@ mt5_logger.addHandler(mt5_handler)
 
 logger = logging.getLogger(__name__)
 
-# Initialize Flask app
-app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET", "genesis_trading_platform_secret")
-
-# Configure the SQLAlchemy database
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_recycle": 300,
-    "pool_pre_ping": True,
-}
-
-# Initialize SQLAlchemy
-class Base(DeclarativeBase):
-    pass
-
-db = SQLAlchemy(model_class=Base)
-db.init_app(app)
+#db.init_app(app)
 
 # ---- Enum Definitions ----
 class Role(enum.Enum):
@@ -313,7 +309,8 @@ class Trade(db.Model):
     status = db.Column(db.Enum(TradeStatus), default=TradeStatus.OPEN)
     opened_at = db.Column(db.DateTime, nullable=True)
     closed_at = db.Column(db.DateTime, nullable=True)
-    context = db.Column(db.Text, nullable=True)  # Additional trade context
+    #context = db.Column(db.Text, nullable=True)  # Additional trade context
+    context_json = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, server_default=func.now())
     updated_at = db.Column(db.DateTime, onupdate=func.now())
 
@@ -1265,21 +1262,33 @@ def get_capture_status():
         logger.error(f"Error getting capture status: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-# Initialize tables and run app
+from multiprocessing import Lock
+
+_once_lock = Lock()           # one lock per Unix process
+
+def _boot_once() -> None:
+    """Create tables and start the capture scheduler exactly once."""
+    if getattr(app, "_booted", False):
+        return                 # already done in this process
+
+    with _once_lock:          # double-checked locking
+        if getattr(app, "_booted", False):
+            return
+
+        # 1) make sure tables exist
+        db.create_all()
+
+        # 2) launch the 15-min capture scheduler
+        from scheduler import start_scheduler
+        app.scheduler = start_scheduler()
+        logger.info("DB tables ready; capture scheduler started")
+
+        app._booted = True     # mark so workers skip this
+
+# run the hook when this module is imported
 with app.app_context():
-    try:
-        #db.create_all()
-        logger.info("Database tables created successfully")
+    _boot_once()
 
-        # Start the scheduler
-        try:
-            from scheduler import start_scheduler
-            scheduler = start_scheduler()
-            logger.info("Capture scheduler started successfully")
-        except Exception as e:
-            logger.error(f"Error starting scheduler: {str(e)}")
-    except Exception as e:
-        logger.error(f"Error creating database tables: {str(e)}")
-
-if __name__ == "__main__":
+# ──────────────────────── dev entry point ──────────────────────
+if __name__ == "__main__":     # python app.py  (dev)
     app.run(host="0.0.0.0", port=5000, debug=True)

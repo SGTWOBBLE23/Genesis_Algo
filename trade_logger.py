@@ -1,11 +1,11 @@
 """
 GENESIS-DEV - Trade logging helper (entry + exit → CSV + Postgres)
 
-Changes 2025-05-08 b:
-• switched deprecated Engine.has_table → inspect(engine).has_table
-• removed deprecated MetaData(bind=…) pattern
-• added missing import: inspect
-No other logic touched.
+Changes 2025-05-09:
+• Fixed indentation and removed duplicate generic `insert` import that masked PostgreSQL‑specific insert.
+• Aliased PostgreSQL insert as `pg_insert` for clarity.
+• Dialect‑aware upsert: uses ON CONFLICT only on PostgreSQL; falls back to SQLite‑safe `OR REPLACE` insert elsewhere.
+• Updated reflection logic; removed deprecated patterns.
 """
 
 from __future__ import annotations
@@ -15,88 +15,98 @@ import csv
 import uuid
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict
 
-import pandas as pd
-from sqlalchemy.dialects.postgresql import insert
+import pandas as pd  # noqa: F401  # kept for downstream analytics
 from sqlalchemy import (
-    Table, Column, String, DateTime, Float, Integer, MetaData, inspect
+    Table,
+    Column,
+    String,
+    DateTime,
+    Float,
+    Integer,
+    MetaData,
+    inspect,
 )
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session
 
-# We'll import db in the methods where it's needed to avoid circular imports
-
-LOGGER   = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 CSV_PATH = os.path.join("logs", "trade_log.csv")
 
 
 class TradeLogger:
-    """Facade:  log_entry() + log_exit()  (non-blocking)."""
+    """Facade: log_entry() + log_exit() with CSV append and SQL upsert."""
+
+    _table: Table | None = None
 
     def __init__(self, log_path: str = CSV_PATH) -> None:
         self.log_path = log_path
         os.makedirs(os.path.dirname(self.log_path), exist_ok=True)
 
     # ------------------------------------------------------------------ #
-    #  Public API
+    # Public API
     # ------------------------------------------------------------------ #
-    def log_entry(self, trade_obj) -> None:
+    def log_entry(self, trade_obj: Any) -> None:
         payload = self._build_payload(trade_obj, is_exit=False)
         self._write(payload)
 
-    def log_exit(self, trade_obj) -> None:
+    def log_exit(self, trade_obj: Any) -> None:
         payload = self._build_payload(trade_obj, is_exit=True)
         self._write(payload)
 
     # ------------------------------------------------------------------ #
-    #  Internals
+    # Internals
     # ------------------------------------------------------------------ #
-    def _build_payload(self, t, *, is_exit: bool) -> dict:
+    def _build_payload(self, t: Any, *, is_exit: bool) -> Dict[str, Any]:
         log_id = uuid.uuid5(uuid.NAMESPACE_DNS, f"{t.ticket}")
 
-        payload = {
-            "id":            str(log_id),
-            "timestamp":     t.opened_at or datetime.utcnow(),
-            "symbol":        t.symbol,
-            "timeframe":     t.context.get("timeframe") if t.context else None,
-            "action":        t.context.get("action") if t.context else None,
-            "entry":         t.entry,
-            "sl":            t.sl,
-            "tp":            t.tp,
-            "confidence":    t.context.get("confidence") if t.context else None,
-            "chart_id":      t.context.get("chart_id") if t.context else None,
-            "result":        None,
-            "exit_price":    None,
-            "exit_time":     None,
-            "duration_sec":  None,
-            "max_drawdown":  None,
+        payload: Dict[str, Any] = {
+            "id": str(log_id),
+            "timestamp": t.opened_at or datetime.utcnow(),
+            "symbol": t.symbol,
+            "timeframe": t.context.get("timeframe") if t.context else None,
+            "action": t.context.get("action") if t.context else None,
+            "entry": t.entry,
+            "sl": t.sl,
+            "tp": t.tp,
+            "confidence": t.context.get("confidence") if t.context else None,
+            "chart_id": t.context.get("chart_id") if t.context else None,
+            "result": None,
+            "exit_price": None,
+            "exit_time": None,
+            "duration_sec": None,
+            "max_drawdown": None,
             "max_favorable": None,
         }
 
         if is_exit:
-            payload["exit_price"]   = t.exit
-            payload["exit_time"]    = t.closed_at or datetime.utcnow()
+            payload["exit_price"] = t.exit
+            payload["exit_time"] = t.closed_at or datetime.utcnow()
             payload["duration_sec"] = (
                 (payload["exit_time"] - payload["timestamp"]).total_seconds()
-                if payload["exit_time"] and payload["timestamp"] else None
+                if payload["exit_time"] and payload["timestamp"]
+                else None
             )
             if t.pnl is not None:
                 payload["result"] = (
-                    "WIN" if t.pnl > 0 else
-                    "LOSS" if t.pnl < 0 else
-                    "BREAKEVEN"
+                    "WIN" if t.pnl > 0 else "LOSS" if t.pnl < 0 else "BREAKEVEN"
                 )
+
         return payload
 
-    # ----------------------- writers ---------------------------------- #
-    def _write(self, row: dict) -> None:
-        """Append → CSV  and  upsert → Postgres (never raise)."""
+    # ------------------------------------------------------------------ #
+    # Writers
+    # ------------------------------------------------------------------ #
+    def _write(self, row: Dict[str, Any]) -> None:
+        """Append to CSV and upsert into SQL; never raises to caller."""
         try:
             self._append_csv(row)
             self._upsert_sql(row)
-        except Exception as exc:                       # pragma: no cover
+        except Exception as exc:  # pragma: no cover
             LOGGER.error("TradeLogger failure: %s", exc, exc_info=True)
 
-    def _append_csv(self, row: dict) -> None:
+    def _append_csv(self, row: Dict[str, Any]) -> None:
         header_needed = not os.path.exists(self.log_path)
         with open(self.log_path, "a", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=row.keys())
@@ -104,55 +114,66 @@ class TradeLogger:
                 writer.writeheader()
             writer.writerow(row)
 
-    def _upsert_sql(self, row: dict) -> None:
-        """Create table on first run; thereafter use fast upsert."""
-        # Get the SQLAlchemy db instance from current app context
-        from app import db
-        
-        inspector = inspect(db.engine)
-        metadata  = MetaData()
+    def _upsert_sql(self, row: Dict[str, Any]) -> None:
+        """Dialect‑aware upsert: PostgreSQL uses ON CONFLICT; others use REPLACE."""
+        from app import db  # late import to avoid circular dependency
 
-        # Create the table once if it doesn't exist (use inspector, not Engine.has_table)
-        if not inspector.has_table("trade_logs"):
-            Table(
-                "trade_logs",
-                metadata,
-                Column("id",            String, primary_key=True),
-                Column("timestamp",     DateTime),
-                Column("symbol",        String),
-                Column("timeframe",     String),
-                Column("action",        String),
-                Column("entry",         Float),
-                Column("sl",            Float),
-                Column("tp",            Float),
-                Column("confidence",    Float),
-                Column("result",        String),
-                Column("exit_price",    Float),
-                Column("exit_time",     DateTime),
-                Column("duration_sec",  Integer),
-                Column("max_drawdown",  Float),
-                Column("max_favorable", Float),
-                Column("chart_id",      String),
-            )
-            #metadata.create_all(db.engine)
-            pass
+        engine: Engine = db.engine
+        session: Session = db.session
 
-        # Reflect the existing trade_logs table
-        metadata.reflect(bind=db.engine, only=["trade_logs"])
-        trade_logs = metadata.tables["trade_logs"]
+        # One‑time reflection / creation
+        if TradeLogger._table is None:
+            metadata = MetaData()
+            inspector = inspect(engine)
 
-        stmt = insert(trade_logs).values(**row)
+            if not inspector.has_table("trade_logs"):
+                Table(
+                    "trade_logs",
+                    metadata,
+                    Column("id", String, primary_key=True),
+                    Column("timestamp", DateTime),
+                    Column("symbol", String),
+                    Column("timeframe", String),
+                    Column("action", String),
+                    Column("entry", Float),
+                    Column("sl", Float),
+                    Column("tp", Float),
+                    Column("confidence", Float),
+                    Column("result", String),
+                    Column("exit_price", Float),
+                    Column("exit_time", DateTime),
+                    Column("duration_sec", Integer),
+                    Column("max_drawdown", Float),
+                    Column("max_favorable", Float),
+                    Column("chart_id", String),
+                )
+                metadata.create_all(engine)
 
-        # On conflict (same id) update only the exit-side columns
-        update_cols = {
-            k: stmt.excluded[k]
-            for k in ("result", "exit_price", "exit_time",
-                      "duration_sec", "max_drawdown", "max_favorable")
-        }
-        stmt = stmt.on_conflict_do_update(
-            index_elements=["id"],
-            set_=update_cols
-        )
+            metadata.reflect(bind=engine, only=["trade_logs"])
+            TradeLogger._table = metadata.tables["trade_logs"]
 
-        with db.engine.begin() as conn:
-            conn.execute(stmt)
+        tbl = TradeLogger._table
+
+        if engine.dialect.name == "postgresql":
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+            stmt = pg_insert(tbl).values(**row)
+            update_cols = {
+                k: getattr(stmt.excluded, k)
+                for k in (
+                    "result",
+                    "exit_price",
+                    "exit_time",
+                    "duration_sec",
+                    "max_drawdown",
+                    "max_favorable",
+                )
+            }
+            stmt = stmt.on_conflict_do_update(index_elements=["id"], set_=update_cols)
+            session.execute(stmt)
+            session.commit()
+        else:
+            # SQLite / other dialects – OR REPLACE guarantees idempotency
+            stmt = tbl.insert().prefix_with("OR REPLACE").values(**row)
+            session.execute(stmt)
+            session.commit()
