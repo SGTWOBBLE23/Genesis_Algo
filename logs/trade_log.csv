@@ -1,0 +1,7 @@
+id,timestamp,symbol,timeframe,action,entry,sl,tp,confidence,chart_id,result,exit_price,exit_time,duration_sec,max_drawdown,max_favorable
+3fea38b7-6a0c-5e25-a89d-c5e9463fe671,2025-05-09 03:30:48,USDJPY,,,146.073,145.71,146.72,,,,,,,,
+a63a7a6d-676e-5854-bf85-8da148df1a60,2025-05-09 03:31:14,XAUUSD,,,3312.42,3317.1,3300.7,,,,,,,,
+fcc526bd-33fc-58db-9574-f43aa80374eb,2025-05-09 05:01:36,USDJPY,,,145.794,146.15,145.15,,,,,,,,
+5d28266f-61ff-58d9-8d7e-3241a4f7486d,2025-05-09 05:01:40,XAUUSD,,,3290.29,3301.41,3274.61,,,,,,,,
+9cdecade-abab-5dfe-93b5-740b74c0dc9f,2025-05-09 05:01:55,GBPJPY,,,192.787,192.95,192.33,,,,,,,,
+8bd4a110-b6ca-569d-b94a-9b1db983c389,2025-05-09 05:30:20,EURUSD,,,1.12064,1.1255,1.1135,,,,,,,,

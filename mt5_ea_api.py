@@ -8,6 +8,7 @@ import time
 import logging
 from datetime import datetime, timedelta
 from models import SignalStatus
+from trade_logger import TradeLogger
 
 
 from flask import Blueprint, request, jsonify, send_file
@@ -22,7 +23,7 @@ from chart_utils import pip_tolerance, is_price_too_close, generate_chart
 from sqlalchemy import Text, cast
 # ────────────────────────────────────────────────────────────
 
-
+trade_logger = TradeLogger()  
 # ─── 2. RISK-LIMIT CONSTANTS (Task #4) ──────────────────────
 MAX_TRADES_PER_SYMBOL   = 3       # live positions allowed
 MIN_FREE_MARGIN_RATIO   = 0.30    # 30 % of balance
@@ -791,7 +792,8 @@ def trade_report():
             
             db.session.add(trade)
             db.session.commit()
-            
+
+            trade_logger.log_entry(trade) 
             logger.info(f"Trade recorded: Ticket {ticket}, Symbol {symbol}, Side {side}")
         
         return jsonify({
@@ -1003,6 +1005,7 @@ def update_trades():
                             # Fallback to current time if no closed_at in payload
                             trade.closed_at = datetime.now()
                             logger.info("No closed_at time in payload, using current time")
+                            trade_logger.log_exit(trade)
                 
                 # Update context with additional info
                 context = trade.context if hasattr(trade, 'context') and trade.context else {}

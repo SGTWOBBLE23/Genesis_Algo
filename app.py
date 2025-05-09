@@ -1262,7 +1262,7 @@ def get_capture_status():
 # Initialize tables and run app
 with app.app_context():
     try:
-        db.create_all()
+        #db.create_all()
         logger.info("Database tables created successfully")
 
         # Start the scheduler
