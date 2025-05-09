@@ -7,9 +7,15 @@ from typing import Dict, Any, Optional, List, Union
 
 from flask import Flask, render_template, request, jsonify, Response, redirect, url_for, send_file, make_response
 from flask_sqlalchemy import SQLAlchemy
+
+db = SQLAlchemy()
+
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.sql import func
 from sqlalchemy import and_, cast, Text
+from trade_logger import TradeLogger
+
+trade_logger = TradeLogger()
 
 # Configure logging with custom filter for important INFO logs
 class ImportantInfoFilter(logging.Filter):

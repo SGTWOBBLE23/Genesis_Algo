@@ -23,8 +23,7 @@ from sqlalchemy import (
     Table, Column, String, DateTime, Float, Integer, MetaData, inspect
 )
 
-# Re-use the existing SQLAlchemy instance from the app
-from app import db
+# We'll import db in the methods where it's needed to avoid circular imports
 
 LOGGER   = logging.getLogger(__name__)
 CSV_PATH = os.path.join("logs", "trade_log.csv")
@@ -107,6 +106,9 @@ class TradeLogger:
 
     def _upsert_sql(self, row: dict) -> None:
         """Create table on first run; thereafter use fast upsert."""
+        # Get the SQLAlchemy db instance from current app context
+        from app import db
+        
         inspector = inspect(db.engine)
         metadata  = MetaData()
 

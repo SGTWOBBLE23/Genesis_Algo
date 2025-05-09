@@ -1005,7 +1005,7 @@ def update_trades():
                             # Fallback to current time if no closed_at in payload
                             trade.closed_at = datetime.now()
                             logger.info("No closed_at time in payload, using current time")
-                            trade_logger.log_exit(trade)
+                        trade_logger.log_exit(trade)
                 
                 # Update context with additional info
                 context = trade.context if hasattr(trade, 'context') and trade.context else {}
