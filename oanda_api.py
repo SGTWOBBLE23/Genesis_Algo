@@ -21,6 +21,33 @@ def fetch_candles(
     api = OandaAPI(api_key=api_key, account_id=account_id)
     return api.get_candles(instrument, granularity, count)
 
+def fetch_candles(symbol: str, timeframe: str, count: int = 100, to: datetime = None) -> list:
+    """Fetch historical candles for a symbol"""
+    try:
+        # Create API instance for the request
+        api = OandaAPI(
+            api_key=os.environ.get('OANDA_API_KEY'),
+            account_id=os.environ.get('OANDA_ACCOUNT_ID')
+        )
+        
+        # Build endpoint with optional 'to' parameter
+        endpoint = f"/instruments/{symbol}/candles"
+        params = {
+            "count": count,
+            "granularity": timeframe,
+            "price": "M"  # Midpoint
+        }
+        if to:
+            params["to"] = to.strftime("%Y-%m-%dT%H:%M:%SZ")
+            
+        response = api._make_request(endpoint, params)
+        if response and 'candles' in response:
+            return response['candles']
+        return []
+    except Exception as e:
+        logger.error(f"Error fetching candles for {symbol}: {e}")
+        return []
+
 class OandaAPI:
     """Class for interacting with the OANDA REST API"""
     
