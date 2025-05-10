@@ -1,0 +1,16 @@
+flask
+flask_sqlalchemy
+apscheduler
+pandas
+numpy
+matplotlib
+mplfinance
+pillow
+requests
+redis
+boto3
+openai
+python-dotenv
+xgboost
+pyyaml
+joblib

@@ -1,3 +1,4 @@
+import time
 import os
 import logging
 from datetime import datetime
@@ -5,6 +6,7 @@ from typing import List, Dict
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+import ml.train_models as train_models
 
 import capture_job
 from config import ASSETS              # 👈 unified list
@@ -62,6 +64,15 @@ def start_scheduler() -> BackgroundScheduler:
         replace_existing=True,
     )
 
+    scheduler.add_job(
+        func=train_models.run,
+        trigger=CronTrigger(day_of_week="sat", hour=3,
+                            timezone="Pacific/Honolulu"),
+        id="weekly_model_retrain",
+        name="Weekly ML retrain",
+        replace_existing=True,
+    )
+    
     scheduler.start()
     logger.info("Scheduler started (15-minute & hourly jobs)")
     return scheduler

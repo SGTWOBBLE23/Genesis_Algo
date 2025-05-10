@@ -1,5 +1,6 @@
 import os
 import logging
+import pandas as pd
 from typing import Dict, List, Any, Optional, Tuple, Union
 from datetime import datetime
 
@@ -8,6 +9,39 @@ from matplotlib import rcParams
 
 from oanda_api import OandaAPI
 from chart_generator_basic import ChartGenerator
+
+# ─── Universal indicator calculator (shared by live + ML) ───
+def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Adds EMA20/50/200, RSI‑14, and MACD(12,26,9) columns to *df* in‑place.
+    Returns the same DataFrame so you can chain it.
+    """
+    close = df["close"]
+
+    # EMAs
+    df["ema20"]  = close.ewm(span=20).mean()
+    df["ema50"]  = close.ewm(span=50).mean()
+    df["ema200"] = close.ewm(span=200).mean()
+
+    # RSI‑14
+    delta = close.diff()
+    up   = delta.clip(lower=0)
+    down = -delta.clip(upper=0)
+    roll_up   = up.ewm(span=14).mean()
+    roll_down = down.ewm(span=14).mean()
+    rs = roll_up / (roll_down + 1e-9)
+    df["rsi"] = 100 - (100 / (1 + rs))
+
+    # MACD
+    ema12 = close.ewm(span=12).mean()
+    ema26 = close.ewm(span=26).mean()
+    macd  = ema12 - ema26
+    signal = macd.ewm(span=9).mean()
+    df["macd"]      = macd
+    df["macd_sig"]  = signal
+    df["macd_hist"] = macd - signal
+    return df
+
 
 # ---------- global light theme ----------
 plt.style.use("seaborn-v0_8-white")
@@ -46,6 +80,9 @@ def fetch_candles(symbol: str, timeframe: str = "H1", count: int = 300) -> List[
     Returns:
         List of candle dictionaries
     """
+
+
+    
     try:
         # Request candles from OANDA
         candles = oanda_api.get_candles(symbol, timeframe, count)

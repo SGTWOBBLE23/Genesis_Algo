@@ -7,6 +7,20 @@ from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
+def fetch_candles(
+    instrument: str,
+    granularity: str = "H1",
+    count: int = 5000,
+    api_key: str | None = None,
+    account_id: str | None = None,
+):
+    """
+    One-shot helper that delegates to OandaAPI.get_candles().
+    Keeps backward-compat with existing capture_job import.
+    """
+    api = OandaAPI(api_key=api_key, account_id=account_id)
+    return api.get_candles(instrument, granularity, count)
+
 class OandaAPI:
     """Class for interacting with the OANDA REST API"""
     
@@ -86,6 +100,7 @@ class OandaAPI:
         Returns:
             List[Dict]: List of candle data
         """
+        
         if not self.api_key:
             return [{"error": "Missing API key"}]
             

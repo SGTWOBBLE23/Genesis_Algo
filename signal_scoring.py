@@ -98,7 +98,14 @@ class SignalScorer:
                 'GBPUSD': 0.40,     # Moderate correlation
                 'USDJPY': -0.35,    # Weak negative correlation
                 'GBPJPY': 0.20      # Weak correlation
-            }
+            },
+            #'BTCUSD': {             # Add entire new entry
+             #   'EURUSD': 0.25,     # Low correlation
+              #  'GBPUSD': 0.20,     # Low correlation
+               # 'USDJPY': -0.15,    # Very low negative correlation
+                #'GBPJPY': 0.10,     # Almost no correlation
+                #'XAUUSD': 0.40      # Moderate correlation with gold
+            #}
         }
         
         # Trade side mapping
@@ -366,7 +373,13 @@ class SignalScorer:
             technical_score = round(
                 sum(scores[k] * weights_norm[k] for k in scores), 4
             )
-        
+
+            from ml.model_inference import predict_one
+            latest_row = df.iloc[-1]                # last candle's feature row
+            ml_prob = predict_one(symbol, "H1", latest_row)
+            technical_score = round(technical_score * ml_prob, 4)
+            details["ml_prob"] = ml_prob           # keep track for debugging
+            
             details["component_scores"] = scores
             details["weights_used"]     = weights_norm
             details["final_technical_score"] = technical_score

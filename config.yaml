@@ -1,0 +1,4 @@
+ML:
+  tf: H1
+  prob_threshold: 0.60
+  retrain_day: SAT

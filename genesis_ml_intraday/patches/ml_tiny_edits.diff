@@ -1,0 +1,103 @@
+diff --git a/capture_job.py b/capture_job.py
+--- a/capture_job.py
++++ b/capture_job.py
+@@
++from typing import Generator
++from datetime import datetime, timedelta
++
++# ────────────────────────────────────────────────────────────
++#  NEW helper for the ML back-fill scripts
++# ────────────────────────────────────────────────────────────
++def yield_candles(symbol: str,
++                  tf: str,
++                  start: datetime,
++                  end: datetime) -> Generator[dict, None, None]:
++    """
++    Stream historical candles (oldest → newest) in 5-k-row chunks.
++    Re-uses the existing `fetch_candles()` helper so we respect
++    the same throttling / auth logic already used in live capture.
++    """
++    cursor = end
++    while cursor > start:
++        batch = fetch_candles(symbol, tf, count=5000, to=cursor)
++        if not batch:
++            break
++        for c in reversed(batch):           # earliest first
++            yield c
++        oldest = batch[0]["time"]
++        cursor = oldest - timedelta(seconds=1)
++
+diff --git a/chart_utils.py b/chart_utils.py
+--- a/chart_utils.py
++++ b/chart_utils.py
+@@
++import pandas as pd
++
++# ────────────────────────────────────────────────────────────
++#  Universal indicator calculator (live + ML share the math)
++# ────────────────────────────────────────────────────────────
++def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
++    """
++    Add EMA20/50/200, RSI14, MACD(12,26,9) columns to *df* in-place.
++    Returns the same DataFrame for chaining.
++    """
++    close = df["close"]
++    df["ema20"]  = close.ewm(span=20).mean()
++    df["ema50"]  = close.ewm(span=50).mean()
++    df["ema200"] = close.ewm(span=200).mean()
++
++    # RSI14
++    delta = close.diff()
++    up   = delta.clip(lower=0)
++    down = -delta.clip(upper=0)
++    roll_up   = up.ewm(span=14).mean()
++    roll_down = down.ewm(span=14).mean()
++    rs  = roll_up / (roll_down + 1e-9)
++    df["rsi"] = 100 - (100 / (1 + rs))
++
++    # MACD(12,26,9)
++    ema12 = close.ewm(span=12).mean()
++    ema26 = close.ewm(span=26).mean()
++    macd  = ema12 - ema26
++    signal = macd.ewm(span=9).mean()
++    df["macd"]      = macd
++    df["macd_sig"]  = signal
++    df["macd_hist"] = macd - signal
++    return df
++
+diff --git a/signal_scoring.py b/signal_scoring.py
+--- a/signal_scoring.py
++++ b/signal_scoring.py
+@@
+-    technical_score = ...
++    technical_score = ...
++
++    # ─── Blend in ML probability ————————————————
++    from ml.model_inference import predict_one
++    latest_row = df.iloc[-1]
++    ml_prob = predict_one(symbol, "H1", latest_row)
++    technical_score *= ml_prob    # multiplicative blend
++    # ──────────────────────────────────────────────────────────
+ 
+     return technical_score
+diff --git a/scheduler.py b/scheduler.py
+--- a/scheduler.py
++++ b/scheduler.py
+@@
+ from apscheduler.schedulers.background import BackgroundScheduler
++from apscheduler.triggers.cron import CronTrigger
++import ml.train_models as train_models
+ 
+ scheduler = BackgroundScheduler()
+ 
++# Weekly ML retrain (Sat 03:00 HST)
++scheduler.add_job(
++    func=train_models.run,
++    trigger=CronTrigger(day_of_week="sat", hour=3,
++                        timezone="Pacific/Honolulu"),
++    id="weekly_model_retrain",
++    name="Weekly ML retrain",
++    replace_existing=True,
++)
++
+ scheduler.start()
