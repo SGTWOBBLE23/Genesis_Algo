@@ -3,17 +3,36 @@ import json
 import uuid
 import logging
 import time
-from datetime import datetime
-from typing import Dict, Any, Optional
+from datetime import datetime, timedelta
+from typing import Dict, Any, Optional, Generator
 from pathlib import Path
 from config import ASSETS, CHARTS_DIR, DEFAULT_TIMEFRAME, mt5_to_oanda, oanda_to_mt5
 
-from oanda_api import OandaAPI
+from oanda_api import OandaAPI, fetch_candles
 from app import app
 
 # Configure logging first
 logger = logging.getLogger(__name__)
 
+# ─── NEW helper for ML back‑fill ─────────────────────────────
+def yield_candles(symbol: str,
+                  tf: str,
+                  start: datetime,
+                  end: datetime) -> Generator[dict, None, None]:
+    """
+    Stream historical candles (oldest → newest) in 5 000‑row chunks.
+    Re‑uses fetch_candles() so we respect the same throttling /
+    authentication logic already used in live capture.
+    """
+    cursor = end
+    while cursor > start:
+        batch = fetch_candles(symbol, tf, count=5000, to=cursor)
+        if not batch:
+            break
+        for c in reversed(batch):           # earliest first
+            yield c
+        oldest = batch[0]["time"]
+        cursor = oldest - timedelta(seconds=1)
 
 
 # Use try/except for dependencies that might not be available

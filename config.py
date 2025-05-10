@@ -16,7 +16,8 @@ ASSETS = [
     "GBP_USD",
     "USD_JPY",
     "XAU_USD",  # Gold
-    "GBP_JPY"
+    "GBP_JPY",
+    #"BTC_USD",
 ]
 
 # Timeframes for chart generation
@@ -79,6 +80,10 @@ def mt5_to_oanda(symbol):
     # Special case for gold
     if symbol == "XAUUSD":
         return "XAU_USD"
+
+    # Special case for bitcoin
+    #if symbol == "BTCUSD":
+        #return "BTC_USD"
     
     # Regular currency pairs (assuming 6-character format)
     if len(symbol) == 6:

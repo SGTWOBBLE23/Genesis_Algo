@@ -1,36 +1,50 @@
 #!/usr/bin/env python3
-
 """
-Signal Scoring Module
+Signal-Scoring Module
+─────────────────────
+Provides advanced scoring and filtering for trading signals.  It implements
+three layers:
 
-This module provides advanced scoring and filtering mechanisms for trading signals.
-It implements three key scoring layers:
-1. Technical Filter Layer - Analyzes technical indicators and price patterns
-2. Performance-Based Adjustment - Adjusts confidence thresholds based on past performance
-3. Correlation Analysis - Prevents multiple positions in highly correlated pairs
+1) Technical-filter layer            – indicator / pattern checks
+2) Performance-based adjustment      – raises / lowers thresholds by recent P&L
+3) Correlation guard                 – avoids stacking trades on correlated pairs
 """
 
+# -- Python std-lib
 import os
 import json
-import logging
-import pandas as pd
-import numpy as np
 import time
-from models import db
-from typing import Dict, List, Any, Optional, Tuple, Union
+import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from app import db, Signal, Trade, SignalAction, SignalStatus, TradeStatus, TradeSide, Log, LogLevel
-from chart_utils import fetch_candles
-from sqlalchemy import text, and_
-import logging
-import re
+from typing import Dict, List, Any, Optional, Tuple, Union
 
-# Configure logging
+# -- Third-party
+import pandas as pd
+import numpy as np
+from sqlalchemy import text, and_
+
+# -- Project sub-modules
+from app import (
+    db,                         # SQLAlchemy session
+    Signal, Trade,
+    SignalAction, SignalStatus,
+    TradeStatus, TradeSide,
+    Log, LogLevel,
+)
+from chart_utils import fetch_candles
+
+# --------------------------------------------------------------------------
+#  Configuration
+# --------------------------------------------------------------------------
+CONFIG_PATH = Path(__file__).resolve().parent / "config" / "signal_weights.json"
+
+# --------------------------------------------------------------------------
+#  Logging
+# --------------------------------------------------------------------------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-CONFIG_PATH = Path(__file__).resolve().parent / "config" / "signal_weights.json"
 
 class _WeightCache:
     def __init__(self):
@@ -65,7 +79,7 @@ class SignalScorer:
         self.min_confidence_threshold = 0.55  # Base minimum confidence threshold
         self.min_technical_score = 0.60      # Minimum technical score required
         self.max_correlation_threshold = 0.75 # Maximum correlation allowed between pairs
-        self.evaluation_period_days = 14     # Days of history to analyze for performance adjustment
+        self.evaluation_period_days = 90     # Days of history to analyze for performance adjustment (extended from 14)
         
         # Currency correlations - initial estimates, will be dynamically updated
         self.pair_correlations = {
@@ -98,7 +112,14 @@ class SignalScorer:
                 'GBPUSD': 0.40,     # Moderate correlation
                 'USDJPY': -0.35,    # Weak negative correlation
                 'GBPJPY': 0.20      # Weak correlation
-            }
+            },
+            #'BTCUSD': {             # Add entire new entry
+             #   'EURUSD': 0.25,     # Low correlation
+              #  'GBPUSD': 0.20,     # Low correlation
+               # 'USDJPY': -0.15,    # Very low negative correlation
+                #'GBPJPY': 0.10,     # Almost no correlation
+                #'XAUUSD': 0.40      # Moderate correlation with gold
+            #}
         }
         
         # Trade side mapping
@@ -366,7 +387,13 @@ class SignalScorer:
             technical_score = round(
                 sum(scores[k] * weights_norm[k] for k in scores), 4
             )
-        
+
+            from ml.model_inference import predict_one
+            latest_row = df.iloc[-1]                # last candle's feature row
+            ml_prob = predict_one(symbol, "H1", latest_row)
+            technical_score = round(technical_score * ml_prob, 4)
+            details["ml_prob"] = ml_prob           # keep track for debugging
+            
             details["component_scores"] = scores
             details["weights_used"]     = weights_norm
             details["final_technical_score"] = technical_score
@@ -399,6 +426,18 @@ class SignalScorer:
             # Get performance data from recent trades
             cutoff_date = datetime.now() - timedelta(days=self.evaluation_period_days)
             
+            logger.info(f"Looking for {symbol} {side.name} trades closed after {cutoff_date}")
+            
+            # First check if we have any trades at all for this symbol
+            total_trades_count = Trade.query.filter(
+                Trade.symbol == symbol,
+                Trade.side == side,
+                Trade.status == TradeStatus.CLOSED
+            ).count()
+            
+            logger.info(f"Found {total_trades_count} total {symbol} {side.name} trades in database")
+            
+            # Now get the trades within our evaluation period
             trades = Trade.query.filter(
                 Trade.symbol == symbol,
                 Trade.side == side,
@@ -406,9 +445,12 @@ class SignalScorer:
                 Trade.closed_at >= cutoff_date
             ).all()
             
+            trade_count = len(trades)
+            logger.info(f"Found {trade_count} {symbol} {side.name} trades within the {self.evaluation_period_days}-day evaluation period")
+            
             if not trades:
                 logger.info(f"No recent trade history for {symbol} {side.name}, using default adjustment")
-                return 1.0, {"reason": "No recent trade history"}
+                return 1.0, {"reason": "No recent trade history", "total_trades_in_db": total_trades_count}
             
             # Calculate performance metrics
             total_trades = len(trades)
@@ -589,6 +631,17 @@ class SignalScorer:
             adjusted_threshold = min(0.95, max(0.5, self.min_confidence_threshold * adjustment_factor))
             result["base_confidence_threshold"] = self.min_confidence_threshold
             result["adjusted_confidence_threshold"] = adjusted_threshold
+            
+            # Log detailed information about the adjustment
+            logger.info(f"Performance adjustment for {signal.symbol} {signal.action.name}: " +
+                       f"Base threshold {self.min_confidence_threshold:.2f} * Factor {adjustment_factor:.2f} = " +
+                       f"Adjusted threshold {adjusted_threshold:.2f}")
+            
+            # Log whether the signal passes the adjusted threshold
+            if signal.confidence >= adjusted_threshold:
+                logger.info(f"Signal confidence {signal.confidence:.2f} meets adjusted threshold {adjusted_threshold:.2f}")
+            else:
+                logger.info(f"Signal confidence {signal.confidence:.2f} below adjusted threshold {adjusted_threshold:.2f}")
             
             if signal.confidence < adjusted_threshold:
                 result["decision"] = "reject"
