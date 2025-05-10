@@ -14,3 +14,4 @@ python-dotenv
 xgboost
 pyyaml
 joblib
+pyarrow>=15.0

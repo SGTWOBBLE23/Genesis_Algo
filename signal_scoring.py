@@ -1,36 +1,50 @@
 #!/usr/bin/env python3
-
 """
-Signal Scoring Module
+Signal-Scoring Module
+─────────────────────
+Provides advanced scoring and filtering for trading signals.  It implements
+three layers:
 
-This module provides advanced scoring and filtering mechanisms for trading signals.
-It implements three key scoring layers:
-1. Technical Filter Layer - Analyzes technical indicators and price patterns
-2. Performance-Based Adjustment - Adjusts confidence thresholds based on past performance
-3. Correlation Analysis - Prevents multiple positions in highly correlated pairs
+1) Technical-filter layer            – indicator / pattern checks
+2) Performance-based adjustment      – raises / lowers thresholds by recent P&L
+3) Correlation guard                 – avoids stacking trades on correlated pairs
 """
 
+# -- Python std-lib
 import os
 import json
-import logging
-import pandas as pd
-import numpy as np
 import time
-from models import db
-from typing import Dict, List, Any, Optional, Tuple, Union
+import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from app import db, Signal, Trade, SignalAction, SignalStatus, TradeStatus, TradeSide, Log, LogLevel
-from chart_utils import fetch_candles
-from sqlalchemy import text, and_
-import logging
-import re
+from typing import Dict, List, Any, Optional, Tuple, Union
 
-# Configure logging
+# -- Third-party
+import pandas as pd
+import numpy as np
+from sqlalchemy import text, and_
+
+# -- Project sub-modules
+from app import (
+    db,                         # SQLAlchemy session
+    Signal, Trade,
+    SignalAction, SignalStatus,
+    TradeStatus, TradeSide,
+    Log, LogLevel,
+)
+from chart_utils import fetch_candles
+
+# --------------------------------------------------------------------------
+#  Configuration
+# --------------------------------------------------------------------------
+CONFIG_PATH = Path(__file__).resolve().parent / "config" / "signal_weights.json"
+
+# --------------------------------------------------------------------------
+#  Logging
+# --------------------------------------------------------------------------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-CONFIG_PATH = Path(__file__).resolve().parent / "config" / "signal_weights.json"
 
 class _WeightCache:
     def __init__(self):
