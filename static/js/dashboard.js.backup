@@ -435,10 +435,6 @@ function executeSignal(signalId) {
 
 
 
-/**
- * Connect to WebSocket for real-time updates
- * Enhanced with reconnection logic and error handling
- */
 function connectWebSocket() {
     // Track connection attempts to implement backoff
     if (!window.wsRetryCount) {
@@ -458,46 +454,42 @@ function connectWebSocket() {
         };
 
         socket.onmessage = function(event) {
-            try {
-                const data = JSON.parse(event.data);
+            const data = JSON.parse(event.data);
 
-                if (data.type === 'price_update') {
-                    // Update price data
-                    const symbol = data.data.symbol;
-                    priceData[symbol] = {
-                        bid: data.data.bid,
-                        ask: data.data.ask,
-                        timestamp: data.data.timestamp
-                    };
+            if (data.type === 'price_update') {
+                // Update price data
+                const symbol = data.data.symbol;
+                priceData[symbol] = {
+                    bid: data.data.bid,
+                    ask: data.data.ask,
+                    timestamp: data.data.timestamp
+                };
 
-                    // Update UI if elements exist
-                    const bidElement = document.getElementById(`${symbol}-bid`);
-                    const askElement = document.getElementById(`${symbol}-ask`);
-                    if (bidElement) {
-                        bidElement.textContent = data.data.bid.toFixed(5);
-                    }
-                    if (askElement) {
-                        askElement.textContent = data.data.ask.toFixed(5);
-                    }
-
-                } else if (data.type === 'new_signal') {
-                    // Reload all signals
-                    loadCurrentSignals();
-
-                    // Show alert
-                    showAlert(`New signal for ${data.data.symbol}: ${data.data.action}`, 'info');
-
-                } else if (data.type === 'new_trade') {
-                    // Add new trade
-                    loadActiveTrades(); // Reload all trades
-
-                    // Show alert
-                    showAlert(`New trade opened: ${data.data.symbol} ${data.data.side}`, 'success');
+                // Update UI if elements exist
+                const bidElement = document.getElementById(`${symbol}-bid`);
+                const askElement = document.getElementById(`${symbol}-ask`);
+                if (bidElement) {
+                    bidElement.textContent = data.data.bid.toFixed(5);
                 }
-            } catch (error) {
-                console.error('Error processing WebSocket message:', error);
-            }
-        };
+                if (askElement) {
+                    askElement.textContent = data.data.ask.toFixed(5);
+                }
+
+            } else if (data.type === 'new_signal') {
+                // Reload all signals
+                loadCurrentSignals();
+
+                // Show alert
+                showAlert(`New signal for ${data.data.symbol}: ${data.data.action}`, 'info');
+
+            } else if (data.type === 'new_trade') {
+                // Add new trade
+                loadActiveTrades(); // Reload all trades
+
+                // Show alert
+                showAlert(`New trade opened: ${data.data.symbol} ${data.data.side}`, 'success');
+        }
+    };
 
         socket.onclose = function(event) {
             if (event.wasClean) {
@@ -523,14 +515,11 @@ function connectWebSocket() {
             }
         };
         
-        // Save the socket reference globally if needed
-        window.tradesSocket = socket;
-        
+        // Return the socket object so we can ensure it's properly closed when needed
         return socket;
     } catch (err) {
         console.error('Error establishing WebSocket connection:', err);
         // Retry connection after a delay
         setTimeout(connectWebSocket, 5000);
-        return null;
     }
 }
