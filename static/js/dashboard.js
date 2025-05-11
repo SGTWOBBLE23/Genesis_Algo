@@ -436,59 +436,90 @@ function executeSignal(signalId) {
 
 
 function connectWebSocket() {
+    // Track connection attempts to implement backoff
+    if (!window.wsRetryCount) {
+        window.wsRetryCount = 0;
+    }
+    
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/api/signals/ws`;
 
-    const socket = new WebSocket(wsUrl);
+    try {
+        const socket = new WebSocket(wsUrl);
 
-    socket.onopen = function(e) {
-        console.log('WebSocket connection established');
-    };
+        socket.onopen = function(e) {
+            console.log('WebSocket connection established');
+            // Reset retry count on successful connection
+            window.wsRetryCount = 0;
+        };
 
-    socket.onmessage = function(event) {
-        const data = JSON.parse(event.data);
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
 
-        if (data.type === 'price_update') {
-            // Update price data
-            const symbol = data.data.symbol;
-            priceData[symbol] = {
-                bid: data.data.bid,
-                ask: data.data.ask,
-                timestamp: data.data.timestamp
-            };
+            if (data.type === 'price_update') {
+                // Update price data
+                const symbol = data.data.symbol;
+                priceData[symbol] = {
+                    bid: data.data.bid,
+                    ask: data.data.ask,
+                    timestamp: data.data.timestamp
+                };
 
-            // Update UI
-            document.getElementById(`${symbol}-bid`).textContent = data.data.bid.toFixed(5);
-            document.getElementById(`${symbol}-ask`).textContent = data.data.ask.toFixed(5);
+                // Update UI if elements exist
+                const bidElement = document.getElementById(`${symbol}-bid`);
+                const askElement = document.getElementById(`${symbol}-ask`);
+                if (bidElement) {
+                    bidElement.textContent = data.data.bid.toFixed(5);
+                }
+                if (askElement) {
+                    askElement.textContent = data.data.ask.toFixed(5);
+                }
 
-        } else if (data.type === 'new_signal') {
-            // Reload all signals
-            loadCurrentSignals();
+            } else if (data.type === 'new_signal') {
+                // Reload all signals
+                loadCurrentSignals();
 
-            // Show alert
-            showAlert(`New signal for ${data.data.symbol}: ${data.data.action}`, 'info');
+                // Show alert
+                showAlert(`New signal for ${data.data.symbol}: ${data.data.action}`, 'info');
 
-        } else if (data.type === 'new_trade') {
-            // Add new trade
-            loadActiveTrades(); // Reload all trades
+            } else if (data.type === 'new_trade') {
+                // Add new trade
+                loadActiveTrades(); // Reload all trades
 
-            // Show alert
-            showAlert(`New trade opened: ${data.data.symbol} ${data.data.side}`, 'success');
+                // Show alert
+                showAlert(`New trade opened: ${data.data.symbol} ${data.data.side}`, 'success');
         }
     };
 
-    socket.onclose = function(event) {
-        if (event.wasClean) {
-            console.log(`WebSocket connection closed cleanly, code=${event.code}, reason=${event.reason}`);
-        } else {
-            console.log('WebSocket connection died');
-        }
+        socket.onclose = function(event) {
+            if (event.wasClean) {
+                console.log(`WebSocket connection closed cleanly, code=${event.code}, reason=${event.reason}`);
+            } else {
+                console.log('WebSocket connection died');
+            }
 
-        // Try to reconnect after 5 seconds
+            // Implement exponential backoff for reconnection
+            window.wsRetryCount = window.wsRetryCount + 1;
+            const timeout = Math.min(30000, Math.pow(1.5, window.wsRetryCount) * 1000);
+            
+            console.log(`Attempting WebSocket reconnection in ${Math.round(timeout/1000)} seconds...`);
+            setTimeout(connectWebSocket, timeout);
+        };
+
+        socket.onerror = function(error) {
+            console.error(`WebSocket error: ${error.message || 'Unknown error'}`);
+            
+            // The connection is likely already closed, but just to be safe
+            if (socket.readyState !== WebSocket.CLOSED) {
+                socket.close();
+            }
+        };
+        
+        // Return the socket object so we can ensure it's properly closed when needed
+        return socket;
+    } catch (err) {
+        console.error('Error establishing WebSocket connection:', err);
+        // Retry connection after a delay
         setTimeout(connectWebSocket, 5000);
-    };
-
-    socket.onerror = function(error) {
-        console.error(`WebSocket error: ${error.message}`);
-    };
+    }
 }
