@@ -27,98 +27,29 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 /**
- * Initialize price charts for tracked symbols
+ * Initialize price data for tracked symbols
+ * Note: We no longer create charts as we're using a table layout
  */
 function initializeCharts() {
     // Focus on our 5 supported forex and metals assets
     const symbols = ['XAUUSD', 'GBPJPY', 'GBPUSD', 'EURUSD', 'USDJPY'];
-    const chartContainer = document.getElementById('charts-container');
-
-    // Create chart containers
+    
+    // Just initialize price data for use in trade calculations
     symbols.forEach(symbol => {
-        // Create card for chart
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.innerHTML = `
-            <div class="card-header">
-                <h3>${symbol}</h3>
-                <div class="price-indicator">
-                    <span class="bid">Bid: <strong id="${symbol}-bid">--</strong></span>
-                    <span class="ask">Ask: <strong id="${symbol}-ask">--</strong></span>
-                </div>
-            </div>
-            <div class="card-body">
-                <canvas id="chart-${symbol}" width="400" height="250"></canvas>
-            </div>
-            <div class="card-footer" id="signals-${symbol}">
-                <div class="spinner-border spinner-border-sm" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                Waiting for signals...
-            </div>
-        `;
-
-        chartContainer.appendChild(card);
-
-        // Initialize chart
-        const ctx = document.getElementById(`chart-${symbol}`).getContext('2d');
-
-        activeCharts[symbol] = new Chart(ctx, {
-            type: 'candlestick', // Using candlestick chart type for OHLC data
-            data: {
-                datasets: [{
-                    label: symbol,
-                    data: []
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const candle = context.raw;
-                                if (candle && candle.o !== undefined) {
-                                    return [
-                                        `Open: ${candle.o.toFixed(5)}`,
-                                        `High: ${candle.h.toFixed(5)}`,
-                                        `Low: ${candle.l.toFixed(5)}`,
-                                        `Close: ${candle.c.toFixed(5)}`
-                                    ];
-                                }
-                                return `Value: ${context.parsed.y}`;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        display: true,
-                        title: {
-                            display: true,
-                            text: 'Time'
-                        }
-                    },
-                    y: {
-                        display: true,
-                        title: {
-                            display: true,
-                            text: 'Price'
-                        }
-                    }
-                }
-            }
-        });
-
-        // Fetch initial chart data
-        fetchChartData(symbol);
+        // Initialize price data object
+        priceData[symbol] = {
+            bid: 0,
+            ask: 0,
+            timestamp: new Date().toISOString()
+        };
+        
+        // Fetch initial price data
+        setTimeout(() => {
+            fetchChartData(symbol);
+        }, 1000);
     });
-
-    console.log("Charts initialized");
+    
+    console.log("Price data initialized");
 }
 
 /**
@@ -135,7 +66,18 @@ function fetchChartData(symbol) {
             return response.json();
         })
         .then(data => {
-            updateChart(symbol, data);
+            // Just update price data directly
+            if (data && data.length > 0) {
+                const latestCandle = data[data.length - 1];
+                const closePrice = latestCandle.close;
+                const spread = 0.0002 * closePrice; // 2 pips spread (example)
+                
+                priceData[symbol] = {
+                    bid: parseFloat((closePrice - spread/2).toFixed(5)),
+                    ask: parseFloat((closePrice + spread/2).toFixed(5)),
+                    timestamp: new Date().toISOString()
+                };
+            }
         })
         .catch(error => {
             console.error('Error fetching chart data:', error);
