@@ -85,57 +85,31 @@ function fetchChartData(symbol) {
 }
 
 /**
- * Update chart with new candle data
+ * Update chart with new candle data - simplified version
  * @param {string} symbol - The trading symbol
  * @param {Array} candles - Array of candle data objects
  */
 function updateChart(symbol, candles) {
-    if (!activeCharts[symbol]) {
-        console.error(`Chart for ${symbol} not found`);
+    // This function is no longer used for chart updates
+    // Just handle price data updates
+    console.log(`Price data update for ${symbol}`);
+    
+    // Early return if no candles data
+    if (!candles || candles.length === 0) {
         return;
     }
 
-    // Format data for chart.js bar chart
-    const chartData = candles.map(candle => ({
-        x: new Date(candle.time).getTime(),
-        y: candle.close, // Use close price for bar chart
-        // Keep OHLC data for tooltip
-        o: candle.open,
-        h: candle.high,
-        l: candle.low,
-        c: candle.close
-    }));
-
-    // Set bar colors based on price movement (green for up, red for down)
-    activeCharts[symbol].data.datasets[0].backgroundColor = chartData.map((d, i) => {
-        if (i === 0) return '#00c851'; // Default to green for first bar
-        return chartData[i].y > chartData[i-1].y ? '#00c851' : '#ff3547'; // Green for up, red for down
-    });
-
-    // Update chart
-    activeCharts[symbol].data.datasets[0].data = chartData;
-    activeCharts[symbol].update();
-
-    // Update latest prices
-    if (chartData.length > 0) {
-        const latest = chartData[chartData.length - 1];
-
-        // Calculate bid/ask spread for display (simplified)
-        const spread = 0.0002 * latest.c; // 2 pips spread (example)
-        const bid = (latest.c - spread/2).toFixed(5);
-        const ask = (latest.c + spread/2).toFixed(5);
-
-        // Store price data
-        priceData[symbol] = {
-            bid: parseFloat(bid),
-            ask: parseFloat(ask),
-            timestamp: new Date().toISOString()
-        };
-
-        // Update UI
-        document.getElementById(`${symbol}-bid`).textContent = bid;
-        document.getElementById(`${symbol}-ask`).textContent = ask;
-    }
+    // Just update the price data
+    const latestCandle = candles[candles.length - 1];
+    const closePrice = latestCandle.close;
+    const spread = 0.0002 * closePrice; // Approximate 2 pip spread
+    
+    // Update price data
+    priceData[symbol] = {
+        bid: parseFloat((closePrice - spread/2).toFixed(5)),
+        ask: parseFloat((closePrice + spread/2).toFixed(5)),
+        timestamp: new Date().toISOString()
+    };
 }
 
 /**
