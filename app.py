@@ -993,6 +993,7 @@ def get_current_signals():
 
     return jsonify([signal.to_dict() for signal in signals])
 
+@app.route('/api/signals/all', methods=['GET'])
 def get_all_signals():
     """
     Dashboard-only endpoint: returns every signal from the last 24 h,
