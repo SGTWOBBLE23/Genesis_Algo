@@ -116,7 +116,12 @@ def get_quote(symbol: str) -> Dict[str, Any]:
     """Fetch the current quote for a symbol from OANDA"""
     try:
         # Get current price from OANDA
-        response = oanda_api._make_request(f"/instruments/{symbol}/candles?count=1&price=BA&granularity=M1")
+        oanda_symbol = symbol
+        if '_' not in oanda_symbol:
+            oanda_symbol = mt5_to_oanda(symbol)  # Convert from MT5 format to OANDA format
+
+        # Get current price from OANDA
+        response = oanda_api._make_request(f"/instruments/{oanda_symbol}/candles?count=1&price=BA&granularity=M1")
         if not response or 'candles' not in response or not response['candles']:
             logger.error(f"Failed to get quote for {symbol}")
             return {}
