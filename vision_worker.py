@@ -115,6 +115,20 @@ class DirectVisionPipeline:
             # ------------------------------------------------------------------
             # 4. Create and commit the new Signal
             # ------------------------------------------------------------------
+            # Extract timeframe from image path (format: SYMBOL_TIMEFRAME_YYYYMMDD_HHMMSS.png)
+            img_timeframe = "H1"  # Default
+            try:
+                # Extract from filename if available
+                img_basename = os.path.basename(image_path)
+                parts = img_basename.split('_')
+                if len(parts) >= 2:
+                    possible_tf = parts[1]
+                    if possible_tf in ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"]:
+                        img_timeframe = possible_tf
+            except Exception as e:
+                logger.warning(f"Could not extract timeframe from image path: {e}")
+
+            # Create the signal object
             signal = Signal(
                 symbol=symbol,
                 action=action_enum,
@@ -126,7 +140,7 @@ class DirectVisionPipeline:
                 context_json=json.dumps({
                     "source": "openai_vision",
                     "image_path": image_path,
-                    "timeframe": timeframe,
+                    "timeframe": img_timeframe,
                     "processed_at": datetime.now().isoformat()
                 })
             )

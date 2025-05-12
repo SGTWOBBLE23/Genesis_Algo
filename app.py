@@ -1173,6 +1173,60 @@ def get_chart(symbol):
     response.headers.set('Content-Type', 'image/png')
     return response
 
+@app.route('/api/signals/<int:signal_id>/chart', methods=['GET'])
+def get_signal_chart(signal_id):
+    """Get the chart for a specific signal"""
+    # Find the signal by ID
+    signal = Signal.query.get(signal_id)
+    if not signal:
+        return jsonify({"error": "Signal not found"}), 404
+    
+    try:
+        # Extract chart information from context
+        context = json.loads(signal.context_json) if signal.context_json else {}
+        image_path = context.get('image_path')
+        timeframe = context.get('timeframe', 'H1')  # Default to H1 if not found
+        
+        if image_path and os.path.exists(image_path):
+            # If we have the original chart image, return it
+            with open(image_path, 'rb') as f:
+                chart_bytes = f.read()
+            
+            # Create response with chart image
+            response = make_response(chart_bytes)
+            response.headers.set('Content-Type', 'image/png')
+            return response
+        else:
+            # If no original image or it doesn't exist, generate a new one
+            from chart_utils import generate_chart_bytes
+            
+            # Convert signal data for chart generation
+            symbol = signal.symbol
+            entry_point = (signal.created_at.strftime('%Y-%m-%d %H:%M:%S'), signal.entry) if signal.entry else None
+            
+            # Generate chart
+            chart_bytes = generate_chart_bytes(
+                symbol=symbol,
+                timeframe=timeframe,
+                count=100,
+                entry_point=entry_point,
+                stop_loss=signal.sl,
+                take_profit=signal.tp,
+                signal_action=signal.action.name if signal.action else None
+            )
+            
+            if not chart_bytes:
+                return jsonify({"error": "Failed to generate chart"}), 500
+                
+            # Create response with chart image
+            response = make_response(chart_bytes)
+            response.headers.set('Content-Type', 'image/png')
+            return response
+            
+    except Exception as e:
+        logger.error(f"Error getting chart for signal {signal_id}: {str(e)}")
+        return jsonify({"error": f"Error getting chart: {str(e)}"}), 500
+
 @app.route('/api/charts/download/<symbol>', methods=['GET'])
 def download_chart(symbol):
     """Generate and download a technical chart for a symbol"""
