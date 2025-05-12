@@ -9,6 +9,7 @@ import pandas as pd
 
 from oanda_api import OandaAPI
 from chart_generator_basic import ChartGenerator  # single import is enough
+from config import mt5_to_oanda
 
 # ──────────────────────────────────────────────────────────────
 #  Indicator helpers
@@ -87,8 +88,8 @@ def fetch_candles(
     Fetch *count* candles from OANDA and return them as a list of dicts.
     Extra query-string keys can be supplied via **params.
     """
-    if "_" not in symbol and len(symbol) == 6:
-          symbol = f"{symbol[:3]}_{symbol[3:]}"
+    if "_" not in symbol:
+        symbol = mt5_to_oanda(symbol)
     try:
         candles = oanda_api.get_candles(symbol, timeframe, count, **params)
 
