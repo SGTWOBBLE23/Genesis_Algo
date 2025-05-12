@@ -1,0 +1,1071 @@
+
+//+------------------------------------------------------------------+
+//| Return symbol's digits                                           |
+//+------------------------------------------------------------------+
+int GetSymbolDigits(const string sym)
+{
+    Print("Checking symbol: ", sym);  // Debug info
+    
+    // First ensure the symbol is in Market Watch
+    if(!SymbolSelect(sym, true)) {
+        Print("ERROR: Symbol not found in Market Watch: ", sym);
+        return _Digits; // Use chart digits as fallback
+    }
+    
+    int digits = (int)SymbolInfoInteger(sym, SYMBOL_DIGITS);
+    if(digits < 0) {
+        int error = GetLastError();
+        Print("ERROR getting digits for symbol: ", sym, " Error: ", error, " - ", ErrorDescription(error));
+        digits = _Digits;
+    }
+    Print("Symbol ", sym, " has ", digits, " digits");
+    return digits;
+}
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+//|                                             MT5_GENESIS_EA.mq5 |
+//|                                       GENESIS Trading Platform |
+//|                                                                |
+//+------------------------------------------------------------------+
+#property copyright "GENESIS Trading Platform"
+#property link      ""
+#property version   "1.00"
+#property strict
+
+// Include required libraries
+#include <Trade/Trade.mqh>           // For trading operations
+#include <Arrays/ArrayString.mqh>    // For string array operations
+#include <JAson.mqh>                 // For JSON operations, needs to be installed
+#include <StdLib.mqh>
+#define DBG  if(DebugLogs) Print               // For ErrorDescription()
+//--- Updated API constants 2025-05-03
+#define API_ENDPOINT "https://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev"
+#define MT5_API_PATH "/mt5"
+#define GET_SIGNALS_PATH "/get_signals"
+#define HEARTBEAT_PATH "/heartbeat"
+#define ACCOUNT_STATUS_PATH "/account_status"
+#define TRADE_UPDATE_PATH "/update_trades"
+#define TRADE_REPORT_PATH "/trade_report"
+const string SIGNALS_URL      = API_ENDPOINT + MT5_API_PATH + GET_SIGNALS_PATH;
+const string HEARTBEAT_URL    = API_ENDPOINT + MT5_API_PATH + HEARTBEAT_PATH;
+const string ACCOUNT_STATUS_URL = API_ENDPOINT + MT5_API_PATH + ACCOUNT_STATUS_PATH;
+const string TRADE_UPDATE_URL   = API_ENDPOINT + MT5_API_PATH + TRADE_UPDATE_PATH;
+const string TRADE_REPORT_URL   = API_ENDPOINT + MT5_API_PATH + TRADE_REPORT_PATH;
+
+bool IsMarketOpenForSymbol(string symbol, bool force_execution=false);
+// Constants
+#define API_TIMEOUT  5000            // Timeout for API requests in milliseconds
+#define SIGNAL_CHECK_INTERVAL 10     // How often to check for new signals (seconds)
+#define HEARTBEAT_INTERVAL 60        // How often to send heartbeat (seconds)
+
+// Input parameters
+input string   API_Key      = "";    // API Key for authentication
+input string   AccountName  = "";    // Account name/identifier
+input bool     AutoTrade    = true;  // Automatically execute trades
+input bool     SendReports  = true;  // Send trade reports back to GENESIS
+input double   LotMultiplier = 1.0;  // Multiplier for lot size from signals
+input int      SlippagePoints = 10;  // Maximum allowed slippage in points
+input bool     SendHeartbeat = true;
+input bool     ShowAlerts   = true;  // Pop-up alerts
+input bool     DebugLogs   = false; // verbose housekeeping prints // Send heartbeat to GENESIS platform
+
+// Global variables
+CTrade         Trade;                // Trading object
+CJAVal         JsonToSend;           // JSON object for sending data
+CJAVal         JsonReceived;         // JSON object for receiving data
+int            LastSignalId = 0;     // Last processed signal ID
+datetime       LastSignalCheck = 0;  // Last time signals were checked
+datetime       LastHeartbeat = 0;    // Last time heartbeat was sent
+string         ActiveSymbols[];      // List of symbols in Market Watch
+int            RetryCount = 0;       // Counter for API retry attempts
+bool           InitialSetupDone = false; // Flag for initial setup
+int            TerminalNumber = 0;   // Unique identifier for this terminal
+
+// Global variables for signal arrows
+color    EntryBuyColor  = clrLime;     // Entry arrow for executed buys
+color    EntrySellColor = clrRed;      // Entry arrow for executed sells
+string   LinePrefix = "GENESIS_Line_"; // Prefix for entry/SL/TP lines
+
+color    AnticipatedLongColor = clrDodgerBlue;    // Color for anticipated long signals
+color    AnticipatedShortColor = clrCrimson;      // Color for anticipated short signals
+int      ArrowSize = 3;                           // Size of the signal arrows
+int      ArrowOffset = 5;                         // Offset from price in points
+string   ArrowPrefix = "GENESIS_Arrow_";         // Prefix for arrow objects
+
+//+------------------------------------------------------------------+
+//| Expert initialization function                                   |
+//+------------------------------------------------------------------+
+int OnInit()
+{
+    // Print startup message
+    DBG("GENESIS EA starting up...");
+    
+    // Generate a unique terminal identifier
+    TerminalNumber = MathRand();
+    
+    // Set up trading parameters
+    Trade.SetDeviationInPoints(SlippagePoints);
+    Trade.SetExpertMagicNumber(123456); // Set a unique magic number
+    
+    // Get all symbols in Market Watch
+    GetActiveSymbols();
+    
+    // Initialize JSON object
+    JsonToSend.Clear();
+    
+    // Send initial heartbeat
+    if(SendHeartbeat) {
+        SendHeartbeatToGenesis();
+    }
+    
+    // Create timer for checking signals and heartbeat
+    EventSetTimer(1);  // 1 second timer
+    
+    // Mark initial setup as complete
+    InitialSetupDone = true;
+    
+    // Clear any existing objects on the chart
+    DeleteAllSignalArrows();
+    return(INIT_SUCCEEDED);
+    
+}
+
+//+------------------------------------------------------------------+
+//| Expert deinitialization function                                 |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+{
+    // Delete timer
+    EventKillTimer();
+    
+    // Print shutdown message
+    DBG("GENESIS EA shutting down, reason: ", GetDeinitReasonText(reason));
+}
+
+//+------------------------------------------------------------------+
+//| Expert tick function                                             |
+//+------------------------------------------------------------------+
+void OnTick()
+{
+    // Main trading logic happens in OnTimer
+}
+
+//+------------------------------------------------------------------+
+//| Timer function                                                   |
+//+------------------------------------------------------------------+
+void OnTimer()
+  {
+   // ── 1.  Send account status every 15 s ─────────────────────────
+   static datetime lastAccountUpdate = 0;
+   if((TimeCurrent() - lastAccountUpdate) >= 15)
+     {
+      SendAccountStatus();
+      lastAccountUpdate = TimeCurrent();
+     }
+
+   // ── 2.  Send trade updates every 20 s ──────────────────────────
+   static datetime lastTradeUpdate = 0;
+   if((TimeCurrent() - lastTradeUpdate) >= 20)
+     {
+      SendTradeUpdates();                 // <-- keep just this ONE call
+      lastTradeUpdate = TimeCurrent();
+     }
+
+   // ── 3.  Heart-beat to server (if enabled) ─────────────────────
+   if(SendHeartbeat && (TimeCurrent() - LastHeartbeat) >= HEARTBEAT_INTERVAL)
+     {
+      SendHeartbeatToGenesis();
+      LastHeartbeat = TimeCurrent();
+     }
+
+   // ── 4.  Poll for new Genesis signals ──────────────────────────
+   if((TimeCurrent() - LastSignalCheck) >= SIGNAL_CHECK_INTERVAL)
+     {
+      GetNewSignalsFromGenesis();
+      LastSignalCheck = TimeCurrent();
+     }
+  }
+
+//+------------------------------------------------------------------+
+//| Sync positions after every trade event                           |
+//+------------------------------------------------------------------+
+void OnTradeTransaction(const MqlTradeTransaction &trans,
+                        const MqlTradeRequest     &request,
+                        const MqlTradeResult      &result)
+  {
+   // Fire only on meaningful order / deal changes
+   if(trans.type==TRADE_TRANSACTION_DEAL_ADD     ||
+      trans.type==TRADE_TRANSACTION_DEAL_UPDATE  ||
+      trans.type==TRADE_TRANSACTION_ORDER_ADD    ||
+      trans.type==TRADE_TRANSACTION_ORDER_UPDATE)
+     {
+      SendTradeUpdates();      // 🚀 push snapshot to the Python server
+     }
+  }
+
+//+------------------------------------------------------------------+
+//| Get all active symbols from Market Watch                         |
+//+------------------------------------------------------------------+
+void GetActiveSymbols()
+{
+    int symbolsTotal = SymbolsTotal(true);
+    ArrayResize(ActiveSymbols, symbolsTotal);
+    
+    for(int i = 0; i < symbolsTotal; i++) {
+        ActiveSymbols[i] = SymbolName(i, true);
+    }
+    
+    DBG("Found ", symbolsTotal, " active symbols in Market Watch");
+}
+
+//+------------------------------------------------------------------+
+//| Send heartbeat to GENESIS platform                               |
+//+------------------------------------------------------------------+
+bool SendHeartbeatToGenesis()
+{
+    // Prepare JSON data
+    JsonToSend.Clear();
+    JsonToSend["account_id"] = AccountName;
+    JsonToSend["terminal_id"] = IntegerToString(TerminalNumber);
+    JsonToSend["connection_time"] = TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS);
+    
+    // Send request
+    string jsonString = JsonToSend.Serialize();
+    string response = "";
+    
+    bool success = SendPostRequest(HEARTBEAT_URL, jsonString, response);
+    
+    if(success) {
+        // Parse response
+        JsonReceived.Clear();
+        JsonReceived.Deserialize(response);
+        
+        if(JsonReceived["status"].ToStr() == "success") {
+            DBG("Heartbeat sent successfully. Server time: ", JsonReceived["server_time"].ToStr());
+            return true;
+        }
+        else {
+            DBG("Error sending heartbeat: ", JsonReceived["message"].ToStr());
+            return false;
+        }
+    }
+    else {
+        DBG("Failed to send heartbeat request");
+        return false;
+    }
+}
+
+//+------------------------------------------------------------------+
+//| Get new signals from GENESIS platform                            |
+//+------------------------------------------------------------------+
+void GetNewSignalsFromGenesis()
+{
+// More detailed logging about API call
+    DBG("Attempting to get signals from URL: ", SIGNALS_URL);
+
+    // Prepare JSON data
+    JsonToSend.Clear();
+    JsonToSend["account_id"] = AccountName;
+    JsonToSend["last_signal_id"] = LastSignalId;
+    
+    // Create a JSON array with active symbols
+    CJAVal symbolsArray;
+    symbolsArray.Clear();
+    for(int i = 0; i < ArraySize(ActiveSymbols); i++) {
+        symbolsArray.Add(ActiveSymbols[i]);
+    }
+    JsonToSend["symbols"] = symbolsArray;
+    
+    // Send request
+    string jsonString = JsonToSend.Serialize();
+    string response = "";
+    
+    bool success = SendPostRequest(SIGNALS_URL, jsonString, response);
+    
+    if(success) {
+        // Parse response
+        JsonReceived.Clear();
+        JsonReceived.Deserialize(response);
+        
+        if(JsonReceived["status"].ToStr() == "success") {
+            // Process signals
+            CJAVal signals = JsonReceived["signals"];
+            int signalsCount = signals.Size();
+            
+            DBG("Received ", signalsCount, " new signals");
+            
+            for(int i = 0; i < signalsCount; i++) {
+
+                CJAVal signal = signals[i];
+                
+                // Get signal data
+                int signalId = (int)signal["id"].ToInt();
+                string symbol = signal["asset"]["symbol"].ToStr();
+                string direction = signal["action"].ToStr();
+                double entry = signal["entry_price"].ToDbl();
+                double stopLoss = signal["stop_loss"].ToDbl();
+                double takeProfit = signal["take_profit"].ToDbl();
+                double confidence = signal["confidence"].ToDbl();
+                double lotSize = signal["position_size"].ToDbl() * LotMultiplier;
+                bool force_execution = signal["force_execution"].ToBool();
+
+                // Keep track of the highest signal ID
+                if(signalId > LastSignalId) {
+                    LastSignalId = signalId;
+                }
+                
+                // Log detailed info about each signal AFTER extraction
+                PrintFormat("Processing signal %d of %d:", i+1, signalsCount);
+                int symbolDigits = GetSymbolDigits(symbol);
+                DBG("  ID: ", signalId);
+                DBG("  Symbol: ", symbol);
+                DBG("  Action: ", direction);
+                DBG("  Entry: ", DoubleToString(entry, symbolDigits));
+                DBG("  Stop Loss: ", DoubleToString(stopLoss, symbolDigits));
+                DBG("  Take Profit: ", DoubleToString(takeProfit, symbolDigits));
+                // Check if we should trade this signal
+                if(AutoTrade) {
+                    ProcessTradeSignal(signalId, symbol, direction, entry, stopLoss, takeProfit, lotSize, force_execution);
+                }
+                else {
+                    // Just print the signal
+                    DBG("Signal: ID=", signalId, " Symbol=", symbol, " Direction=", direction, 
+                          " Entry=", entry, " SL=", stopLoss, " TP=", takeProfit,
+                          " Confidence=", confidence, " Lot=", lotSize);
+                          
+                    // Alert the user
+                    string alertMessage = StringFormat("[GENESIS] %s Signal [%s] – (Entry %.4f  SL %.4f  TP %.4f)", 
+                                                      symbol, direction, entry, stopLoss, takeProfit);
+                    Alert(alertMessage);
+                }
+            }
+        }
+        else {
+            DBG("Error getting signals: ", JsonReceived["message"].ToStr());
+        }
+    }
+    else {
+        DBG("Failed to send signal request");
+    }
+}
+
+//+------------------------------------------------------------------+
+//| Process a trade signal and execute it                            |
+//+------------------------------------------------------------------+
+void ProcessTradeSignal(int signalId, string symbol, string direction, double entry, double stopLoss, double takeProfit, double lotSize, bool force_execution=false)
+{
+    bool isAnticipated = StringFind(direction, "ANTICIPATED") >= 0;
+    // Detailed logging for signal processing
+    int symbolDigits = GetSymbolDigits(symbol);
+    DBG("  Entry: ", DoubleToString(entry, symbolDigits));
+    DBG("  Stop Loss: ", DoubleToString(stopLoss, symbolDigits));
+    DBG("  Take Profit: ", DoubleToString(takeProfit, symbolDigits));
+    
+    // Check if symbol is valid
+    if(!SymbolSelect(symbol, true)) {
+        DBG("Symbol ", symbol, " is not available. Signal cannot be processed.");
+        if(SendReports) {
+            SendTradeReport(signalId, symbol, direction, 0, 0, 0, 0, 0, "error", "Symbol not found");
+        }
+        return;
+    }
+    
+    // Check if market is open for this symbol
+    if(!IsMarketOpenForSymbol(symbol, force_execution)) {
+        DBG("Market for ", symbol, " is closed. Signal will be executed when market opens.");
+        if(SendReports) {
+            SendTradeReport(signalId, symbol, direction, 0, 0, 0, 0, 0, "pending", "Market closed");
+        }
+        // Draw an arrow on chart for anticipated signals
+        if(isAnticipated) {
+            DrawSignalArrow(signalId, symbol, direction, entry);
+        FireSignalAlert(direction, symbol, entry);
+        }
+        return;
+    }
+    
+    // Determine order type
+    ENUM_ORDER_TYPE orderType;
+    
+    if(StringFind(direction, "BUY") >= 0 || StringFind(direction, "LONG") >= 0) {
+        orderType = ORDER_TYPE_BUY;
+    }
+    else if(StringFind(direction, "SELL") >= 0 || StringFind(direction, "SHORT") >= 0) {
+        orderType = ORDER_TYPE_SELL;
+    }
+    else {
+        DBG("Invalid direction: ", direction);
+        if(SendReports) {
+            SendTradeReport(signalId, symbol, direction, 0, 0, 0, 0, 0, "error", "Invalid direction");
+        }
+        return;
+    }
+    
+    // Handle anticipated vs immediate signals differently
+    if(isAnticipated) {
+        // Draw an arrow on chart for anticipated signals
+        DrawSignalArrow(signalId, symbol, direction, entry);
+        
+        // For anticipated signals, we set a limit or stop order at the specified entry price
+        double currentPrice = SymbolInfoDouble(symbol, SYMBOL_ASK);
+        if(orderType == ORDER_TYPE_SELL)
+            currentPrice = SymbolInfoDouble(symbol, SYMBOL_BID);
+        
+        ENUM_ORDER_TYPE pendingOrderType;
+        
+        if(orderType == ORDER_TYPE_BUY) {
+            if(entry < currentPrice) {
+                pendingOrderType = ORDER_TYPE_BUY_LIMIT; // Buy at a lower price than current
+            }
+            else {
+                pendingOrderType = ORDER_TYPE_BUY_STOP; // Buy at a higher price than current
+            }
+        }
+        else { // SELL
+            if(entry > currentPrice) {
+                pendingOrderType = ORDER_TYPE_SELL_LIMIT; // Sell at a higher price than current
+            }
+            else {
+                pendingOrderType = ORDER_TYPE_SELL_STOP; // Sell at a lower price than current
+            }
+        }
+        
+        // Place the pending order
+        DBG("Placing pending order: ", EnumToString(pendingOrderType), " for ", symbol, " at ", DoubleToString(entry, GetSymbolDigits(symbol)),
+              " with SL: ", DoubleToString(stopLoss, GetSymbolDigits(symbol)), " TP: ", DoubleToString(takeProfit, GetSymbolDigits(symbol)),
+              " Lot: ", DoubleToString(lotSize, 2));
+              
+        // Use Trade.OrderOpen() for pending orders
+        bool success = Trade.OrderOpen(
+            symbol,
+            pendingOrderType,
+            lotSize,
+            0, // Current price, will be filled in by OrderOpen
+            entry, // Price to trigger the order
+            stopLoss,
+            takeProfit,
+            0, // No expiration
+            0, // No expiration time
+            "GENESIS Signal #" + IntegerToString(signalId)
+        );
+        
+        if(success) {
+            ulong ticket = Trade.ResultOrder();
+            FireSignalAlert(direction, symbol, entry);
+
+            DBG("Pending order placed successfully. Ticket: ", ticket);
+            if(SendReports) {
+                SendTradeReport(signalId, symbol, direction, ticket, lotSize, entry, stopLoss, takeProfit, "pending", "Pending order placed");
+            }
+        }
+        else {
+            int errorCode = GetLastError();
+            string errorDesc = ErrorDescription(errorCode);
+            DBG("Failed to place pending order. Error: ", errorCode, " - ", errorDesc);
+            if(SendReports) {
+                SendTradeReport(signalId, symbol, direction, 0, lotSize, entry, stopLoss, takeProfit, "error", "Error placing pending order: " + errorDesc);
+            }
+        }
+    }
+    else {
+        // For immediate signals, place a market order
+        DBG("Placing market order: ", EnumToString(orderType), " for ", symbol,
+              " with SL: ", DoubleToString(stopLoss, GetSymbolDigits(symbol)), " TP: ", DoubleToString(takeProfit, GetSymbolDigits(symbol)),
+              " Lot: ", DoubleToString(lotSize, 2));
+              
+        // Use Trade.PositionOpen() for market orders
+        bool success = Trade.PositionOpen(
+            symbol,
+            orderType,
+            lotSize,
+            0, // Current price, will be filled in by PositionOpen
+            stopLoss,
+            takeProfit,
+            "GENESIS Signal #" + IntegerToString(signalId)
+        );
+        
+        if(success) {
+            ulong ticket = Trade.ResultDeal();
+            double price = Trade.ResultPrice();
+            DrawSignalArrow(ticket, symbol, direction, price);
+            DrawTradeLines(ticket, symbol, price, stopLoss, takeProfit);
+            FireSignalAlert(direction, symbol, price);
+            price = Trade.ResultPrice();
+            DBG("Market order executed successfully. Ticket: ", ticket, " Price: ", DoubleToString(price, GetSymbolDigits(symbol)));
+            if(SendReports) {
+                SendTradeReport(signalId, symbol, direction, ticket, lotSize, price, stopLoss, takeProfit, "success", "Trade executed");
+            }
+        }
+        else {
+            int errorCode = GetLastError();
+            string errorDesc = ErrorDescription(errorCode);
+            DBG("Failed to execute market order. Error: ", errorCode, " - ", errorDesc);
+            if(SendReports) {
+                SendTradeReport(signalId, symbol, direction, 0, lotSize, 0, stopLoss, takeProfit, "error", "Error executing market order: " + errorDesc);
+            }
+        }
+    }
+}
+
+//+------------------------------------------------------------------+
+//| Draw a signal arrow on the chart                                 |
+//+------------------------------------------------------------------+
+
+void DrawSignalArrow(int signalId, string symbol, string direction, double entryPrice)
+{
+    // Create a unique object name and clean any existing one
+    string objName = ArrowPrefix + IntegerToString(signalId);
+    ObjectDelete(0, objName);
+
+    // Decide arrow glyph & colour
+    int   arrowCode;
+    color arrowColor;
+    bool isBuy = (StringFind(direction, "LONG") >= 0 || StringFind(direction, "BUY") >= 0);
+    if(isBuy)
+    {
+        arrowCode  = 233;      // ▲  (Wingdings)
+        arrowColor = clrLime;  // bright green
+    }
+    else
+    {
+        arrowCode  = 234;      // ▼
+        arrowColor = clrRed;   // red
+    }
+
+    // Offset: ~USD 2 for gold (point=0.01 on XAUUSD → 200*point = $2)
+    double point  = SymbolInfoDouble(symbol, SYMBOL_POINT);
+    double offset = 400 * point;                 // make this big & easy to spot
+
+    // Use current candle for placement; fall back to entryPrice if no data yet
+    double candleHigh = iHigh(symbol, PERIOD_CURRENT, 0);
+    double candleLow  = iLow (symbol, PERIOD_CURRENT, 0);
+    if(candleHigh == 0 || candleLow == 0)
+    {
+        candleHigh = candleLow = entryPrice;
+    }
+
+    double arrowPrice = isBuy ? (candleLow  - offset)
+                              : (candleHigh + offset);
+
+    // Create and style the arrow
+    if(ObjectCreate(0, objName, OBJ_ARROW, 0, TimeCurrent(), arrowPrice))
+    {
+        ObjectSetInteger(0, objName, OBJPROP_ARROWCODE, arrowCode);
+        ObjectSetInteger(0, objName, OBJPROP_COLOR,     arrowColor);
+        ObjectSetInteger(0, objName, OBJPROP_WIDTH,     2);        // BIG arrow
+        ObjectSetInteger(0, objName, OBJPROP_SELECTABLE,false);
+
+        string tip = "GENESIS Signal #" + IntegerToString(signalId) + "\n" + direction;
+        ObjectSetString(0, objName, OBJPROP_TOOLTIP, tip);
+
+        ChartRedraw(0);
+        DBG("Drew signal arrow on chart: ", objName, " at ", DoubleToString(arrowPrice, _Digits));
+    }
+    else
+    {
+        DBG("Failed to create signal arrow on chart: ", objName, ", error: ", GetLastError());
+    }
+}
+
+//+------------------------------------------------------------------+
+//| Draw entry, SL and TP lines                                       |
+//+------------------------------------------------------------------+
+void DrawTradeLines(ulong ticket, string symbol, double entryPrice, double sl, double tp)
+{
+    string base = LinePrefix + IntegerToString(ticket);
+    // Entry line (blue)
+    string entryName = base + "_ENTRY";
+    ObjectDelete(0, entryName);
+    ObjectCreate(0, entryName, OBJ_HLINE, 0, 0, entryPrice);
+    ObjectSetInteger(0, entryName, OBJPROP_COLOR, clrBlue);
+    ObjectSetString(0, entryName, OBJPROP_TOOLTIP, "Entry " + DoubleToString(entryPrice, GetSymbolDigits(symbol)));
+    // SL line (red)
+    string slName = base + "_SL";
+    ObjectDelete(0, slName);
+    ObjectCreate(0, slName, OBJ_HLINE, 0, 0, sl);
+    ObjectSetInteger(0, slName, OBJPROP_COLOR, clrRed);
+    ObjectSetString(0, slName, OBJPROP_TOOLTIP, "Stop Loss " + DoubleToString(sl, GetSymbolDigits(symbol)));
+    // TP line (green)
+    string tpName = base + "_TP";
+    ObjectDelete(0, tpName);
+    ObjectCreate(0, tpName, OBJ_HLINE, 0, 0, tp);
+    ObjectSetInteger(0, tpName, OBJPROP_COLOR, clrLime);
+    ObjectSetString(0, tpName, OBJPROP_TOOLTIP, "Take Profit " + DoubleToString(tp, GetSymbolDigits(symbol)));
+    ChartRedraw(0);
+}
+
+//+------------------------------------------------------------------+
+//| Delete all signal arrows from the chart                          |
+//+------------------------------------------------------------------+
+void DeleteAllSignalArrows()
+{
+    int totalObjects = ObjectsTotal(0, 0, -1);
+    
+    for(int i = totalObjects - 1; i >= 0; i--) {
+        string objName = ObjectName(0, i);
+        if(StringFind(objName, ArrowPrefix) == 0) {
+            ObjectDelete(0, objName);
+        }
+    }
+    
+    ChartRedraw(0);
+    DBG("Deleted all signal arrows from chart");
+}
+
+//+------------------------------------------------------------------+
+//| Send a trade report back to GENESIS                              |
+//+------------------------------------------------------------------+
+void SendTradeReport(int signalId, string symbol, string direction, ulong ticket, double lotSize,
+                     double entryPrice, double stopLoss, double takeProfit, string status, string message)
+{
+    // Prepare JSON data
+    JsonToSend.Clear();
+    JsonToSend["signal_id"] = signalId;
+    JsonToSend["account_id"] = AccountName;
+    JsonToSend["symbol"] = symbol;
+    JsonToSend["action"] = direction;
+    JsonToSend["ticket"] = IntegerToString(ticket);
+    JsonToSend["lot_size"] = DoubleToString(lotSize, 2);
+    JsonToSend["entry_price"] = DoubleToString(entryPrice, GetSymbolDigits(symbol));
+    JsonToSend["stop_loss"] = DoubleToString(stopLoss, GetSymbolDigits(symbol));
+    JsonToSend["take_profit"] = DoubleToString(takeProfit, GetSymbolDigits(symbol));
+    JsonToSend["execution_time"] = TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS);
+    JsonToSend["status"] = status;
+    JsonToSend["message"] = message;
+    // ML context extras
+    int spreadPts = SymbolInfoInteger(symbol,SYMBOL_SPREAD);
+    double atr14     = iATR(symbol, PERIOD_H1, 14);
+    double rsi14     = iRSI(symbol, PERIOD_H1, 14, PRICE_CLOSE);
+    CJAVal ctx;
+    ctx["spread_pts"] = IntegerToString((int)spreadPts);
+    ctx["atr14"]      = DoubleToString(atr14,5);
+    ctx["rsi14"]      = DoubleToString(rsi14,2);
+    JsonToSend["ctx"] = ctx;
+    
+    // Send request
+    string jsonString = JsonToSend.Serialize();
+    string response = "";
+    
+    bool success = SendPostRequest(API_ENDPOINT + MT5_API_PATH + "/trade_report", jsonString, response);
+    
+    if(success) {
+        // Parse response
+        JsonReceived.Clear();
+        JsonReceived.Deserialize(response);
+        
+        if(JsonReceived["status"].ToStr() == "success") {
+            DBG("Trade report sent successfully for signal #", signalId);
+        }
+        else {
+            DBG("Error sending trade report: ", JsonReceived["message"].ToStr());
+        }
+    }
+    else {
+        DBG("Failed to send trade report for signal #", signalId);
+    }
+}
+
+//+------------------------------------------------------------------+
+//| Send a POST request to the API                                   |
+//+------------------------------------------------------------------+
+bool SendPostRequest(string url, string postData, string &responseData)
+{
+    int timeout = API_TIMEOUT;
+    char data[];
+    char result[];
+    string headers = "Content-Type: application/json\r\n";
+    int res = -1;
+    
+    // Add API key to headers if provided
+    if(StringLen(API_Key) > 0) {
+        headers = headers + "Authorization: Bearer " + API_Key + "\r\n";
+    }
+    
+    // Convert post data to char array
+    int dataSize = StringToCharArray(postData, data) - 1;
+    
+    // Allow for retries
+    int maxRetries = 3;
+    int retryDelay = 1000; // 1 second
+    
+    for(int i = 0; i < maxRetries; i++) {
+        res = WebRequest("POST", url, headers, timeout, data, result, headers);
+        
+        if(res == 200) {
+            // Success
+            responseData = CharArrayToString(result, 0, ArraySize(result));
+            return true;
+        }
+        else {
+            // Failed
+            int errorCode = GetLastError();
+            
+            // 4060 = No connection to server
+            // 4061 = Connection to server failed
+            // 4062 = Timeout
+            if(errorCode == 4060 || errorCode == 4061 || errorCode == 4062) {
+                DBG("Temporary error, retrying in ", retryDelay/1000, " seconds. Error: ", errorCode, " - ", ErrorDescription(errorCode));
+                Sleep(retryDelay);
+                retryDelay *= 2; // Exponential backoff
+                continue;
+            }
+            else {
+                // More serious error
+                DBG("WebRequest failed. URL: ", url, " Error: ", errorCode, " - ", ErrorDescription(errorCode));
+                break;
+            }
+        }
+    }
+    
+    return false;
+}
+
+//+------------------------------------------------------------------+
+//| Convert deinitialization reason code to text                     |
+//+------------------------------------------------------------------+
+string GetDeinitReasonText(int reasonCode)
+{
+    string text = "Unknown reason";
+    
+    switch(reasonCode) {
+        case REASON_PROGRAM:     text = "Program called by ExpertRemove()"; break;
+        case REASON_REMOVE:      text = "Program removed from chart"; break;
+        case REASON_RECOMPILE:   text = "Program recompiled"; break;
+        case REASON_CHARTCHANGE: text = "Symbol or timeframe changed"; break;
+        case REASON_CHARTCLOSE:  text = "Chart closed"; break;
+        case REASON_PARAMETERS:  text = "Parameters changed"; break;
+        case REASON_ACCOUNT:     text = "Another account activated"; break;
+        case REASON_TEMPLATE:    text = "New template applied"; break;
+        case REASON_INITFAILED:  text = "OnInit() handler returned non-zero value"; break;
+        case REASON_CLOSE:       text = "Terminal closed"; break;
+    }
+    
+    return text;
+}
+
+//+------------------------------------------------------------------+
+//| Check if market is open for a specific symbol                    |
+//+------------------------------------------------------------------+
+bool IsMarketOpenForSymbol(string symbol, bool force_execution=false)
+{
+    // If force execution is enabled, return true regardless
+    if(force_execution) {
+        DBG("Force execution enabled for ", symbol, ", bypassing market open check");
+        return true;
+    }
+    
+    // Get trading session info
+    datetime now = TimeCurrent();
+    
+    // Check if trading is allowed for the symbol
+    long tradeMode;
+    if(SymbolInfoInteger(symbol, SYMBOL_TRADE_MODE, tradeMode)) {
+        if(tradeMode == SYMBOL_TRADE_MODE_DISABLED) {
+            DBG("Trading is disabled for ", symbol);
+            return false;
+        }
+    }
+    
+    // Check if outside of defined trading sessions
+    datetime sess_from, sess_to;
+    if(SymbolInfoSessionQuote(symbol, MONDAY, 0, sess_from, sess_to)) {
+        MqlDateTime timeStruct;
+        TimeToStruct(now, timeStruct);
+        
+        int day_of_week = timeStruct.day_of_week;
+        datetime from, to;
+        
+        // Check if current time is within a trading session
+        if(SymbolInfoSessionQuote(symbol, (ENUM_DAY_OF_WEEK)day_of_week, 0, from, to)) {
+            if(now >= from && now <= to) {
+                return true;
+            }
+            else {
+                // Check additional sessions for the day
+                for(int session = 1; session < 10; session++) {
+                    if(SymbolInfoSessionQuote(symbol, (ENUM_DAY_OF_WEEK)day_of_week, session, from, to)) {
+                        if(now >= from && now <= to) {
+                            return true;
+                        }
+                    }
+                    else {
+                        break; // No more sessions
+                    }
+                }
+                DBG("Market for ", symbol, " is closed now");
+                return false;
+            }
+        }
+    }
+    
+    // Default to true if no sessions defined or if checks pass
+    return true;
+}
+
+//+------------------------------------------------------------------+
+
+//| Send account status to GENESIS                                     |
+
+//+------------------------------------------------------------------+
+
+void SendAccountStatus()
+{
+
+    JsonToSend.Clear();
+
+    JsonToSend["account_id"] = AccountName;
+
+    JsonToSend["balance"] = AccountInfoDouble(ACCOUNT_BALANCE);
+
+    JsonToSend["equity"] = AccountInfoDouble(ACCOUNT_EQUITY);
+
+    JsonToSend["margin"] = AccountInfoDouble(ACCOUNT_MARGIN);
+
+    JsonToSend["free_margin"] = AccountInfoDouble(ACCOUNT_FREEMARGIN);
+
+    string jsonString = JsonToSend.Serialize();
+
+    string response = "";
+
+    SendPostRequest(ACCOUNT_STATUS_URL, jsonString, response);
+
+}
+
+//+------------------------------------------------------------------+
+
+//| Send open trades to GENESIS                                       |
+
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+//| Send open trades and history to GENESIS                          |
+//+------------------------------------------------------------------+
+// Define a simple string array at a global level to track sent trades
+string g_sentTradeIds[100];  // Fixed size array
+int g_sentTradeCount = 0;
+// Function to check if a trade was already sent
+bool IsTradeAlreadySent(string tradeId)
+{
+   for(int i=0; i<g_sentTradeCount; i++)
+   {
+      if(g_sentTradeIds[i] == tradeId)
+         return true;
+   }
+   return false;
+}
+// Function to mark a trade as sent
+void MarkTradeAsSent(string tradeId)
+{
+   if(g_sentTradeCount < 100)  // Avoid buffer overflow
+   {
+      g_sentTradeIds[g_sentTradeCount] = tradeId;
+      g_sentTradeCount++;
+   }
+}
+void SendTradeUpdates()
+{
+    DBG("======= STARTING TRADE UPDATES =======");
+    
+    int total = PositionsTotal();
+    DBG("Found " + IntegerToString(total) + " open positions");
+    
+    JsonToSend.Clear();
+    JsonToSend["account_id"] = AccountName;
+    
+    // Create a JSON object for trades data
+    CJAVal trades;
+    trades.Clear();
+    
+    bool hasData = false;
+    
+    // --- Open positions -------------------------------------------------
+    for(int i=0; i<total; i++)
+    {
+        ulong ticket = PositionGetTicket(i);
+        if(PositionSelectByTicket(ticket))
+        {
+            string symbol = PositionGetString(POSITION_SYMBOL);
+            double open_price = PositionGetDouble(POSITION_PRICE_OPEN);
+            double current_price = PositionGetDouble(POSITION_PRICE_CURRENT);
+            double profit = PositionGetDouble(POSITION_PROFIT);
+            datetime open_time = (datetime)PositionGetInteger(POSITION_TIME);
+            
+            DBG("Processing open position: Ticket=" + IntegerToString(ticket) + 
+                  ", Symbol=" + symbol +
+                  ", Open Price=" + DoubleToString(open_price, 5) +
+                  ", Current Price=" + DoubleToString(current_price, 5) +
+                  ", Profit=" + DoubleToString(profit, 2));
+            
+            CJAVal trade;
+            trade["symbol"] = symbol;
+            trade["lot"] = DoubleToString(PositionGetDouble(POSITION_VOLUME), 2);
+            trade["type"] = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY) ? "BUY" : "SELL";
+            trade["open_price"] = DoubleToString(open_price, GetSymbolDigits(symbol));
+            trade["sl"] = DoubleToString(PositionGetDouble(POSITION_SL), GetSymbolDigits(symbol));
+            trade["tp"] = DoubleToString(PositionGetDouble(POSITION_TP), GetSymbolDigits(symbol));
+            trade["profit"] = DoubleToString(profit, 2);
+            
+            // IMPORTANT: Include the opened_at timestamp
+            if(open_time > 0)
+            {
+                trade["opened_at"] = TimeToString(open_time, TIME_DATE|TIME_SECONDS);
+                DBG("Setting opened_at for position " + IntegerToString(ticket) + " to: " + TimeToString(open_time, TIME_DATE|TIME_SECONDS));
+            }
+            
+            trade["status"] = "OPEN";
+            
+            // Add to trades object with ticket as key
+            trades[IntegerToString(ticket)] = trade;
+            hasData = true;
+        }
+    }
+    
+    // --- Closed trades (last 30 days) ------------------------------------
+    datetime endTime = TimeCurrent();
+    datetime startTime = endTime - 3*24*60*60;   // 3-day window
+    
+    bool historySelected = HistorySelect(startTime, endTime);
+    DBG("History select returned: " + (historySelected ? "true" : "false") + 
+          " for period " + TimeToString(startTime) + " to " + TimeToString(endTime));
+    
+    if(historySelected)
+    {
+        int dealsTotal = HistoryDealsTotal();
+        DBG("Found " + IntegerToString(dealsTotal) + " total deals in history");
+        
+        // First, collect all OUT deals to get closed positions
+        int closedDealsCount = 0;
+        
+        for(int i=0; i<dealsTotal; i++)
+        {
+            ulong dealTicket = HistoryDealGetTicket(i);
+            
+            if(dealTicket <= 0) {
+                DBG("Invalid deal ticket at index " + IntegerToString(i));
+                continue;
+            }
+            
+            if(HistoryDealGetInteger(dealTicket, DEAL_ENTRY) == DEAL_ENTRY_OUT)
+            {
+                ENUM_DEAL_TYPE dealType = (ENUM_DEAL_TYPE)HistoryDealGetInteger(dealTicket, DEAL_TYPE);
+                
+                if(dealType == DEAL_TYPE_BUY || dealType == DEAL_TYPE_SELL)
+                {
+                    string symbol = HistoryDealGetString(dealTicket, DEAL_SYMBOL);
+                    double volume = HistoryDealGetDouble(dealTicket, DEAL_VOLUME);
+                    double price = HistoryDealGetDouble(dealTicket, DEAL_PRICE);
+                    double profit = HistoryDealGetDouble(dealTicket, DEAL_PROFIT);
+                    datetime closeTime = (datetime)HistoryDealGetInteger(dealTicket, DEAL_TIME);
+                    ulong posId = HistoryDealGetInteger(dealTicket, DEAL_POSITION_ID);
+                    
+                    DBG("Found closed deal: Deal=" + IntegerToString(dealTicket) + 
+                          ", Position=" + IntegerToString(posId) + 
+                          ", Symbol=" + symbol + 
+                          ", Volume=" + DoubleToString(volume, 2) + 
+                          ", Exit Price=" + DoubleToString(price, 5) + 
+                          ", Profit=" + DoubleToString(profit, 2) + 
+                          ", Close Time=" + TimeToString(closeTime));
+                    
+                    // Look for matching IN deal for this position
+                    double entryPrice = 0;
+                    datetime openTime = 0;
+                    string type = (dealType == DEAL_TYPE_BUY) ? "SELL" : "BUY";  // Opposite of closing deal
+                    
+                    // Search for the entry deal with the same position ID
+                    for(int j=0; j<dealsTotal; j++)
+                    {
+                        ulong inDealTicket = HistoryDealGetTicket(j);
+                        
+                        if(inDealTicket <= 0) continue;
+                        
+                        if(HistoryDealGetInteger(inDealTicket, DEAL_POSITION_ID) == posId && 
+                           HistoryDealGetInteger(inDealTicket, DEAL_ENTRY) == DEAL_ENTRY_IN)
+                        {
+                            entryPrice = HistoryDealGetDouble(inDealTicket, DEAL_PRICE);
+                            openTime = (datetime)HistoryDealGetInteger(inDealTicket, DEAL_TIME);
+                            ENUM_DEAL_TYPE inDealType = (ENUM_DEAL_TYPE)HistoryDealGetInteger(inDealTicket, DEAL_TYPE);
+                            type = (inDealType == DEAL_TYPE_BUY) ? "BUY" : "SELL";
+                            
+                            DBG("Found matching entry deal: Deal=" + IntegerToString(inDealTicket) + 
+                                  ", Entry Price=" + DoubleToString(entryPrice, 5) + 
+                                  ", Open Time=" + TimeToString(openTime) + 
+                                  ", Type=" + type);
+                            break;
+                        }
+                    }
+                    
+                    // Create trade object for this closed position
+                    CJAVal trade;
+                    trade["symbol"] = symbol;
+                    trade["lot"] = DoubleToString(volume, 2);
+                    trade["type"] = type;
+                    trade["open_price"] = DoubleToString(entryPrice, GetSymbolDigits(symbol));
+                    trade["exit_price"] = DoubleToString(price, GetSymbolDigits(symbol));
+                    trade["profit"] = DoubleToString(profit, 2);
+                    trade["status"] = "CLOSED";
+                    
+                    // IMPORTANT: Include the opened_at timestamp
+                    if(openTime > 0)
+                    {
+                        trade["opened_at"] = TimeToString(openTime, TIME_DATE|TIME_SECONDS);
+                        DBG("Setting opened_at for position " + IntegerToString(posId) + " to: " + TimeToString(openTime, TIME_DATE|TIME_SECONDS));
+                    }
+                    
+                    // IMPORTANT: Include the closed_at timestamp
+                    trade["closed_at"] = TimeToString(closeTime, TIME_DATE|TIME_SECONDS);
+                    DBG("Setting closed_at for position " + IntegerToString(posId) + " to: " + TimeToString(closeTime, TIME_DATE|TIME_SECONDS));
+                    
+                    // Use position ID as key
+                    trades[IntegerToString(posId)] = trade;
+                    closedDealsCount++;
+                    hasData = true;
+                }
+            }
+        }
+        
+        DBG("Added " + IntegerToString(closedDealsCount) + " closed trades to the update");
+    }
+    else
+    {
+        DBG("Failed to select history for the period");
+    }
+    
+    // Add trades to main JSON
+    JsonToSend["trades"] = trades;
+    
+    // Log the full payload for debugging
+    string jsonString = JsonToSend.Serialize();
+    DBG("Trade update payload: " + jsonString);
+    
+   // ─────────────────────────────────────────────────────────────
+   //  Always send the snapshot – even when there are ZERO trades
+   // ─────────────────────────────────────────────────────────────
+   string response = "";
+   bool   success  = SendPostRequest(TRADE_UPDATE_URL, jsonString, response);
+
+   if(success)
+     {
+      DBG("Trade updates sent successfully. Response: " + response);
+     }
+   else
+     {
+      DBG("Failed to send trade updates");
+     }
+
+   // Optional: clarify when the payload is empty
+   if(!hasData)
+      DBG("Snapshot contained no open/closed trades – server will mark account flat");
+      
+   DBG("======= COMPLETED TRADE UPDATES =======");
+}
+
+//+------------------------------------------------------------------+
+//| Pop-up alert helper                                              |
+//+------------------------------------------------------------------+
+void FireSignalAlert(string direction, string symbol, double price)
+{
+    if(!ShowAlerts) return;
+    string msg = StringFormat("[GENESIS] %s Signal [%s] – (%.2f)", direction, symbol, price);
+    Alert(msg);
+}
