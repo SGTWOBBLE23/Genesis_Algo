@@ -765,6 +765,7 @@ def trade_report():
                 logger.info(f"Using original signal ID {actual_signal_id} for trade record")
             
             trade = Trade(
+                account_id=account_id,
                 signal_id=actual_signal_id,
                 ticket=ticket,
                 symbol=symbol,
@@ -831,19 +832,6 @@ def update_trades():
             return None
 
         # ──────────────────────────────────────────────────────────────
-        # 2️⃣  Bulk-fetch existing tickets (1 SQL query)
-        # ──────────────────────────────────────────────────────────────
-        tickets          = list(trades_blob.keys())
-        existing_by_id   = {
-            t.ticket: t
-            for t in db.session.query(Trade)
-                               .filter(Trade.ticket.in_(tickets))
-                               .all()
-        }
-
-        new_objects, updated, created = [], 0, 0
-
-        # ──────────────────────────────────────────────────────────────
         # 2️⃣  Bulk-fetch existing tickets (single SQL round-trip)
         #     KEEP tickets as *strings* to match Trade.ticket VARCHAR
         # ──────────────────────────────────────────────────────────────
@@ -869,6 +857,7 @@ def update_trades():
             prev_status = trade.status if trade else None
 
             attrs = dict(
+                account_id= account_id,
                 ticket    = ticket,
                 symbol    = info.get("symbol", ""),
                 side      = TradeSide.BUY if info.get("type", "").upper() == "BUY" else TradeSide.SELL,
