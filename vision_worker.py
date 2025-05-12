@@ -126,6 +126,7 @@ class DirectVisionPipeline:
                 context_json=json.dumps({
                     "source": "openai_vision",
                     "image_path": image_path,
+                    "timeframe": timeframe,
                     "processed_at": datetime.now().isoformat()
                 })
             )
