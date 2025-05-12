@@ -15,3 +15,5 @@ xgboost
 pyyaml
 joblib
 pyarrow>=15.0
+openai
+sqlalchemy
