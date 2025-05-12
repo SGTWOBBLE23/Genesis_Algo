@@ -833,8 +833,22 @@ def update_trades():
         # ──────────────────────────────────────────────────────────────
         # 2️⃣  Bulk-fetch existing tickets (1 SQL query)
         # ──────────────────────────────────────────────────────────────
-        tickets          = [int(k) for k in trades_blob.keys()]
+        tickets          = list(trades_blob.keys())
         existing_by_id   = {
+            t.ticket: t
+            for t in db.session.query(Trade)
+                               .filter(Trade.ticket.in_(tickets))
+                               .all()
+        }
+
+        new_objects, updated, created = [], 0, 0
+
+        # ──────────────────────────────────────────────────────────────
+        # 2️⃣  Bulk-fetch existing tickets (single SQL round-trip)
+        #     KEEP tickets as *strings* to match Trade.ticket VARCHAR
+        # ──────────────────────────────────────────────────────────────
+        tickets = list(trades_blob.keys())               # ← str, not int
+        existing_by_id = {
             t.ticket: t
             for t in db.session.query(Trade)
                                .filter(Trade.ticket.in_(tickets))
@@ -846,30 +860,30 @@ def update_trades():
         # ──────────────────────────────────────────────────────────────
         # 3️⃣  Iterate incoming trades once
         # ──────────────────────────────────────────────────────────────
-        for ticket_str, info in trades_blob.items():
-            ticket = int(ticket_str)
-
+        for ticket, info in trades_blob.items():         # ticket already str
             # Skip unwanted crypto symbols
-            if any(c in info.get("symbol","") for c in ("BTC","ETH","XRP","DOG","SOL","LTC")):
+            if any(c in info.get("symbol", "") for c in ("BTC", "ETH", "XRP", "DOG", "SOL", "LTC")):
                 continue
 
-            attrs = dict(
-                ticket   = ticket,
-                symbol   = info.get("symbol",""),
-                side     = TradeSide.BUY if info.get("type","").upper()=="BUY" else TradeSide.SELL,
-                lot      = float(info.get("lot",0)),
-                entry    = float(info.get("open_price",0)  or 0) or None,
-                exit     = float(info.get("exit_price",0)  or 0) or None,
-                sl       = float(info.get("sl",0)          or 0) or None,
-                tp       = float(info.get("tp",0)          or 0) or None,
-                pnl      = float(info.get("profit",0)),
-                status   = TradeStatus.CLOSED if info.get("status")=="CLOSED" else TradeStatus.OPEN,
-                opened_at= _dt(info.get("opened_at")),
-                closed_at= _dt(info.get("closed_at")),
-            )
-            pnl_before = trade.pnl if trade else None
+            trade       = existing_by_id.get(ticket)     # look up first
+            prev_status = trade.status if trade else None
 
-            trade = existing_by_id.get(ticket)
+            attrs = dict(
+                ticket    = ticket,
+                symbol    = info.get("symbol", ""),
+                side      = TradeSide.BUY if info.get("type", "").upper() == "BUY" else TradeSide.SELL,
+                lot       = float(info.get("lot", 0)),
+                entry     = float(info.get("open_price", 0) or 0) or None,
+                exit      = float(info.get("exit_price", 0) or 0) or None,
+                sl        = float(info.get("sl", 0) or 0) or None,
+                tp        = float(info.get("tp", 0) or 0) or None,
+                pnl       = float(info.get("profit", 0)),
+                status    = TradeStatus.CLOSED if info.get("status") == "CLOSED" else TradeStatus.OPEN,
+                opened_at = _dt(info.get("opened_at")),
+                closed_at = _dt(info.get("closed_at")),
+            )
+
+            pnl_before = trade.pnl if trade else None     # now safe
 
             if trade is None:
                 # -------- create ----------
@@ -880,7 +894,6 @@ def update_trades():
                 created += 1
             else:
                 # -------- update ----------
-                prev_status = trade.status          # remember status before we overwrite
                 for k, v in attrs.items():
                     setattr(trade, k, v)
                 ctx = trade.context or {}
@@ -890,9 +903,8 @@ def update_trades():
                 trade.context = ctx
                 updated += 1
 
-            if attrs["status"] == TradeStatus.CLOSED and (
-                (trade in new_objects) or prev_status != TradeStatus.CLOSED
-            ):
+            # Log exits only on the first transition to CLOSED
+            if attrs["status"] == TradeStatus.CLOSED and (trade in new_objects or prev_status != TradeStatus.CLOSED):
                 trade_logger.log_exit(trade)
         # ──────────────────────────────────────────────────────────────
         # 4️⃣  Bulk insert + single commit
