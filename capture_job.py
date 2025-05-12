@@ -203,7 +203,12 @@ def calculate_features(symbol: str, quote: Dict[str, Any]) -> Dict[str, Any]:
     """Calculate additional features for the symbol"""
     try:
         # Get recent candles for ATR calculation
-        response = oanda_api._make_request(f"/instruments/{symbol}/candles?count=5&price=M&granularity=M1")
+        if "_" not in symbol and len(symbol) == 6:              # e.g. "XAUUSD"
+            symbol = f"{symbol[:3]}_{symbol[3:]}"               # -> "XAU_USD"
+
+        response = oanda_api._make_request(
+            f"/instruments/{symbol}/candles?count=5&price=M&granularity=M1"
+            )
         if not response or 'candles' not in response or not response['candles']:
             logger.error(f"Failed to get candles for {symbol} to calculate features")
             return {}
