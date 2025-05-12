@@ -1,9 +1,12 @@
 import os
 import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 import enum
 import json
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List, Union
+from config import mt5_to_oanda
 
 from flask import Flask, render_template, request, jsonify, Response, redirect, url_for, send_file, make_response
 from flask_sqlalchemy import SQLAlchemy
@@ -448,49 +451,71 @@ class MT5Service:
 class OandaService:
     """Service for OANDA integration"""
 
-    def __init__(self):
-        self.api_key = os.environ.get("OANDA_API_KEY")
-        self.account_id = os.environ.get("OANDA_ACCOUNT_ID")
+    def __init__(self) -> None:
+        self.api_key: Optional[str] = os.environ.get("OANDA_API_KEY")
+        self.account_id: Optional[str] = os.environ.get("OANDA_ACCOUNT_ID")
         self.api = None
         if self.api_key and self.account_id:
             self._init_api()
         logger.info("OANDA service initialized")
 
-    def _init_api(self):
+    # ──────────────────────────────────────────────────────────────
+    #  Internal helpers
+    # ──────────────────────────────────────────────────────────────
+    def _init_api(self) -> None:
+        """Lazy-import OandaAPI to avoid circular imports at app start-up"""
         from oanda_api import OandaAPI
         self.api = OandaAPI(self.api_key, self.account_id)
 
-    def update_api_key(self, api_key, account_id):
+    # ──────────────────────────────────────────────────────────────
+    #  Public methods
+    # ──────────────────────────────────────────────────────────────
+    def update_api_key(self, api_key: str, account_id: str) -> None:
+        """Hot-swap credentials (e.g. via admin panel)"""
         self.api_key = api_key
         self.account_id = account_id
         if self.api_key and self.account_id:
             self._init_api()
 
-    def test_connection(self):
+    def test_connection(self) -> bool:
         if not self.api:
             return False
         return self.api.test_connection()
 
-    def account_info(self):
+    def account_info(self) -> Optional[Dict[str, Any]]:
         if not self.api:
             return None
         result = self.api.get_account_summary()
-        if "error" in result:
+        if isinstance(result, dict) and result.get("error"):
             logger.error(f"Error getting account info: {result['error']}")
             return None
         return result
 
-    def get_instruments(self):
+    def get_instruments(self) -> List[Dict[str, Any]]:
         if not self.api:
             return []
         return self.api.get_instruments()
 
-    def get_candles(self, instrument, granularity="H1", count=50):
+    def get_candles(
+        self,
+        instrument: str,
+        granularity: str = "H1",
+        count: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch *count* candles for *instrument*.
+        Converts raw MT5 symbols (XAUUSD, EURUSD …) to OANDA form (XAU_USD, EUR_USD …)
+        so the REST call never triggers a 400-Bad-Request.
+        """
         if not self.api:
             return []
+
+        if "_" not in instrument:               # raw MT5 code
+            instrument = mt5_to_oanda(instrument)
+
         return self.api.get_candles(instrument, granularity, count)
 
-    def get_open_trades(self):
+    def get_open_trades(self) -> List[Dict[str, Any]]:
         if not self.api:
             return []
         return self.api.get_open_trades()

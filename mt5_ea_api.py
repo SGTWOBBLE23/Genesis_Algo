@@ -21,6 +21,7 @@ from app import (
 from config import MT5_ASSETS as DEFAULT_SYMBOLS
 from chart_utils import pip_tolerance, is_price_too_close, generate_chart
 from sqlalchemy import Text, cast
+from config import mt5_to_oanda
 # ────────────────────────────────────────────────────────────
 
 trade_logger = TradeLogger()  
@@ -1135,7 +1136,13 @@ def signal_chart(signal_id):
             from chart_utils import fetch_candles
             
             # Format symbol for OANDA
-            oanda_symbol = signal.symbol
+            oanda_symbol = (
+                signal.symbol
+                if '_' in signal.symbol
+                else mt5_to_oanda(signal.symbol)
+            )
+            if oanda_symbol != signal.symbol:
+                logger.info(f"Reformatted symbol for OANDA: {signal.symbol} -> {oanda_symbol}")
             # If symbol doesn't have underscore but should (like EURUSD), add it (EUR_USD)
             if '_' not in oanda_symbol and len(oanda_symbol) == 6:
                 oanda_symbol = oanda_symbol[:3] + '_' + oanda_symbol[3:]
