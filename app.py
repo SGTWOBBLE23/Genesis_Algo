@@ -451,6 +451,9 @@ class MT5Service:
 class OandaService:
     """Service for OANDA integration"""
 
+    # ──────────────────────────────────────────────────────────────
+    #  Ctor & internal helper
+    # ──────────────────────────────────────────────────────────────
     def __init__(self) -> None:
         self.api_key: Optional[str] = os.environ.get("OANDA_API_KEY")
         self.account_id: Optional[str] = os.environ.get("OANDA_ACCOUNT_ID")
@@ -459,37 +462,34 @@ class OandaService:
             self._init_api()
         logger.info("OANDA service initialized")
 
-    # ──────────────────────────────────────────────────────────────
-    #  Internal helpers
-    # ──────────────────────────────────────────────────────────────
     def _init_api(self) -> None:
-        """Lazy-import OandaAPI to avoid circular imports at app start-up"""
+        """Lazy-import to avoid circular-import traps at app start-up"""
         from oanda_api import OandaAPI
         self.api = OandaAPI(self.api_key, self.account_id)
 
     # ──────────────────────────────────────────────────────────────
-    #  Public methods
+    #  Admin hot-swap
     # ──────────────────────────────────────────────────────────────
     def update_api_key(self, api_key: str, account_id: str) -> None:
-        """Hot-swap credentials (e.g. via admin panel)"""
         self.api_key = api_key
         self.account_id = account_id
         if self.api_key and self.account_id:
             self._init_api()
 
+    # ──────────────────────────────────────────────────────────────
+    #  Convenience wrappers
+    # ──────────────────────────────────────────────────────────────
     def test_connection(self) -> bool:
-        if not self.api:
-            return False
-        return self.api.test_connection()
+        return bool(self.api and self.api.test_connection())
 
     def account_info(self) -> Optional[Dict[str, Any]]:
         if not self.api:
             return None
-        result = self.api.get_account_summary()
-        if isinstance(result, dict) and result.get("error"):
-            logger.error(f"Error getting account info: {result['error']}")
+        info = self.api.get_account_summary()
+        if isinstance(info, dict) and info.get("error"):
+            logger.error(f"Error getting OANDA account info: {info['error']}")
             return None
-        return result
+        return info
 
     def get_instruments(self) -> List[Dict[str, Any]]:
         if not self.api:
@@ -503,17 +503,31 @@ class OandaService:
         count: int = 50,
     ) -> List[Dict[str, Any]]:
         """
-        Fetch *count* candles for *instrument*.
-        Converts raw MT5 symbols (XAUUSD, EURUSD …) to OANDA form (XAU_USD, EUR_USD …)
-        so the REST call never triggers a 400-Bad-Request.
+        Return *count* candles for *instrument* at *granularity*.
+
+        • Converts MT5 codes (EURUSD, XAUUSD …) → OANDA codes (EUR_USD, XAU_USD …).  
+        • Adds `price=BA`, because OANDA  v20 API rejects a /candles request
+          that lacks the price param and your wrapper then yields an empty list.
         """
         if not self.api:
             return []
 
-        if "_" not in instrument:               # raw MT5 code
+        # Ensure proper instrument format
+        if "_" not in instrument:
             instrument = mt5_to_oanda(instrument)
 
-        return self.api.get_candles(instrument, granularity, count)
+        # Build endpoint manually so we can inject `price=BA`
+        endpoint = (
+            f"/instruments/{instrument}/candles"
+            f"?count={count}&price=BA&granularity={granularity}"
+        )
+
+        try:
+            resp = self.api._make_request(endpoint)
+            return resp.get("candles", []) if isinstance(resp, dict) else []
+        except Exception as exc:
+            logger.error(f"OANDA candle fetch error for {instrument}: {exc}")
+            return []
 
     def get_open_trades(self) -> List[Dict[str, Any]]:
         if not self.api:
