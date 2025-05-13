@@ -93,6 +93,21 @@ class SignalScorer:
     def _normalize_symbol_for_db(self, symbol: str) -> str:
         """Convert symbol with underscores (XAU_USD) to format stored in database (XAUUSD)"""
         return symbol.replace('_', '') if symbol else symbol
+            
+    def __init__(self):
+        """Initialize the SignalScorer with default settings"""
+        self.min_confidence_threshold = 0.70  # Base minimum confidence threshold
+        self.min_technical_score = 0.60      # Minimum technical score required
+        self.max_correlation_threshold = 0.75 # Maximum correlation allowed between pairs
+        self.evaluation_period_days = 90     # Days of history to analyze for performance adjustment (extended from 14)
+        
+        # Trade side mapping
+        self.action_to_side = {
+            SignalAction.BUY_NOW: TradeSide.BUY,
+            SignalAction.SELL_NOW: TradeSide.SELL,
+            SignalAction.ANTICIPATED_LONG: TradeSide.BUY,
+            SignalAction.ANTICIPATED_SHORT: TradeSide.SELL
+        }
         
         # Currency correlations - initial estimates, will be dynamically updated
         self.pair_correlations = {
