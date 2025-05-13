@@ -4,11 +4,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 import enum
 import json
+from websocket_routes import register, signals_queue
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List, Union
 from config import mt5_to_oanda
 
 from flask import Flask, render_template, request, jsonify, Response, redirect, url_for, send_file, make_response
+from flask_sock import sock
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
@@ -1387,3 +1389,5 @@ with app.app_context():
 # ──────────────────────── dev entry point ──────────────────────
 if __name__ == "__main__":     # python app.py  (dev)
     app.run(host="0.0.0.0", port=5000, debug=True)
+
+

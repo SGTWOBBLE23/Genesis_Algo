@@ -18,3 +18,5 @@ pyarrow>=15.0
 openai
 sqlalchemy
 openai
+flask-sock
+hypercorn
