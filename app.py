@@ -10,7 +10,7 @@ from typing import Dict, Any, Optional, List, Union
 from config import mt5_to_oanda
 
 from flask import Flask, render_template, request, jsonify, Response, redirect, url_for, send_file, make_response
-from flask_sock import sock
+from flask_sock import Sock
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
