@@ -21,3 +21,4 @@ openai
 flask-sock
 hypercorn
 flask-sock
+hypercorn

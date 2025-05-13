@@ -4,14 +4,17 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 import enum
 import json
+import websocket_routes
 from websocket_routes import register, signals_queue
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List, Union
 from config import mt5_to_oanda
 
 from flask import Flask, render_template, request, jsonify, Response, redirect, url_for, send_file, make_response
-from flask_sock import Sock
+from flask_sock import sock
 from flask_sqlalchemy import SQLAlchemy
+
+sock = Sock(app)
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
