@@ -82,11 +82,19 @@ class SignalScorer:
         self.max_correlation_threshold = 0.75 # Maximum correlation allowed between pairs
         self.evaluation_period_days = 90     # Days of history to analyze for performance adjustment (extended from 14)
         
+        # Trade side mapping
+        self.action_to_side = {
+            SignalAction.BUY_NOW: TradeSide.BUY,
+            SignalAction.SELL_NOW: TradeSide.SELL,
+            SignalAction.ANTICIPATED_LONG: TradeSide.BUY,
+            SignalAction.ANTICIPATED_SHORT: TradeSide.SELL
+        }
+        
     def _normalize_symbol_for_db(self, symbol: str) -> str:
         """Convert symbol with underscores (XAU_USD) to format stored in database (XAUUSD)"""
         return symbol.replace('_', '') if symbol else symbol
         
-    # Currency correlations - initial estimates, will be dynamically updated
+        # Currency correlations - initial estimates, will be dynamically updated
         self.pair_correlations = {
             'EURUSD': {
                 'GBPUSD': 0.85,  # EUR and GBP often move together against USD
@@ -438,12 +446,15 @@ class SignalScorer:
 
             # Get performance data from recent trades
             cutoff_date = datetime.now() - timedelta(days=self.evaluation_period_days)
-
-            logger.info(f"Looking for {symbol} {side.name} trades closed after {cutoff_date}")
+            
+            # Convert XAU_USD format to XAUUSD for database queries
+            db_symbol = self._normalize_symbol_for_db(symbol)
+            
+            logger.info(f"Looking for {symbol} (DB: {db_symbol}) {side.name} trades closed after {cutoff_date}")
 
             # First check if we have any trades at all for this symbol
             total_trades_count = Trade.query.filter(
-                Trade.symbol == symbol,
+                Trade.symbol == db_symbol,
                 Trade.side == side,
                 Trade.status == TradeStatus.CLOSED
             ).count()
@@ -452,7 +463,7 @@ class SignalScorer:
 
             # Now get the trades within our evaluation period
             trades = Trade.query.filter(
-                Trade.symbol == symbol,
+                Trade.symbol == db_symbol,
                 Trade.side == side,
                 Trade.status == TradeStatus.CLOSED,
                 Trade.closed_at >= cutoff_date
@@ -530,6 +541,9 @@ class SignalScorer:
             - should_proceed: True if correlation check passes, False if failed
         """
         try:
+            # Convert incoming symbol to database format (remove underscore)
+            db_symbol = self._normalize_symbol_for_db(symbol)
+            
             # Get current open positions
             open_trades = Trade.query.filter(Trade.status == TradeStatus.OPEN).all()
 
@@ -550,14 +564,18 @@ class SignalScorer:
                 trade_side = trade.side
 
                 # Skip same symbol - handled by risk management
-                if trade_symbol == symbol:
+                if trade_symbol == db_symbol:
                     continue
 
+                # Convert both to non-underscore format for correlation lookup
+                corr_symbol = self._normalize_symbol_for_db(symbol) 
+                corr_trade_symbol = trade_symbol  # Already in DB format without underscore
+
                 # Get base correlation
-                if trade_symbol in self.pair_correlations and symbol in self.pair_correlations[trade_symbol]:
-                    base_correlation = self.pair_correlations[trade_symbol][symbol]
-                elif symbol in self.pair_correlations and trade_symbol in self.pair_correlations[symbol]:
-                    base_correlation = self.pair_correlations[symbol][trade_symbol]
+                if corr_trade_symbol in self.pair_correlations and corr_symbol in self.pair_correlations[corr_trade_symbol]:
+                    base_correlation = self.pair_correlations[corr_trade_symbol][corr_symbol]
+                elif corr_symbol in self.pair_correlations and corr_trade_symbol in self.pair_correlations[corr_symbol]:
+                    base_correlation = self.pair_correlations[corr_symbol][corr_trade_symbol]
                 else:
                     # Unknown correlation, assume moderate
                     base_correlation = 0.5
