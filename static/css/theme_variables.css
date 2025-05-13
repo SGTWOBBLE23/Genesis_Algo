@@ -1,0 +1,82 @@
+/**
+ * GENESIS Trading Platform - Theme variables
+ * This file defines CSS variables for light and dark themes.
+ */
+
+/* Light theme variables */
+.light-theme {
+    --body-bg: #f8f9fa;
+    --body-color: #333333;
+    --card-bg: #ffffff;
+    --card-border: #dee2e6;
+    --sidebar-bg: #0033a0;
+    --sidebar-color: #ffffff;
+    --table-bg: #ffffff;
+    --table-border: #dee2e6;
+    --table-striped: #f8f9fa;
+    --input-bg: #ffffff;
+    --input-border: #ced4da;
+    --input-color: #333333;
+    --btn-default-bg: #f8f9fa;
+    --btn-default-border: #dee2e6;
+    --btn-default-color: #333333;
+}
+
+/* Dark theme variables */
+.dark-theme {
+    --body-bg: #212529;
+    --body-color: #f8f9fa;
+    --card-bg: #2c3034;
+    --card-border: #444444;
+    --sidebar-bg: #1a1a1a;
+    --sidebar-color: #ffffff;
+    --table-bg: #2c3034;
+    --table-border: #444444;
+    --table-striped: #343a40;
+    --input-bg: #343a40;
+    --input-border: #495057;
+    --input-color: #f8f9fa;
+    --btn-default-bg: #343a40;
+    --btn-default-border: #495057;
+    --btn-default-color: #f8f9fa;
+}
+
+/* Apply theme variables to elements */
+body {
+    background-color: var(--body-bg);
+    color: var(--body-color);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.card {
+    background-color: var(--card-bg);
+    border-color: var(--card-border);
+}
+
+.table {
+    color: var(--body-color);
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: var(--table-striped);
+}
+
+.sidebar {
+    background-color: var(--sidebar-bg) !important;
+    color: var(--sidebar-color) !important;
+}
+
+.bg-dark {
+    background-color: var(--sidebar-bg) !important;
+}
+
+input, select, textarea {
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--input-color);
+}
+
+.btn-outline-secondary {
+    border-color: var(--btn-default-border);
+    color: var(--btn-default-color);
+}
