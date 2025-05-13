@@ -28,11 +28,6 @@ class Base(DeclarativeBase):
 
 db = SQLAlchemy(app, model_class=Base)
 
-# Initialize Sock for WebSockets
-sock = Sock(app)
-# Register WebSocket routes
-register(sock)
-
 
 from sqlalchemy.sql import func
 from sqlalchemy import and_, cast, Text

@@ -1,0 +1,53 @@
+Price data initialized
+dashboard.js:452 WebSocket connection to 'wss://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev/api/signals/ws' failed: Error during WebSocket handshake: Unexpected response code: 403
+connectWebSocket @ dashboard.js:452
+dashboard.js:518 WebSocket error: Unknown error
+socket.onerror @ dashboard.js:518
+dashboard.js:506 WebSocket connection died
+dashboard.js:513 Attempting WebSocket reconnection in 2 seconds...
+dashboard.js:142 Trade data processed but UI display removed as requested
+dashboard.js:294 Available signals: Array(356)
+dashboard.js:452 WebSocket connection to 'wss://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev/api/signals/ws' failed: Error during WebSocket handshake: Unexpected response code: 403
+connectWebSocket @ dashboard.js:452
+dashboard.js:518 WebSocket error: Unknown error
+socket.onerror @ dashboard.js:518
+dashboard.js:506 WebSocket connection died
+dashboard.js:513 Attempting WebSocket reconnection in 2 seconds...
+dashboard.js:452 WebSocket connection to 'wss://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev/api/signals/ws' failed: Error during WebSocket handshake: Unexpected response code: 403
+connectWebSocket @ dashboard.js:452
+dashboard.js:518 WebSocket error: Unknown error
+socket.onerror @ dashboard.js:518
+dashboard.js:506 WebSocket connection died
+dashboard.js:513 Attempting WebSocket reconnection in 3 seconds...
+dashboard.js:142 Trade data processed but UI display removed as requested
+dashboard.js:452 WebSocket connection to 'wss://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev/api/signals/ws' failed: Error during WebSocket handshake: Unexpected response code: 403
+connectWebSocket @ dashboard.js:452
+dashboard.js:518 WebSocket error: Unknown error
+socket.onerror @ dashboard.js:518
+error (async)
+connectWebSocket @ dashboard.js:517
+dashboard.js:506 WebSocket connection died
+dashboard.js:513 Attempting WebSocket reconnection in 5 seconds...
+dashboard.js:142 Trade data processed but UI display removed as requested
+dashboard.js:452 WebSocket connection to 'wss://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev/api/signals/ws' failed: Error during WebSocket handshake: Unexpected response code: 403
+connectWebSocket @ dashboard.js:452
+dashboard.js:518 WebSocket error: Unknown error
+socket.onerror @ dashboard.js:518
+error (async)
+connectWebSocket @ dashboard.js:517
+setTimeout (async)
+socket.onclose @ dashboard.js:514
+dashboard.js:506 WebSocket connection died
+dashboard.js:513 Attempting WebSocket reconnection in 8 seconds...
+2dashboard.js:142 Trade data processed but UI display removed as requested
+dashboard.js:452 WebSocket connection to 'wss://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev/api/signals/ws' failed: Error during WebSocket handshake: Unexpected response code: 403
+connectWebSocket @ dashboard.js:452
+dashboard.js:518 WebSocket error: Unknown error
+socket.onerror @ dashboard.js:518
+error (async)
+connectWebSocket @ dashboard.js:517
+setTimeout (async)
+socket.onclose @ dashboard.js:514
+dashboard.js:506 WebSocket connection died
+dashboard.js:513 Attempting WebSocket reconnection in 11 seconds...
+dashboard.js:142 Trade data processed but UI display removed as requested
