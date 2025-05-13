@@ -17,3 +17,4 @@ joblib
 pyarrow>=15.0
 openai
 sqlalchemy
+openai

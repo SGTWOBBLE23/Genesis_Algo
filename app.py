@@ -299,6 +299,7 @@ class Trade(db.Model):
     __tablename__ = "trades"
 
     id = db.Column(db.Integer, primary_key=True)
+    account_id = db.Column(db.String(32), index=True)
     signal_id = db.Column(db.Integer, db.ForeignKey("signals.id"), nullable=True)
     ticket = db.Column(db.String(50), nullable=True)  # MT5 ticket number
     symbol = db.Column(db.String(20), nullable=False)
