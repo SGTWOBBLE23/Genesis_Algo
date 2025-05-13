@@ -77,7 +77,7 @@ class SignalScorer:
 
     def __init__(self):
         # Configuration settings
-        self.min_confidence_threshold = 0.55  # Base minimum confidence threshold
+        self.min_confidence_threshold = 0.70  # Base minimum confidence threshold
         self.min_technical_score = 0.60      # Minimum technical score required
         self.max_correlation_threshold = 0.75 # Maximum correlation allowed between pairs
         self.evaluation_period_days = 90     # Days of history to analyze for performance adjustment (extended from 14)

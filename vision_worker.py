@@ -458,6 +458,13 @@ BUY_NOW | SELL_NOW | ANTICIPATED_LONG | ANTICIPATED_SHORT
 ────────────────────────────────────────
 CONFIDENCE SCORE
 0.90 – 1.00 = Perfect (multiple confirmations) | 0.80 – 0.89 = Strong | 0.70 – 0.79 = Good | 0.60 – 0.69 = Marginal | < 0.60 = Reject / no-trade
+Start from 0.55 then adjust:
+• +0.05  for each additional confirmation beyond the first (EMA confluence, divergence, FVG rejection, range edge, etc.)
+• +0.03  if ATR > its 20-bar average (momentum)
+• –0.05  if the entry is counter-trend relative to the one-time-frame-higher EMA-50 slope
+• –0.07  if major news is scheduled within 60 minutes (`major_news_within_60m = true`)
+Clamp the final value to 0.50 – 0.99 and round to two decimals.
+This creates a natural distribution: marginal ideas ~0.60, textbook setups ~0.85-0.92, near-perfect confluence ≥0.95.
 
 ────────────────────────────────────────
 ➕ NUMBER-FORMATTING REQUIREMENTS
