@@ -6,7 +6,7 @@ packages = ["arrow-cpp", "cairo", "ffmpeg-full", "freetype", "ghostscript", "gli
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["hypercorn", "main:app", "--bind", "0.0.0.0:5000"]
+run = ["gunicorn", "--bind", "0.0.0.0:5000", "main:app"]
 
 [workflows]
 runButton = "Project"
@@ -17,9 +17,8 @@ mode = "parallel"
 author = "agent"
 
 [[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "hypercorn --bind 0.0.0.0:5000 --reload main:app"
-waitForPort = 5000
+task = "workflow.run"
+args = "Start application"
 
 [[workflows.workflow]]
 name = "Start application"
