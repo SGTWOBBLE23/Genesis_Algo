@@ -1,5 +1,7 @@
 import os
 import logging
+import numpy as np
+import pandas as pd
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
@@ -199,3 +201,29 @@ def pip_tolerance(symbol: str) -> float:
 def is_price_too_close(symbol: str, price_a: float, price_b: float) -> bool:
     """True if the two prices sit inside the instrument’s 10-pip band."""
     return abs(price_a - price_b) <= pip_tolerance(symbol)
+
+def get_atr(symbol: str, timeframe: str = "M15", lookback: int = 14) -> float | None:
+    """
+    Returns ATR-{lookback} in *pips* for the requested symbol / timeframe.
+    Uses fetch_candles(), which must return a DataFrame with
+    ['high', 'low', 'close'] columns and at least (lookback + 1) rows.
+    """
+    df: pd.DataFrame | None = fetch_candles(symbol, timeframe, count=lookback + 1)
+    if df is None or len(df) < lookback + 1:
+        return None
+
+    high  = df["high"].to_numpy()
+    low   = df["low"].to_numpy()
+    close = df["close"].to_numpy()
+
+    # True-range vector
+    tr = np.maximum.reduce([
+        high[1:] - low[1:],
+        np.abs(high[1:] - close[:-1]),
+        np.abs(low[1:]  - close[:-1]),
+    ])
+
+    # Price-units ATR → pips
+    factor = price_to_pip_factor(symbol)
+    atr_pips = (tr[-lookback:].mean()) * factor
+    return float(atr_pips)
