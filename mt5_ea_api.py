@@ -599,6 +599,9 @@ def get_signals():
             mt5_symbol = symbol_map.get(signal.symbol, mt5_symbol)
             # -------------------------------------------------------------------
 
+            # Set force_execution flag (only true for immediate actions, false for anticipated)
+            is_immediate_action = action in ("BUY_NOW", "SELL_NOW")
+            
             formatted_signal = {
                 "id":            signal.id,
                 "asset":         {"symbol": mt5_symbol},
@@ -608,7 +611,7 @@ def get_signals():
                 "take_profit":   float(signal.tp) if signal.tp else 0.0,
                 "confidence":    float(signal.confidence),
                 "position_size": 0.1,                           # (Task #5 will replace)
-                "force_execution": action in ("BUY_NOW", "SELL_NOW"),
+                "force_execution": is_immediate_action,
             }
 
             # -------- Context overrides (optional) -----------------------------
@@ -624,7 +627,12 @@ def get_signals():
                     formatted_signal["asset"]["symbol"] = ctx["mt5_symbol"]
                 if ctx.get("position_size") is not None:
                     formatted_signal["position_size"] = float(ctx["position_size"])
-                if ctx.get("force_execution") is not None:
+                # For anticipated signals, always ensure force_execution is False
+                # regardless of what might be in the context
+                if action in ("ANTICIPATED_LONG", "ANTICIPATED_SHORT"):
+                    formatted_signal["force_execution"] = False
+                    logger.info(f"Ensuring force_execution=False for anticipated signal {signal.id}")
+                elif ctx.get("force_execution") is not None:
                     formatted_signal["force_execution"] = bool(ctx["force_execution"])
                 if ctx.get("timeframe"):
                     formatted_signal["timeframe"] = ctx["timeframe"]
