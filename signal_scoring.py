@@ -33,7 +33,7 @@ from app import (
     TradeStatus, TradeSide,
     Log, LogLevel,
 )
-from chart_utils import fetch_candles
+from chart_utils import fetch_candles, get_atr, price_to_pip_factor
 
 # --------------------------------------------------------------------------
 #  Configuration
@@ -623,6 +623,23 @@ class SignalScorer:
             Tuple of (should_execute, details_dict)
         """
         try:
+
+            # ── ATR sanity-check : reject SL < 0.3 × ATR ───────────────────
+            sl_pips = abs(signal.entry - signal.sl) * price_to_pip_factor(signal.symbol)
+            atr = get_atr(
+                symbol     = signal.symbol,
+                timeframe  = signal.context.get("timeframe", "M15"),
+                lookback   = 14,
+            )
+            if atr and sl_pips < 0.3 * atr:
+                return False, {
+                    "decision": "reject",
+                    "reason"  : f"SL {sl_pips:.1f} pips < 0.3 × ATR {atr:.1f}",
+                    "atr"     : atr,
+                    "sl_pips" : sl_pips,
+                }
+            # ----------------------------------------------------------------
+
 
             if not self.merge_or_update(signal):
                 return False, {"decision": "merged_into_existing"}
