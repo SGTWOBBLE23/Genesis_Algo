@@ -4,16 +4,27 @@ import logging
 import time
 import os
 from typing import Dict, Any
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, datetime as dt
 from config import ASSETS        # new
 from sqlalchemy import func
 from chart_utils import is_price_too_close
 from app import db, Signal, SignalAction, app
 from signal_scoring import signal_scorer
 from models import SignalStatus
+from zoneinfo import ZoneInfo 
 
 import redis
 import requests
+
+def classify_session(t_utc: dt) -> str:
+    """Return a coarse FX session tag based on UTC hour."""
+    h = t_utc.hour
+    if 22 <= h or h < 1:   return "Asia"      # Tokyo ramp-up
+    if 1  <= h < 7:        return "London"
+    if 7  <= h < 12:       return "NY_pre"
+    if 12 <= h < 16:       return "NY_main"
+    return "NY_post"
+
 
 logger = logging.getLogger(__name__)
 
@@ -398,9 +409,17 @@ def analyze_image(image_path: str) -> Dict[str, Any]:
             'Authorization': f'Bearer {OPENAI_API_KEY}',
             'Content-Type': 'application/json'
         }
-        
+        # ── build two-line meta header ─────────────────────
+        now_utc  = dt.utcnow().replace(tzinfo=ZoneInfo("UTC"))
+        session  = classify_session(now_utc)
+        meta_hdr = (
+            f"utc_timestamp: {now_utc.isoformat(timespec='seconds').replace('+00:00','Z')}\n"
+            f"session: {session}\n"
+            '---\n'
+        )
+        # ---------------------------------------------------
         # Construct a detailed prompt for the vision model
-        system_prompt = """
+        system_prompt = f"""{meta_hdr}
 You are **GENESIS**, an expert forex-trading analyst and professional chart-pattern-recognition system.  
 Your task is to analyse the supplied forex chart image and return a single, precise trading signal (or decline if none is worth taking).
 
