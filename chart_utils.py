@@ -227,3 +227,20 @@ def get_atr(symbol: str, timeframe: str = "M15", lookback: int = 14) -> float | 
     factor = price_to_pip_factor(symbol)
     atr_pips = (tr[-lookback:].mean()) * factor
     return float(atr_pips)
+
+def price_to_pip_factor(symbol: str) -> int:
+    """
+    Returns the multiplier to convert raw price to pips for a given symbol.
+    Handles:
+    - Forex majors like EURUSD → 10,000
+    - JPY pairs like USDJPY → 100
+    - Metals like XAUUSD → 100
+    """
+    symbol = symbol.upper()
+
+    if "JPY" in symbol and len(symbol) == 6:
+        return 100
+    elif symbol.startswith("XAU") or symbol.startswith("XAG"):
+        return 100
+    else:
+        return 10000
