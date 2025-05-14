@@ -1216,7 +1216,7 @@ def signal_chart(signal_id):
         logger.error(traceback.format_exc())
         return jsonify({"status": "error", "message": f"General error: {str(e)}"}), 500
 
-@mt5_api.route('/account_status', methods=['POST'])
+@mt5_api.route('/account_status', methods=['POST', 'GET'])
 def account_status():
     """Receive account status updates from MT5 EA"""
     try:
@@ -1225,21 +1225,20 @@ def account_status():
         logger.info(f"Received raw account status data: {raw_data}")
         
         # Clean the input data by removing null bytes
-        try:
-            if b'\x00' in raw_data:
-                logger.info("Found null character in the request data, cleaning it")
-                clean_data = raw_data.replace(b'\x00', b'')
-                # Try to parse the cleaned JSON
-                data = json.loads(clean_data.decode('utf-8'))
-                logger.info(f"Successfully parsed cleaned JSON: {data}")
-            else:
-                # Use Flask's built-in parser if no null characters
-                data = request.json
-                
-            logger.debug(f"Account status update received: {data}")
-        except Exception as json_err:
-            logger.error(f"Error parsing JSON: {str(json_err)}")
-            return jsonify({"status": "error", "message": f"Invalid JSON: {str(json_err)}"}), 400
+        if request.method == "GET":
+            data = request.args.to_dict()
+            logger.info(f"[DEBUG] /account_status received GET: {data}")
+        else:
+            try:
+                clean_data = raw_data.replace(b'\x00', b'') if b'\x00' in raw_data else raw_data
+                json_str = clean_data.decode("utf-8")
+                data = json.loads(json_str)
+                logger.info(f"[DEBUG] /account_status parsed JSON: {data}")
+            except Exception as json_err:
+                logger.error(f"Manual JSON parse error: {json_err}")
+                logger.error(f"Raw body (decoded): {json_str if 'json_str' in locals() else 'unavailable'}")
+                return jsonify({"status": "error", "message": f"Invalid JSON format"}), 400
+
         
         if not data:
             return jsonify({"status": "error", "message": "No data provided"}), 400
