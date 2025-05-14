@@ -419,7 +419,7 @@ def analyze_image(image_path: str) -> Dict[str, Any]:
         )
         # ---------------------------------------------------
         # Construct a detailed prompt for the vision model
-        system_prompt = f"""{meta_hdr}
+        system_prompt = meta_hdr +"""
 You are **GENESIS**, an expert forex-trading analyst and professional chart-pattern-recognition system.  
 Your task is to analyse the supplied forex chart image and return a single, precise trading signal (or decline if none is worth taking).
 
