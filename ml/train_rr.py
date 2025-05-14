@@ -66,14 +66,32 @@ def label_best_rr(df: pd.DataFrame, look_ahead: int = 60) -> pd.Series:
     return fav / adv
 
 def build_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Very simple feature set matching vision pipeline meta"""
+    """
+    Build a minimal feature-set that mirrors what the live vision pipeline
+    uses, plus a fast ATR computed locally (so we don’t need the API call).
+    """
+    # True-range vector
+    high  = df["high"].to_numpy()
+    low   = df["low"].to_numpy()
+    close = df["close"].to_numpy()
+
+    tr = np.maximum.reduce([
+        high[1:] - low[1:],
+        np.abs(high[1:] - close[:-1]),
+        np.abs(low[1:]  - close[:-1]),
+    ])
+    # ATR-14 in price units (same length as df, pad first row)
+    atr14 = pd.Series(np.r_[np.nan, tr]).ewm(span=14, adjust=False).mean()
+
     feats = pd.DataFrame({
-        'atr': get_atr(df, period=14),
-        'vwap': (df['high']+df['low']+df['close'])/3,
-        'range': df['high']-df['low'],
-        'session_hour': df.index.hour,
-    })
-    feats = feats.fillna(method='bfill').fillna(method='ffill')
+        "atr":   atr14,
+        "vwap":  (high + low + close) / 3,
+        "range": high - low,
+        "session_hour": df.index.hour,
+    }, index=df.index)
+
+    # Fill initial NaNs produced by the EMA
+    feats = feats.bfill().ffill()
     return feats
 
 # -----------------------------------------------
@@ -81,7 +99,16 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
 # -----------------------------------------------
 def train_symbol(symbol: str, tf: str, window: int):
     logging.info("Training RR model for %s %s", symbol, tf)
-    candles = fetch_candles(symbol, tf, years=3)      # 3‑yr history
+    candles = fetch_candles(symbol, tf, years=3) 
+    if isinstance(candles, list):
+        candles = pd.DataFrame(candles)# 3‑yr history
+    if not pd.api.types.is_datetime64_any_dtype(candles.index):
+        if "timestamp" in candles.columns:
+            candles["timestamp"] = pd.to_datetime(candles["timestamp"])
+            candles = candles.set_index("timestamp")
+        elif "time" in candles.columns:
+            candles["time"] = pd.to_datetime(candles["time"])
+            candles = candles.set_index("time")
     if candles.empty:
         logging.warning("No candles for %s – skipping", symbol)
         return
@@ -98,6 +125,9 @@ def train_symbol(symbol: str, tf: str, window: int):
         objective='reg:squarederror',
         random_state=42
     )
+    mask = np.isfinite(y) & np.isfinite(X).all(axis=1)
+    X = X[mask]
+    y = y[mask]
     model.fit(X, y)
     out_path = MODELS_DIR / f"{symbol}_{tf}_rr.pkl"
     joblib.dump(model, out_path)
