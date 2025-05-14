@@ -4,6 +4,8 @@ from sqlalchemy.sql import func
 from typing import Dict, Any, Optional, List, Union
 from flask_sqlalchemy import SQLAlchemy
 
+
+
 # This will be set when app.py creates the SQLAlchemy instance
 db = None
 
