@@ -1,7 +1,0 @@
-{
-  "default": 0.70,
-  "overrides": {
-    "EURUSD": 0.72,
-    "GBPUSD": 0.70
-  }
-}

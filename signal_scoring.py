@@ -35,7 +35,6 @@ from app import (
 )
 from chart_utils import fetch_candles, get_atr, price_to_pip_factor
 
-
 # --------------------------------------------------------------------------
 #  Configuration
 # --------------------------------------------------------------------------
@@ -46,7 +45,6 @@ CONFIG_PATH = Path(__file__).resolve().parent / "config" / "signal_weights.json"
 # --------------------------------------------------------------------------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger = logging.getLogger("signal_scoring")
 
 
 class _WeightCache:
@@ -83,39 +81,7 @@ class SignalScorer:
         self.min_technical_score = 0.60      # Minimum technical score required
         self.max_correlation_threshold = 0.75 # Maximum correlation allowed between pairs
         self.evaluation_period_days = 90     # Days of history to analyze for performance adjustment (extended from 14)
-        tech_cfg_path = Path(__file__).resolve().parent / "config" / "symbol_thresholds.json"
-
-        try:
-            with open(tech_cfg_path) as fh:
-                tech_cfg = json.load(fh)
-        except FileNotFoundError:
-            tech_cfg = {"default": self.min_technical_score, "overrides": {}}
-
-        # overwrite the base default if calibrator wrote a new one
-        self.min_technical_score = tech_cfg["default"]
-        self.symbol_thresholds   = tech_cfg["overrides"]   # {"EURUSD": 0.55, …}
-
-        # ─── load per-symbol confidence cut-offs  ‹NEW› ─────────────────
-        conf_cfg_path = Path(__file__).resolve().parent / "config" / "conf_thresholds.json"   # ‹NEW›
-        try:                                            # ‹NEW›
-            with open(conf_cfg_path) as fh:             # ‹NEW›
-                conf_cfg = json.load(fh)                # ‹NEW›
-        except FileNotFoundError:                       # ‹NEW›
-            conf_cfg = {"default": self.min_confidence_threshold, "overrides": {}}  # ‹NEW›
-
-        # --- load per-pair correlation cut-offs  ← NEW -----------------
-        corr_cfg_path = Path(__file__).resolve().parent / "config" / "corr_thresholds.json"
-        try:
-            with open(corr_cfg_path) as fh:
-                corr_cfg = json.load(fh)
-        except FileNotFoundError:
-            corr_cfg = {"default": self.max_correlation_threshold, "overrides": {}}
-
-        self.base_conf_threshold = conf_cfg["default"]  # ‹NEW›
-        self.conf_thresholds     = conf_cfg["overrides"]  # ‹NEW›
-        self.max_correlation_threshold = corr_cfg["default"]
-        self.corr_thresholds           = corr_cfg["overrides"]   # {"EURUSD_GBPUSD": 0.90, ...}
-
+        
         # Currency correlations - initial estimates, will be dynamically updated
         self.pair_correlations = {
             'EURUSD': {
@@ -589,13 +555,13 @@ class SignalScorer:
                 trade_symbol = trade.symbol
                 trade_side = trade.side
 
-                # ── NEW: let majors through regardless of correlation ──
-                if corr_symbol in ("EURUSD", "GBPUSD") or corr_trade_symbol in ("EURUSD","GBPUSD"):
-                    continue  # skip correlation check for this pair
+                # Skip same symbol - handled by risk management
+                if trade_symbol == db_symbol:
+                    continue
 
                 # Convert both to non-underscore format for correlation lookup
-                corr_symbol       = self._normalize_symbol_for_db(symbol)
-                corr_trade_symbol = self._normalize_symbol_for_db(trade_symbol)  # Already in DB format without underscore
+                corr_symbol = self._normalize_symbol_for_db(symbol) 
+                corr_trade_symbol = trade_symbol  # Already in DB format without underscore
 
                 # Get base correlation
                 if corr_trade_symbol in self.pair_correlations and corr_symbol in self.pair_correlations[corr_trade_symbol]:
@@ -612,18 +578,7 @@ class SignalScorer:
                 effective_correlation = base_correlation
                 if trade_side != side:
                     effective_correlation = -effective_correlation
-                pair_key     = f"{corr_symbol}_{corr_trade_symbol}"
-                reverse_key  = f"{corr_trade_symbol}_{corr_symbol}"
-                pair_limit   = self.corr_thresholds.get(pair_key,
-                                self.corr_thresholds.get(reverse_key,
-                                                          self.max_correlation_threshold))
 
-                if abs(effective_correlation) > pair_limit:
-                    result = {
-                        "decision": "reject",
-                        "reason"  : "Failed correlation check"
-                    }
-                    return False, result
                 correlations.append({
                     "symbol": trade_symbol,
                     "side": trade_side.name,
@@ -631,9 +586,8 @@ class SignalScorer:
                     "effective_correlation": effective_correlation
                 })
 
-            # ---- AFTER the for-loop ends ----
-            return True, {"passed": True, "reason": "Correlation OK"}
-
+            # Check if any high correlations exist
+            high_correlations = [c for c in correlations if abs(c["effective_correlation"]) >= self.max_correlation_threshold]
 
             details = {
                 "proposed_trade": {
@@ -645,7 +599,14 @@ class SignalScorer:
                 "high_correlations": high_correlations
             }
 
-            return True, {"passed": True, "reason": "Correlation OK"}
+            if high_correlations:
+                details["passed"] = False
+                details["reason"] = "High correlation with existing positions"
+                return False, details
+            else:
+                details["passed"] = True
+                details["reason"] = "Acceptable correlation with existing positions"
+                return True, details
 
         except Exception as e:
             logger.error(f"Error in correlation evaluation: {str(e)}")
@@ -662,7 +623,7 @@ class SignalScorer:
             Tuple of (should_execute, details_dict)
         """
         try:
-            symbol_norm = signal.symbol.replace("_", "").upper()
+
             # ── ATR sanity-check : reject SL < 0.3 × ATR ───────────────────
             sl_pips = abs(signal.entry - signal.sl) * price_to_pip_factor(signal.symbol)
             atr = get_atr(
@@ -671,14 +632,6 @@ class SignalScorer:
                 lookback   = 14,
             )
             if atr and sl_pips < 0.3 * atr:
-                logger.info(
-                    "FINAL %s %s – %s  | tech %.3f/%.2f  conf %.2f/%.2f  reason=%s",
-                    symbol_norm, signal.action.name,
-                    "ACCEPT" if result.get("decision") != "reject" else "REJECT",
-                    technical_score, threshold,
-                    signal.confidence, adjusted_threshold,
-                    result.get("reason", "")
-                )
                 return False, {
                     "decision": "reject",
                     "reason"  : f"SL {sl_pips:.1f} pips < 0.3 × ATR {atr:.1f}",
@@ -689,14 +642,6 @@ class SignalScorer:
 
 
             if not self.merge_or_update(signal):
-                logger.info(
-                    "FINAL %s %s – %s  | tech %.3f/%.2f  conf %.2f/%.2f  reason=%s",
-                    symbol_norm, signal.action.name,
-                    "ACCEPT" if result.get("decision") != "reject" else "REJECT",
-                    technical_score, threshold,
-                    signal.confidence, adjusted_threshold,
-                    result.get("reason", "")
-                )
                 return False, {"decision": "merged_into_existing"}
             result = {"signal_id": signal.id, "symbol": signal.symbol, "action": signal.action.name}
 
@@ -709,23 +654,9 @@ class SignalScorer:
             result["technical_score"] = technical_score
             result["technical_details"] = technical_details
 
-            threshold = self.symbol_thresholds.get(symbol_norm, self.min_technical_score)
-            # DEBUG: log the exact numbers we’re about to compare
-            logger.info(
-                "TECH-DEBUG %s | tech=%.3f  thresh=%.2f  conf=%.2f",
-                symbol_norm, technical_score, threshold, signal.confidence
-            )   
-            if technical_score < threshold:
+            if technical_score < self.min_technical_score:
                 result["decision"] = "reject"
-                result["reason"] = f"Technical score {technical_score:.2f} below threshold                                   {self.min_technical_score:.2f}"
-                logger.info(
-                    "FINAL %s %s – %s  | tech %.3f/%.2f  conf %.2f/%.2f  reason=%s",
-                    symbol_norm, signal.action.name,
-                    "ACCEPT" if result.get("decision") != "reject" else "REJECT",
-                    technical_score, threshold,
-                    signal.confidence, adjusted_threshold,
-                    result.get("reason", "")
-                )
+                result["reason"] = f"Technical score {technical_score:.2f} below threshold {self.min_technical_score:.2f}"
                 return False, result
 
             # Step 2: Performance-Based Adjustment
@@ -737,10 +668,7 @@ class SignalScorer:
             result["performance_details"] = performance_details
 
             # Apply adjustment to confidence threshold
-            adjusted_threshold = self.conf_thresholds.get(
-                symbol_norm,
-                min(0.95, max(0.5, self.base_conf_threshold * adjustment_factor))
-            )
+            adjusted_threshold = min(0.95, max(0.5, self.min_confidence_threshold * adjustment_factor))
             result["base_confidence_threshold"] = self.min_confidence_threshold
             result["adjusted_confidence_threshold"] = adjusted_threshold
 
@@ -758,14 +686,6 @@ class SignalScorer:
             if signal.confidence < adjusted_threshold:
                 result["decision"] = "reject"
                 result["reason"] = f"Signal confidence {signal.confidence:.2f} below adjusted threshold {adjusted_threshold:.2f}"
-                logger.info(
-                    "FINAL %s %s – %s  | tech %.3f/%.2f  conf %.2f/%.2f  reason=%s",
-                    symbol_norm, signal.action.name,
-                    "ACCEPT" if result.get("decision") != "reject" else "REJECT",
-                    technical_score, threshold,
-                    signal.confidence, adjusted_threshold,
-                    result.get("reason", "")
-                )
                 return False, result
 
             # Step 3: Correlation Analysis
@@ -779,27 +699,11 @@ class SignalScorer:
             if not correlation_passed:
                 result["decision"] = "reject"
                 result["reason"] = "Failed correlation check"
-                logger.info(
-                    "FINAL %s %s – %s  | tech %.3f/%.2f  conf %.2f/%.2f  reason=%s",
-                    symbol_norm, signal.action.name,
-                    "ACCEPT" if result.get("decision") != "reject" else "REJECT",
-                    technical_score, threshold,
-                    signal.confidence, adjusted_threshold,
-                    result.get("reason", "")
-                )
                 return False, result
 
             # All checks passed
             result["decision"] = "execute"
             result["reason"] = "Passed all scoring layers"
-            logger.info(
-                "FINAL %s %s – %s  | tech %.3f/%.2f  conf %.2f/%.2f  reason=%s",
-                symbol_norm, signal.action.name,
-                "ACCEPT" if result.get("decision") != "reject" else "REJECT",
-                technical_score, threshold,
-                signal.confidence, adjusted_threshold,
-                result.get("reason", "")
-            )
             return True, result
 
         except Exception as e:
@@ -815,26 +719,10 @@ class SignalScorer:
             if signal.confidence >= self.min_confidence_threshold:
                 error_result["decision"] = "execute"
                 error_result["reason"] = "Error in scoring, defaulting to base confidence check"
-                logger.info(
-                    "FINAL %s %s – %s  | tech %.3f/%.2f  conf %.2f/%.2f  reason=%s",
-                    symbol_norm, signal.action.name,
-                    "ACCEPT" if result.get("decision") != "reject" else "REJECT",
-                    technical_score, threshold,
-                    signal.confidence, adjusted_threshold,
-                    result.get("reason", "")
-                )
                 return True, error_result
             else:
                 error_result["decision"] = "reject"
                 error_result["reason"] = "Error in scoring and below base confidence threshold"
-                logger.info(
-                    "FINAL %s %s – %s  | tech %.3f/%.2f  conf %.2f/%.2f  reason=%s",
-                    symbol_norm, signal.action.name,
-                    "ACCEPT" if result.get("decision") != "reject" else "REJECT",
-                    technical_score, threshold,
-                    signal.confidence, adjusted_threshold,
-                    result.get("reason", "")
-                )
                 return False, error_result
 
 # Global instance
