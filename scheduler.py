@@ -109,20 +109,20 @@ def start_scheduler() -> BackgroundScheduler:
     # Weekly ML retrain – Sunday 23:00 UTC  (≈ 13:00 HST)
     scheduler.add_job(
         retrain_job,
-        CronTrigger(day_of_week="sun", hour=23, minute=0, timezone=pytz.UTC),
+        CronTrigger(day_of_week="fri", hour=21, minute=5, timezone=pytz.UTC),
         id="weekly_ml_retrain",
         name="Weekly ML retrain",
         replace_existing=True,
     )
 
     # (2) Calibrate thresholds – 10 minutes later
-    scheduler.add_job(
-        calibrate_thresholds,
-        CronTrigger(day_of_week="sun", hour=23, minute=10, timezone=pytz.UTC),
-        id="weekly_threshold_calibration",
-        name="Weekly threshold calibration",
-        replace_existing=True,
-    )
+    #scheduler.add_job(
+      #  calibrate_thresholds,
+       #CronTrigger(day_of_week="fri", hour=21, minute=15, timezone=pytz.UTC),
+       #id="weekly_threshold_calibration",
+       #name="Weekly threshold calibration",
+       #replace_existing=True,
+    #)
 
     scheduler.start()
     logger.info("Scheduler started (15-minute, hourly, weekly jobs)")

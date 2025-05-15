@@ -13,7 +13,9 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import pandas as pd
 from sqlalchemy import text
-from app import db, Signal, Trade               # ⬅ already in project
+from app import app, db, Signal, Trade        
+from signal_scoring import SignalScorer 
+
 
 LOG = logging.getLogger("threshold_calibrator")
 CONFIG_PATH = Path(__file__).resolve().parent.parent / "config"
@@ -24,16 +26,23 @@ LOOKBACK_DAYS = 30              # tunable
 def fetch_history(days: int = LOOKBACK_DAYS) -> pd.DataFrame:
     since = datetime.utcnow() - timedelta(days=days)
     sql = text("""
-        SELECT s.symbol,
-               s.technical_score,
-               t.profit_points  AS pnl           -- (+) win, (–) loss
-        FROM signals       AS s
-        JOIN trades        AS t   ON t.signal_id = s.id
+        SELECT s.id, s.symbol,
+               t.profit_points AS pnl,
+               s.raw_payload                 -- whatever column stores the
+                                            -- original JSON/fields you need
+        FROM signals AS s
+        JOIN trades  AS t ON t.signal_id = s.id
         WHERE s.created_at >= :since
-          AND s.technical_score IS NOT NULL
     """)
-    df = pd.read_sql(sql, db.engine, params={"since": since})
-    return df
+    raw = pd.read_sql(sql, db.engine, params={"since": since})
+    tech_scores = []
+    for _, row in raw.iterrows():
+        sig_obj = Signal.from_json(row["raw_payload"])   # or however you rebuild
+        score, _ = scorer.score_signal(sig_obj)
+        tech_scores.append(score)
+
+    raw["technical_score"] = tech_scores
+    return raw
 
 # ─── 2) Calibrate one symbol ─────────────────────────────────────────────
 def best_threshold(df_sym: pd.DataFrame) -> float:
@@ -57,22 +66,23 @@ def best_threshold(df_sym: pd.DataFrame) -> float:
 
 # ─── 3) Main entry point ─────────────────────────────────────────────────
 def main() -> None:
-    LOG.info("Calibrating thresholds from last %d days", LOOKBACK_DAYS)
-    df = fetch_history()
-    if df.empty:
-        LOG.warning("No data – skipping calibration")
-        return
+    with app.app_context():        # <-- NEW: open Flask context
+        LOG.info("Calibrating thresholds from last %d days", LOOKBACK_DAYS)
+        df = fetch_history()
+        if df.empty:
+            LOG.warning("No data – skipping calibration")
+            return
 
-    out = {"default": 0.60, "overrides": {}}
-
-    for sym, grp in df.groupby("symbol"):
-        cut = best_threshold(grp)
-        if math.isnan(cut):
-            LOG.info("%s: not enough data – keep default", sym)
-            continue
-        out["overrides"][sym] = cut
-        LOG.info("%s: best cut-off %.2f (trades=%d)",
-                 sym, cut, len(grp))
+        out = {"default": 0.60, "overrides": {}}
+    
+        for sym, grp in df.groupby("symbol"):
+            cut = best_threshold(grp)
+            if math.isnan(cut):
+                LOG.info("%s: not enough data – keep default", sym)
+                continue
+            out["overrides"][sym] = cut
+            LOG.info("%s: best cut-off %.2f (trades=%d)",
+                     sym, cut, len(grp))
 
     CONFIG_PATH.mkdir(exist_ok=True)
     with open(OUTFILE, "w") as fh:
