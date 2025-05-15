@@ -95,6 +95,21 @@ def start_scheduler() -> BackgroundScheduler:
         name="Capture all assets every 15 min (+10 s buffer)",
         replace_existing=True,
     )
+    
+    # Add the trade exit monitor job to run every 15 minutes
+    # Import here to avoid circular imports
+    try:
+        from create_exit_monitor import monitor_trades_and_apply_exit_system
+        scheduler.add_job(
+            monitor_trades_and_apply_exit_system,
+            CronTrigger(second=40, minute="*/15"),  # Run 30 seconds after capture job
+            id="exit_monitor",
+            name="Monitor trades for exit signals every 15 minutes",
+            replace_existing=True,
+        )
+        logger.info("Added exit monitor job to scheduler")
+    except Exception as e:
+        logger.error(f"Failed to add exit monitor job: {e}")
 
     # Hourly at HH:00:10
     scheduler.add_job(
