@@ -924,6 +924,76 @@ def update_trades():
         logger.error(f"Error updating trades: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# ──────────────────────────────────────────────────────────────
+#  CLOSE / MODIFY endpoints – called by your Python back-end
+#  (ExitNet or manual dashboard) to tell the EA what to do.
+#  ReportBot EA will poll these URLs every OnTimer().
+# ──────────────────────────────────────────────────────────────
+
+# in-memory queue  ➜  terminal_id → [ ticket, … ]
+pending_closures   = {}     # {"12345678": [8754321,8754322]}
+pending_mods       = {}     # {"12345678": {ticket: {"sl":..,"tp":..}, …}}
+
+@mt5_api.route("/close_ticket", methods=["POST"])
+def api_close_ticket():
+    """
+    JSON:  { "account_id":"12345678", "ticket": 8754321 }
+    Queues the ticket for immediate full close by the EA.
+    """
+    data = request.get_json(force=True) or {}
+    acct = str(data.get("account_id", "")).strip()
+    tk   = str(data.get("ticket", "")).strip()
+
+    if not acct or not tk:
+        return jsonify({"status":"error","msg":"account_id & ticket required"}), 400
+
+    pending_closures.setdefault(acct, []).append(tk)
+    logger.info(f"Queued CLOSE for account {acct} ticket {tk}")
+    return jsonify({"status": "ok"})
+
+@mt5_api.route("/modify_sl_tp", methods=["POST"])
+def api_modify_sl_tp():
+    """
+    JSON:  { "account_id":"12345678", "ticket":8754321, "sl":2345.6, "tp":2360.0 }
+    Queues a SL/TP modification for the EA.
+    """
+    data  = request.get_json(force=True) or {}
+    acct  = str(data.get("account_id", "")).strip()
+    tk    = str(data.get("ticket", "" )).strip()
+    sl    = data.get("sl")
+    tp    = data.get("tp")
+
+    if not acct or not tk:
+        return jsonify({"status":"error","msg":"account_id & ticket required"}), 400
+    if sl is None and tp is None:
+        return jsonify({"status":"error","msg":"sl or tp must be provided"}), 400
+
+    pending_mods.setdefault(acct, {})[tk] = {"sl": sl, "tp": tp}
+    logger.info(f"Queued MODIFY for acct {acct} ticket {tk}: SL={sl} TP={tp}")
+    return jsonify({"status": "ok"})
+
+# ------------------------------------------------------------------
+#  POLLING helpers — ReportBot EA calls these via WebRequest(GET)
+# ------------------------------------------------------------------
+
+@mt5_api.route("/poll_close_queue", methods=["GET"])
+def poll_close_queue():
+    """EA calls ?account_id=XXX → gets and clears list of tickets to close."""
+    acct = request.args.get("account_id", "")
+    tickets = pending_closures.pop(acct, [])
+    return jsonify({"tickets": tickets})
+
+@mt5_api.route("/poll_modify_queue", methods=["GET"])
+def poll_modify_queue():
+    """EA calls ?account_id=XXX → gets and clears dict of ticket→{sl,tp}."""
+    acct = request.args.get("account_id", "")
+    mods = pending_mods.pop(acct, {})
+    return jsonify({"mods": mods})
+
+
+
+
+
 # API endpoints for frontend (non-EA) calls
 @api_routes.route('/signals/<int:signal_id>/execute', methods=['POST'])
 def execute_signal(signal_id):

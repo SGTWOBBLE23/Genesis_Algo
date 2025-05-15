@@ -1,39 +1,71 @@
-import os
+# ────────────────────────────────────────
+#  Standard-library imports
+# ────────────────────────────────────────
 import logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 import enum
 import json
-import websocket_routes
-from websocket_routes import register, signals_queue
+import os
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List, Union
-from config import mt5_to_oanda
+from typing import Any, Dict, List, Optional, Union
 
-from flask import Flask, render_template, request, jsonify, Response, redirect, url_for, send_file, make_response
+# ────────────────────────────────────────
+#  Third-party imports
+# ────────────────────────────────────────
+from flask import (
+    Flask,
+    Response,
+    jsonify,
+    make_response,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    url_for,
+)
 from flask_sock import Sock
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import and_, cast, Text
+from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.sql import func
+from pydantic import BaseModel                   # ← added for /mt5/close_trade schema
 
+# ────────────────────────────────────────
+#  Internal / project-level imports
+# ────────────────────────────────────────
+import websocket_routes
+from websocket_routes import register, signals_queue
+from config import mt5_to_oanda
+from mt5_manager import MT5Manager               # ← added for ticket-close endpoint
+from trade_logger import TradeLogger
+
+# ────────────────────────────────────────
+#  Logging setup
+# ────────────────────────────────────────
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# ────────────────────────────────────────
+#  Flask app + SQLAlchemy setup
+# ────────────────────────────────────────
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_pre_ping": True,   # ping before checkout
     "pool_size": 2,          # keep 2 connections in pool (Replit-friendly)
-    "max_overflow": 0        # don’t create extra connections
+    "max_overflow": 0,       # don’t create extra connections
 }
 
-from sqlalchemy.orm import DeclarativeBase
 class Base(DeclarativeBase):
+    """SQLAlchemy declarative base"""
     pass
 
 db = SQLAlchemy(app, model_class=Base)
 
-
-from sqlalchemy.sql import func
-from sqlalchemy import and_, cast, Text
-from trade_logger import TradeLogger
-
+# ────────────────────────────────────────
+#  Global helpers / singletons
+# ────────────────────────────────────────
 trade_logger = TradeLogger()
+mt5_mgr      = MT5Manager()          # used by /mt5/close_trade endpoint
 
 # Configure logging with custom filter for important INFO logs
 class ImportantInfoFilter(logging.Filter):
