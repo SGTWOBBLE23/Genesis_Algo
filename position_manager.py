@@ -120,10 +120,23 @@ class PositionManager:
         if pos.ticket is None:
             return
         try:
-            requests.post(
+            # Update to explicitly log the ticket being sent
+            ticket = int(pos.ticket)
+            account_id = ACCOUNT_ID
+            
+            logger.info(f"Sending close request for ticket {ticket} on account {account_id}")
+            
+            response = requests.post(
                 f"{API_HOST}/mt5/close_ticket",
-                json={"account_id": ACCOUNT_ID, "ticket": int(pos.ticket)},
+                json={"account_id": account_id, "ticket": ticket},
                 timeout=2,
             )
+            
+            # Log the response status to verify it worked
+            if response.ok:
+                logger.info(f"Successfully added ticket {ticket} to close queue")
+            else:
+                logger.warning(f"Close ticket request failed with status {response.status_code}: {response.text}")
+                
         except Exception as exc:
             logger.error("close_ticket POST failed: %s", exc)
