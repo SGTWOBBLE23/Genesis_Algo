@@ -81,7 +81,17 @@ class SignalScorer:
         self.min_technical_score = 0.60      # Minimum technical score required
         self.max_correlation_threshold = 0.75 # Maximum correlation allowed between pairs
         self.evaluation_period_days = 90     # Days of history to analyze for performance adjustment (extended from 14)
-        
+        cfg_path = Path(__file__).resolve().parent / "config" / "symbol_thresholds.json"
+
+        try:
+            with open(cfg_path) as fh:
+                cfg = json.load(fh)
+        except FileNotFoundError:
+            cfg = {"default": self.min_technical_score, "overrides": {}}
+
+        # overwrite the base default if calibrator wrote a new one
+        self.min_technical_score = cfg["default"]
+        self.symbol_thresholds   = cfg["overrides"]        # {"EURUSD": 0.55, ...}
         # Currency correlations - initial estimates, will be dynamically updated
         self.pair_correlations = {
             'EURUSD': {
@@ -654,9 +664,10 @@ class SignalScorer:
             result["technical_score"] = technical_score
             result["technical_details"] = technical_details
 
-            if technical_score < self.min_technical_score:
+            threshold = self.symbol_thresholds.get(signal.symbol, self.min_technical_score)
+            if technical_score < threshold:
                 result["decision"] = "reject"
-                result["reason"] = f"Technical score {technical_score:.2f} below threshold {self.min_technical_score:.2f}"
+                result["reason"] = f"Technical score {technical_score:.2f} below threshold                                   {self.min_technical_score:.2f}"
                 return False, result
 
             # Step 2: Performance-Based Adjustment

@@ -11,6 +11,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 import pytz                                       # NEW
 import ml.train_models as train_models
+from ml.calibrate_thresholds import main as calibrate_thresholds
 
 import capture_job
 from config import ASSETS              # 👈 unified list
@@ -111,6 +112,15 @@ def start_scheduler() -> BackgroundScheduler:
         CronTrigger(day_of_week="sun", hour=23, minute=0, timezone=pytz.UTC),
         id="weekly_ml_retrain",
         name="Weekly ML retrain",
+        replace_existing=True,
+    )
+
+    # (2) Calibrate thresholds – 10 minutes later
+    scheduler.add_job(
+        calibrate_thresholds,
+        CronTrigger(day_of_week="sun", hour=23, minute=10, timezone=pytz.UTC),
+        id="weekly_threshold_calibration",
+        name="Weekly threshold calibration",
         replace_existing=True,
     )
 
