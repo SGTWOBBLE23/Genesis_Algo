@@ -647,6 +647,7 @@ def get_signals():
                         ctx = json.loads(signal.context_json) if ctx is None else ctx
                         ctx["mt5_processed"] = True
                         signal.context_json = json.dumps(ctx)
+                        signal.status = "ACTIVE"
                     except Exception as e:
                         logger.warning(f"Couldn’t update context for {signal.id}: {e}")
                         signal.status = "ACTIVE"
