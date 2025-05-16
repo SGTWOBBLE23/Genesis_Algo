@@ -852,6 +852,30 @@ def update_trades():
                                .all()
         }
 
+        # Get list of trades that are marked as OPEN in the database
+        # but were not included in this update (they might be closed)
+        if len(tickets) > 0:
+            all_open_trades = db.session.query(Trade).filter(
+                Trade.account_id == account_id,
+                Trade.status == TradeStatus.OPEN,
+                ~Trade.ticket.in_(tickets)  # Not in current open trades list
+            ).all()
+            
+            # If we found trades that are marked as OPEN but aren't in the active list
+            # update them to CLOSED status
+            for missing_trade in all_open_trades:
+                logger.info(f"Trade {missing_trade.ticket} not in MT5's active trades - marking as CLOSED")
+                missing_trade.status = TradeStatus.CLOSED
+                missing_trade.closed_at = datetime.now()
+                context = missing_trade.context or {}
+                context["closed_by"] = "sync_missing"
+                context["last_update"] = datetime.now().isoformat()
+                missing_trade.context = context
+            
+            if all_open_trades:
+                db.session.commit()
+                logger.info(f"Closed {len(all_open_trades)} trades that are no longer in MT5")
+
         new_objects, updated, created = [], 0, 0
 
         # ──────────────────────────────────────────────────────────────
@@ -879,7 +903,7 @@ def update_trades():
                 status    = TradeStatus.CLOSED if info.get("status") == "CLOSED" else TradeStatus.OPEN,
                 opened_at = _dt(info.get("opened_at")),
                 closed_at = _dt(info.get("closed_at")),
-            )
+            }
 
             pnl_before = trade.pnl if trade else None     # now safe
 
