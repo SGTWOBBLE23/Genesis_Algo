@@ -1,0 +1,38 @@
+2025-05-16 07:30:40,000 - apscheduler.executors.default - INFO - Running job "Monitor trades for exit signals every 15 minutes (trigger: cron[minute='*/15', second='40'], next run at: 2025-05-16 07:45:40 UTC)" (scheduled at 2025-05-16 07:30:40+00:00)
+2025-05-16 07:30:40,086 - create_exit_monitor - INFO - Found 21 open trades to evaluate
+2025-05-16 07:30:40,167 - create_exit_monitor - INFO - Processing 5 trades for XAUUSD at price 3215.005
+2025-05-16 07:30:40,167 - create_exit_monitor - INFO - Running exit evaluation for 5 positions in XAUUSD
+2025-05-16 07:30:40,170 - position_manager - INFO - Sending close request for ticket 128350903 on account 163499
+2025-05-16 07:30:40,214 - position_manager - INFO - Successfully added ticket 128350903 to close queue
+2025-05-16 07:30:40,266 - create_exit_monitor - INFO - ExitNet triggered 3 exits for XAUUSD
+2025-05-16 07:30:40,359 - create_exit_monitor - INFO - Processing 6 trades for USDJPY at price 145.06
+2025-05-16 07:30:40,359 - create_exit_monitor - INFO - Running exit evaluation for 8 positions in USDJPY
+2025-05-16 07:30:40,370 - position_manager - INFO - Sending close request for ticket 112183606 on account 163499
+2025-05-16 07:30:40,413 - position_manager - INFO - Successfully added ticket 112183606 to close queue
+2025-05-16 07:30:40,444 - position_manager - INFO - Sending close request for ticket 112202800 on account 163499
+2025-05-16 07:30:40,472 - position_manager - INFO - Successfully added ticket 112202800 to close queue
+2025-05-16 07:30:40,481 - position_manager - INFO - Sending close request for ticket 128356817 on account 163499
+2025-05-16 07:30:40,509 - position_manager - INFO - Successfully added ticket 128356817 to close queue
+2025-05-16 07:30:40,530 - position_manager - INFO - Sending close request for ticket 112177397 on account 163499
+2025-05-16 07:30:40,567 - position_manager - INFO - Successfully added ticket 112177397 to close queue
+2025-05-16 07:30:40,578 - position_manager - INFO - Sending close request for ticket 112177425 on account 163499
+2025-05-16 07:30:40,607 - position_manager - INFO - Successfully added ticket 112177425 to close queue
+2025-05-16 07:30:40,629 - position_manager - INFO - Sending close request for ticket 128463597 on account 163499
+2025-05-16 07:30:40,656 - position_manager - INFO - Successfully added ticket 128463597 to close queue
+2025-05-16 07:30:40,660 - position_manager - INFO - Sending close request for ticket 128471842 on account 163499
+2025-05-16 07:30:40,692 - position_manager - INFO - Successfully added ticket 128471842 to close queue
+2025-05-16 07:30:40,705 - position_manager - INFO - Sending close request for ticket 128471875 on account 163499
+2025-05-16 07:30:40,733 - position_manager - INFO - Successfully added ticket 128471875 to close queue
+2025-05-16 07:30:40,733 - create_exit_monitor - INFO - ExitNet triggered 6 exits for USDJPY
+2025-05-16 07:30:40,865 - create_exit_monitor - INFO - Processing 6 trades for GBPJPY at price 193.288
+2025-05-16 07:30:40,865 - create_exit_monitor - INFO - Running exit evaluation for 6 positions in GBPJPY
+2025-05-16 07:30:40,927 - create_exit_monitor - INFO - ExitNet triggered 6 exits for GBPJPY
+2025-05-16 07:30:41,000 - create_exit_monitor - INFO - Processing 4 trades for EURUSD at price 1.12123
+2025-05-16 07:30:41,001 - create_exit_monitor - INFO - Running exit evaluation for 4 positions in EURUSD
+2025-05-16 07:30:41,001 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 07:30:41,001 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 07:30:41,001 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 07:30:41,001 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 07:30:41,001 - create_exit_monitor - INFO - No exit signals triggered for EURUSD
+2025-05-16 07:30:41,038 - create_exit_monitor - INFO - Trade monitoring completed
+2025-05-16 07:30:41,038 - apscheduler.executors.default - INFO - Job "Monitor trades for exit signals every 15 minutes (trigger: cron[minute='*/15', second='40'], next run at: 2025-05-16 07:45:40 UTC)" executed successfully

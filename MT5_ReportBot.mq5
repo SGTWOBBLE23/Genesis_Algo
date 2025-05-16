@@ -1,10 +1,10 @@
 //+------------------------------------------------------------------+
 //|                    MT5_ReportBot.mq5                             |
 //|   Lightweight account/position reporter for MT5 → Flask API      |
-//|   Version: 1.05-fix – compile errors removed (no optimisation)   |
+//|   Version: 1.06 – Fixed JSON formatting for update_trades        |
 //+------------------------------------------------------------------+
 #property copyright "You"
-#property version   "1.05-fix"
+#property version   "1.06"
 #property strict
 
 //─- Inputs ----------------------------------------------------------
@@ -80,10 +80,15 @@ void OnTimer()
 //+------------------------------------------------------------------+
 void SendOpenPositions()
 {
-   string json = "{\"account_id\":\""+gAccountId+"\",\"trades\":{";
+   // Create JSON using CJAVal to ensure proper formatting
+   CJAVal json;
+   json["account_id"] = gAccountId;
+   
+   // Create the trades object
+   CJAVal trades;
    int total = PositionsTotal();
 
-   for(int i=0;i<total;i++)
+   for(int i=0; i<total; i++)
    {
       ulong ticket = PositionGetTicket(i);
       if(!PositionSelectByTicket(ticket)) continue;
@@ -95,21 +100,37 @@ void SendOpenPositions()
       double tp = PositionGetDouble(POSITION_TP);
       double pl = PositionGetDouble(POSITION_PROFIT);
       string side = (PositionGetInteger(POSITION_TYPE)==POSITION_TYPE_BUY) ? "BUY":"SELL";
+      string open_time = TimeToString(PositionGetInteger(POSITION_TIME), TIME_DATE|TIME_SECONDS);
 
-      json += "\""+IntegerToString(ticket)+"\":{"
-              "\"symbol\":\""+sym+"\","
-              "\"lot\":"+DoubleToString(lot,2)+","
-              "\"side\":\""+side+"\","
-              "\"entry\":"+DoubleToString(entry,_Digits)+","
-              "\"sl\":"+DoubleToString(sl,_Digits)+","
-              "\"tp\":"+DoubleToString(tp,_Digits)+","
-              "\"profit\":"+DoubleToString(pl,2)+","
-              "\"opened_at\":\"" + TimeToString(PositionGetInteger(POSITION_TIME), TIME_DATE|TIME_SECONDS) + "\"}";
+      // Add position to trades object
+      CJAVal position;
+      position["symbol"] = sym;
+      position["lot"] = lot;
+      position["type"] = side;  // Changed key from "side" to "type" to match server expectation
+      position["open_price"] = entry;  // Changed key from "entry" to "open_price"
+      position["sl"] = sl;
+      position["tp"] = tp;
+      position["profit"] = pl;
+      position["opened_at"] = open_time;
+      position["status"] = "OPEN";
+      
+      // Add position to trades using ticket as key
+      trades[IntegerToString(ticket)] = position;
    }
-   json += "}}";
-
-   char post[];   StrToBytes(json, post);
-   char result[]; string resultHdr;
+   
+   // Add trades object to main json
+   json["trades"] = trades;
+   
+   // Convert to string
+   string jsonStr = json.Serialize();
+   
+   // Debug output
+   Print("DEBUG: Sending JSON: ", jsonStr);
+   
+   char post[];   
+   StrToBytes(jsonStr, post);
+   char result[]; 
+   string resultHdr;
    string headers = "Content-Type: application/json\r\n";
 
    int code = WebRequest("POST",
@@ -120,6 +141,13 @@ void SendOpenPositions()
                          result, resultHdr);
 
    PrintFormat("[ReportBot] /update_trades → HTTP %d  (open=%d)", code, total);
+   
+   // If error, print the response for debugging
+   if(code != 200)
+   {
+      string response = CharArrayToString(result, 0, ArraySize(result));
+      PrintFormat("Error response: %s", response);
+   }
 }
 
 //+------------------------------------------------------------------+
