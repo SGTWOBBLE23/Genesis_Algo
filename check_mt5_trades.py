@@ -66,13 +66,18 @@ def check_trade_discrepancies():
             mt5_count = int(mt5_info['count']) if isinstance(mt5_info['count'], str) else mt5_info['count']
             db_count = db_info['count']
             
-            # Check for count mismatch
+            # Check for count mismatch - even a difference of 1 is significant here
             count_diff = abs(mt5_count - db_count)
             has_discrepancy = count_diff > 0
+            
+            # Immediately alert if there's a significant discrepancy (more than 1 trade difference)
+            # which likely indicates a system issue rather than just normal trading activity
+            significant_discrepancy = count_diff >= 2
             
             # Prepare result object
             result = {
                 'has_discrepancy': has_discrepancy,
+                'significant_discrepancy': significant_discrepancy,
                 'mt5_count': mt5_info['count'],
                 'db_count': db_info['count'],
                 'count_diff': count_diff,
@@ -123,18 +128,40 @@ def run_discrepancy_check():
                     for t in result['details']['db_trades']:
                         trade_details += f"• {t['symbol']} {t['side']} {t['lot']} lots (Ticket: {t['ticket']})\n"
                 
-                # Send Discord alert
+                # Determine alert severity based on discrepancy size
+                is_significant = result.get('significant_discrepancy', False)
+                
+                # Use red for significant discrepancies, orange for minor ones
+                alert_color = 0xFF0000 if is_significant else 0xFFA500  # Red vs Orange
+                
+                # Create a more urgent title for significant discrepancies
+                alert_title = "CRITICAL: MT5-Database Trade Count Mismatch" if is_significant else "MT5 Trade Discrepancy Detected"
+                
+                # Create appropriate description based on severity
+                if is_significant:
+                    description = f"**URGENT: MT5 reports {result['mt5_count']} open positions, but database has {result['db_count']} open trades.**\n\n"
+                    description += f"This {result['count_diff']} trade difference indicates the exit monitor may be working with incorrect data.\n\n"
+                    description += f"Last MT5 update: {result['mt5_last_update']}\n"
+                    description += f"{trade_details}\n\n"
+                    description += f"**Action Required**: The exit monitor may attempt to close positions that no longer exist or miss positions that need to be closed."
+                else:
+                    description = f"**MT5 reports {result['mt5_count']} open positions, but database has {result['db_count']} open trades.**\n\n"
+                    description += f"Last MT5 update: {result['mt5_last_update']}\n"
+                    description += f"{trade_details}\n\n"
+                    description += f"This discrepancy may indicate trades not properly tracked in the database."
+                
+                # Send Discord alert with appropriate severity
                 send_discord_alert(
-                    title="MT5 Trade Discrepancy Detected",
-                    description=f"**MT5 reports {result['mt5_count']} open positions, but database has {result['db_count']} open trades.**\n\n"
-                               f"Last MT5 update: {result['mt5_last_update']}\n"
-                               f"{trade_details}\n\n"
-                               f"This discrepancy may indicate trades not properly tracked in the database.",
+                    title=alert_title,
+                    description=description,
                     alert_type="db_discrepancy",
-                    color=0xFFA500  # Orange color for warnings
+                    color=alert_color
                 )
                 
-                logger.warning(f"Trade discrepancy detected: MT5={result['mt5_count']}, DB={result['db_count']}")
+                if is_significant:
+                    logger.error(f"CRITICAL trade discrepancy detected: MT5={result['mt5_count']}, DB={result['db_count']}")
+                else:
+                    logger.warning(f"Trade discrepancy detected: MT5={result['mt5_count']}, DB={result['db_count']}")
             else:
                 logger.info("No trade discrepancies found")
                 
