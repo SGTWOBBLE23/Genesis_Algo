@@ -1,0 +1,85 @@
+nute='*/15', second='10'], next run at: 2025-05-16 04:45:10 UTC)" executed successfully
+2025-05-16 04:30:40,719 - position_manager - INFO - Successfully added ticket 112092532 to close queue
+2025-05-16 04:30:40,722 - position_manager - INFO - Sending close request for ticket 112097823 on account 163499
+2025-05-16 04:30:40,767 - position_manager - INFO - Successfully added ticket 112097823 to close queue
+2025-05-16 04:30:40,771 - position_manager - INFO - Sending close request for ticket 128356817 on account 163499
+2025-05-16 04:30:40,813 - position_manager - INFO - Successfully added ticket 128356817 to close queue
+2025-05-16 04:30:40,816 - position_manager - INFO - Sending close request for ticket 128350847 on account 163499
+2025-05-16 04:30:40,929 - position_manager - INFO - Successfully added ticket 128350847 to close queue
+2025-05-16 04:30:40,932 - position_manager - INFO - Sending close request for ticket 112101447 on account 163499
+2025-05-16 04:30:40,957 - position_manager - INFO - Successfully added ticket 112101447 to close queue
+2025-05-16 04:30:40,960 - position_manager - INFO - Sending close request for ticket 128367819 on account 163499
+2025-05-16 04:30:40,984 - position_manager - INFO - Successfully added ticket 128367819 to close queue
+2025-05-16 04:30:40,987 - position_manager - INFO - Sending close request for ticket 128362250 on account 163499
+2025-05-16 04:30:41,027 - position_manager - INFO - Successfully added ticket 128362250 to close queue
+2025-05-16 04:30:41,030 - position_manager - INFO - Sending close request for ticket 112106646 on account 163499
+2025-05-16 04:30:41,058 - position_manager - INFO - Successfully added ticket 112106646 to close queue
+2025-05-16 04:30:41,061 - position_manager - INFO - Sending close request for ticket 127473344 on account 163499
+2025-05-16 04:30:41,087 - position_manager - INFO - Successfully added ticket 127473344 to close queue
+2025-05-16 04:30:41,090 - position_manager - INFO - Sending close request for ticket 112152125 on account 163499
+2025-05-16 04:30:41,114 - position_manager - INFO - Successfully added ticket 112152125 to close queue
+2025-05-16 04:30:41,121 - position_manager - INFO - Sending close request for ticket 112081839 on account 163499
+2025-05-16 04:30:41,147 - position_manager - INFO - Successfully added ticket 112081839 to close queue
+2025-05-16 04:30:41,150 - position_manager - INFO - Sending close request for ticket 128339010 on account 163499
+2025-05-16 04:30:41,172 - position_manager - INFO - Successfully added ticket 128339010 to close queue
+2025-05-16 04:30:41,174 - position_manager - INFO - Sending close request for ticket 128342903 on account 163499
+2025-05-16 04:30:41,200 - position_manager - INFO - Successfully added ticket 128342903 to close queue
+2025-05-16 04:30:41,200 - create_exit_monitor - INFO - ExitNet triggered 19 exits for USDJPY
+2025-05-16 04:30:41,278 - create_exit_monitor - INFO - Processing 24 trades for GBPJPY at price 193.378
+2025-05-16 04:30:41,278 - create_exit_monitor - INFO - Running exit evaluation for 24 positions in GBPJPY
+2025-05-16 04:30:41,326 - create_exit_monitor - INFO - ExitNet triggered 16 exits for GBPJPY
+2025-05-16 04:30:41,494 - create_exit_monitor - INFO - Processing 19 trades for XAUUSD at price 3211.93
+2025-05-16 04:30:41,494 - create_exit_monitor - INFO - Running exit evaluation for 27 positions in XAUUSD
+2025-05-16 04:30:41,515 - position_manager - INFO - Sending close request for ticket 112088997 on account 163499
+2025-05-16 04:30:41,543 - position_manager - INFO - Successfully added ticket 112088997 to close queue
+2025-05-16 04:30:41,546 - position_manager - INFO - Sending close request for ticket 128346942 on account 163499
+2025-05-16 04:30:41,619 - position_manager - INFO - Successfully added ticket 128346942 to close queue
+2025-05-16 04:30:41,622 - position_manager - INFO - Sending close request for ticket 128353759 on account 163499
+2025-05-16 04:30:41,648 - position_manager - INFO - Successfully added ticket 128353759 to close queue
+2025-05-16 04:30:41,651 - position_manager - INFO - Sending close request for ticket 112092584 on account 163499
+2025-05-16 04:30:41,676 - position_manager - INFO - Successfully added ticket 112092584 to close queue
+2025-05-16 04:30:41,678 - position_manager - INFO - Sending close request for ticket 112095026 on account 163499
+2025-05-16 04:30:41,708 - position_manager - INFO - Successfully added ticket 112095026 to close queue
+2025-05-16 04:30:41,710 - position_manager - INFO - Sending close request for ticket 128350903 on account 163499
+2025-05-16 04:30:41,735 - position_manager - INFO - Successfully added ticket 128350903 to close queue
+2025-05-16 04:30:41,738 - position_manager - INFO - Sending close request for ticket 112101454 on account 163499
+2025-05-16 04:30:41,764 - position_manager - INFO - Successfully added ticket 112101454 to close queue
+2025-05-16 04:30:41,766 - position_manager - INFO - Sending close request for ticket 128362257 on account 163499
+2025-05-16 04:30:41,792 - position_manager - INFO - Successfully added ticket 128362257 to close queue
+2025-05-16 04:30:41,795 - position_manager - INFO - Sending close request for ticket 112101683 on account 163499
+2025-05-16 04:30:41,822 - position_manager - INFO - Successfully added ticket 112101683 to close queue
+2025-05-16 04:30:41,825 - position_manager - INFO - Sending close request for ticket 128362505 on account 163499
+2025-05-16 04:30:41,853 - position_manager - INFO - Successfully added ticket 128362505 to close queue
+2025-05-16 04:30:41,855 - position_manager - INFO - Sending close request for ticket 128315200 on account 163499
+2025-05-16 04:30:41,880 - position_manager - INFO - Successfully added ticket 128315200 to close queue
+2025-05-16 04:30:41,893 - position_manager - INFO - Sending close request for ticket 112072734 on account 163499
+2025-05-16 04:30:41,923 - position_manager - INFO - Successfully added ticket 112072734 to close queue
+2025-05-16 04:30:41,925 - position_manager - INFO - Sending close request for ticket 128328928 on account 163499
+2025-05-16 04:30:41,951 - position_manager - INFO - Successfully added ticket 128328928 to close queue
+2025-05-16 04:30:41,952 - create_exit_monitor - INFO - ExitNet triggered 14 exits for XAUUSD
+2025-05-16 04:30:42,204 - create_exit_monitor - INFO - Processing 5 trades for EURUSD at price 1.12006
+2025-05-16 04:30:42,204 - create_exit_monitor - INFO - Running exit evaluation for 10 positions in EURUSD
+2025-05-16 04:30:42,207 - position_manager - INFO - Sending close request for ticket 127946274 on account 163499
+2025-05-16 04:30:42,247 - position_manager - INFO - Successfully added ticket 127946274 to close queue
+2025-05-16 04:30:42,249 - position_manager - INFO - Sending close request for ticket 127993461 on account 163499
+2025-05-16 04:30:42,273 - position_manager - INFO - Successfully added ticket 127993461 to close queue
+2025-05-16 04:30:42,275 - position_manager - INFO - Sending close request for ticket 127993462 on account 163499
+2025-05-16 04:30:42,305 - position_manager - INFO - Successfully added ticket 127993462 to close queue
+2025-05-16 04:30:42,308 - position_manager - INFO - Sending close request for ticket 127999923 on account 163499
+2025-05-16 04:30:42,335 - position_manager - INFO - Successfully added ticket 127999923 to close queue
+2025-05-16 04:30:42,338 - position_manager - INFO - Sending close request for ticket 128122159 on account 163499
+2025-05-16 04:30:42,364 - position_manager - INFO - Successfully added ticket 128122159 to close queue
+2025-05-16 04:30:42,364 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 04:30:42,364 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 04:30:42,364 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 04:30:42,364 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 04:30:42,364 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 04:30:42,364 - create_exit_monitor - INFO - ExitNet triggered 2 exits for EURUSD
+2025-05-16 04:30:42,437 - create_exit_monitor - INFO - Processing 5 trades for GBPUSD at price 1.33124
+2025-05-16 04:30:42,438 - create_exit_monitor - INFO - Running exit evaluation for 8 positions in GBPUSD
+2025-05-16 04:30:42,438 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 04:30:42,438 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 04:30:42,438 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 04:30:42,453 - create_exit_monitor - INFO - ExitNet triggered 5 exits for GBPUSD
+2025-05-16 04:30:42,481 - create_exit_monitor - INFO - Trade monitoring completed
+2025-05-16 04:30:42,481 - apscheduler.executors.default - INFO - Job "Monitor trades for exit signals every 15 minutes (trigger: cron[minute='*/15', second='40'], next run at: 2025-05-16 04:45:40 UTC)" executed successfully
