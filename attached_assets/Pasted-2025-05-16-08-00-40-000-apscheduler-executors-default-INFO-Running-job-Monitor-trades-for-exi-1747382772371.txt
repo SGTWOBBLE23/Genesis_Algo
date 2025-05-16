@@ -1,0 +1,38 @@
+2025-05-16 08:00:40,000 - apscheduler.executors.default - INFO - Running job "Monitor trades for exit signals every 15 minutes (trigger: cron[minute='*/15', second='40'], next run at: 2025-05-16 08:15:40 UTC)" (scheduled at 2025-05-16 08:00:40+00:00)
+2025-05-16 08:00:40,099 - create_exit_monitor - INFO - Found 16 open trades to evaluate
+2025-05-16 08:00:40,213 - create_exit_monitor - INFO - Processing 3 trades for GBPJPY at price 193.376
+2025-05-16 08:00:40,213 - create_exit_monitor - INFO - Running exit evaluation for 3 positions in GBPJPY
+2025-05-16 08:00:40,223 - create_exit_monitor - INFO - ExitNet triggered 3 exits for GBPJPY
+2025-05-16 08:00:40,356 - create_exit_monitor - INFO - Processing 4 trades for EURUSD at price 1.12088
+2025-05-16 08:00:40,356 - create_exit_monitor - INFO - Running exit evaluation for 4 positions in EURUSD
+2025-05-16 08:00:40,356 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 08:00:40,356 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 08:00:40,356 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 08:00:40,356 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 08:00:40,357 - create_exit_monitor - INFO - No exit signals triggered for EURUSD
+2025-05-16 08:00:40,481 - create_exit_monitor - INFO - Processing 6 trades for XAUUSD at price 3207.625
+2025-05-16 08:00:40,481 - create_exit_monitor - INFO - Running exit evaluation for 10 positions in XAUUSD
+2025-05-16 08:00:40,481 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 08:00:40,481 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 08:00:40,481 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 08:00:40,481 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 08:00:40,496 - create_exit_monitor - INFO - ExitNet triggered 2 exits for XAUUSD
+2025-05-16 08:00:40,595 - create_exit_monitor - INFO - Processing 3 trades for USDJPY at price 145.238
+2025-05-16 08:00:40,596 - create_exit_monitor - INFO - Running exit evaluation for 7 positions in USDJPY
+2025-05-16 08:00:40,599 - position_manager - INFO - Sending close request for ticket 128402155 on account 163499
+2025-05-16 08:00:40,625 - position_manager - INFO - Successfully added ticket 128402155 to close queue
+2025-05-16 08:00:40,628 - position_manager - INFO - Sending close request for ticket 128350776 on account 163499
+2025-05-16 08:00:40,657 - position_manager - INFO - Successfully added ticket 128350776 to close queue
+2025-05-16 08:00:40,659 - position_manager - INFO - Sending close request for ticket 128391710 on account 163499
+2025-05-16 08:00:40,700 - position_manager - INFO - Successfully added ticket 128391710 to close queue
+2025-05-16 08:00:40,703 - position_manager - INFO - Sending close request for ticket 128472632 on account 163499
+2025-05-16 08:00:40,737 - position_manager - INFO - Successfully added ticket 128472632 to close queue
+2025-05-16 08:00:40,741 - position_manager - INFO - Sending close request for ticket 112217676 on account 163499
+2025-05-16 08:00:40,789 - position_manager - INFO - Successfully added ticket 112217676 to close queue
+2025-05-16 08:00:40,792 - position_manager - INFO - Sending close request for ticket 128525660 on account 163499
+2025-05-16 08:00:40,839 - position_manager - INFO - Successfully added ticket 128525660 to close queue
+2025-05-16 08:00:40,848 - position_manager - INFO - Sending close request for ticket 112224994 on account 163499
+2025-05-16 08:00:40,895 - position_manager - INFO - Successfully added ticket 112224994 to close queue
+2025-05-16 08:00:40,895 - create_exit_monitor - INFO - ExitNet triggered 3 exits for USDJPY
+2025-05-16 08:00:40,925 - create_exit_monitor - INFO - Trade monitoring completed
+2025-05-16 08:00:40,925 - apscheduler.executors.default - INFO - Job "Monitor trades for exit signals every 15 minutes (trigger: cron[minute='*/15', second='40'], next run at: 2025-05-16 08:15:40 UTC)" executed successfully
