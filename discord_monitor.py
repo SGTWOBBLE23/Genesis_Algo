@@ -34,7 +34,7 @@ recent_alerts = {
 }
 
 # Minimum time between similar alerts (in minutes)
-ALERT_COOLDOWN_MINUTES = 30
+ALERT_COOLDOWN_MINUTES = 10
 
 def send_discord_alert(title, description, alert_type, color=0xFF0000):
     """

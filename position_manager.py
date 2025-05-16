@@ -97,7 +97,7 @@ class PositionManager:
             p_hold = predict_exit_prob(p.symbol, p.context_tf, features)
             logger.debug("ExitNet %s p_hold=%.2f", p.symbol, p_hold)
 
-            if p_hold < 0.40:
+            if p_hold < 0.35:
                 self._send_close_ticket(p)
                 eq += max(0, price - p.entry)
                 self.positions.remove(p)
