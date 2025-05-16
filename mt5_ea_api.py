@@ -889,20 +889,20 @@ def update_trades():
             trade       = existing_by_id.get(ticket)     # look up first
             prev_status = trade.status if trade else None
 
-            attrs = dict(
-                account_id= account_id,
-                ticket    = ticket,
-                symbol    = info.get("symbol", ""),
-                side      = TradeSide.BUY if info.get("type", "").upper() == "BUY" else TradeSide.SELL,
-                lot       = float(info.get("lot", 0)),
-                entry     = float(info.get("open_price", 0) or 0) or None,
-                exit      = float(info.get("exit_price", 0) or 0) or None,
-                sl        = float(info.get("sl", 0) or 0) or None,
-                tp        = float(info.get("tp", 0) or 0) or None,
-                pnl       = float(info.get("profit", 0)),
-                status    = TradeStatus.CLOSED if info.get("status") == "CLOSED" else TradeStatus.OPEN,
-                opened_at = _dt(info.get("opened_at")),
-                closed_at = _dt(info.get("closed_at")),
+            attrs = {
+                "account_id": account_id,
+                "ticket"    : ticket,
+                "symbol"    : info.get("symbol", ""),
+                "side"      : TradeSide.BUY if info.get("type", "").upper() == "BUY" else TradeSide.SELL,
+                "lot"       : float(info.get("lot", 0)),
+                "entry"     : float(info.get("open_price", 0) or 0) or None,
+                "exit"      : float(info.get("exit_price", 0) or 0) or None,
+                "sl"        : float(info.get("sl", 0) or 0) or None,
+                "tp"        : float(info.get("tp", 0) or 0) or None,
+                "pnl"       : float(info.get("profit", 0)),
+                "status"    : TradeStatus.CLOSED if info.get("status") == "CLOSED" else TradeStatus.OPEN,
+                "opened_at" : _dt(info.get("opened_at")),
+                "closed_at" : _dt(info.get("closed_at"))
             }
 
             pnl_before = trade.pnl if trade else None     # now safe
