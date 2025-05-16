@@ -1,0 +1,39 @@
+2025-05-16 07:45:40,000 - apscheduler.executors.default - INFO - Running job "Monitor trades for exit signals every 15 minutes (trigger: cron[minute='*/15', second='40'], next run at: 2025-05-16 07:45:40 UTC)" (scheduled at 2025-05-16 07:45:40+00:00)
+2025-05-16 07:45:40,096 - create_exit_monitor - INFO - Found 13 open trades to evaluate
+2025-05-16 07:45:40,185 - create_exit_monitor - INFO - Processing 3 trades for GBPJPY at price 193.288
+2025-05-16 07:45:40,185 - create_exit_monitor - INFO - Running exit evaluation for 3 positions in GBPJPY
+2025-05-16 07:45:40,193 - create_exit_monitor - INFO - ExitNet triggered 3 exits for GBPJPY
+2025-05-16 07:45:40,278 - create_exit_monitor - INFO - Processing 4 trades for EURUSD at price 1.12123
+2025-05-16 07:45:40,278 - create_exit_monitor - INFO - Running exit evaluation for 4 positions in EURUSD
+2025-05-16 07:45:40,278 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 07:45:40,278 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 07:45:40,278 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 07:45:40,278 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 07:45:40,278 - create_exit_monitor - INFO - No exit signals triggered for EURUSD
+2025-05-16 07:45:40,373 - create_exit_monitor - INFO - Processing 5 trades for XAUUSD at price 3215.005
+2025-05-16 07:45:40,373 - create_exit_monitor - INFO - Running exit evaluation for 9 positions in XAUUSD
+2025-05-16 07:45:40,373 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 07:45:40,373 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 07:45:40,373 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 07:45:40,373 - ml.exit_inference - WARNING - Missing ExitNet model: /home/runner/workspace/ml/models/EURUSD_H1_exit.pkl
+2025-05-16 07:45:40,385 - create_exit_monitor - INFO - ExitNet triggered 1 exits for XAUUSD
+2025-05-16 07:45:40,559 - create_exit_monitor - INFO - Processing 1 trades for USDJPY at price 145.06
+2025-05-16 07:45:40,559 - create_exit_monitor - INFO - Running exit evaluation for 5 positions in USDJPY
+2025-05-16 07:45:40,563 - position_manager - INFO - Sending close request for ticket 128402155 on account 163499
+2025-05-16 07:45:40,604 - position_manager - INFO - Successfully added ticket 128402155 to close queue
+2025-05-16 07:45:40,607 - position_manager - INFO - Sending close request for ticket 128350776 on account 163499
+2025-05-16 07:45:40,654 - position_manager - INFO - Successfully added ticket 128350776 to close queue
+2025-05-16 07:45:40,658 - position_manager - INFO - Sending close request for ticket 128391710 on account 163499
+2025-05-16 07:45:40,685 - position_manager - INFO - Successfully added ticket 128391710 to close queue
+2025-05-16 07:45:40,688 - position_manager - INFO - Sending close request for ticket 128472632 on account 163499
+2025-05-16 07:45:40,715 - position_manager - INFO - Successfully added ticket 128472632 to close queue
+2025-05-16 07:45:40,718 - position_manager - INFO - Sending close request for ticket 112217676 on account 163499
+2025-05-16 07:45:40,747 - position_manager - INFO - Successfully added ticket 112217676 to close queue
+2025-05-16 07:45:40,747 - create_exit_monitor - INFO - ExitNet triggered 1 exits for USDJPY
+2025-05-16 07:45:40,782 - create_exit_monitor - INFO - Trade monitoring completed
+2025-05-16 07:45:40,782 - apscheduler.executors.default - INFO - Job "Monitor trades for exit signals every 15 minutes (trigger: cron[minute='*/15', second='40'], next run at: 2025-05-16 08:00:40 UTC)" executed successfully
+2025-05-16 07:45:42,131 - vision_worker - INFO - Successfully analyzed chart: {'action': 'SELL_NOW', 'entry': 193.36, 'sl': 193.8, 'tp': 192.5, 'confidence': 0.82}
+2025-05-16 07:45:42,226 - vision_worker - INFO - Vision worker: skipping duplicate GBP_JPY SELL_NOW @ 193.36000 (≤ 10-pip diff from 193.36000)
+2025-05-16 07:45:42,226 - capture_job - ERROR - Failed to process chart for GBP_JPY (M15) without Redis
+2025-05-16 07:45:42,255 - capture_job - INFO - Capture job completed for GBP_JPY (M15), Redis not available - attempted direct vision processing
+2025-05-16 07:45:42,255 - apscheduler.executors.default - INFO - Job "Capture all assets every 15 min (+10 s buffer) (trigger: cron[minute='*/15', second='10'], next run at: 2025-05-16 08:00:10 UTC)" executed successfully
