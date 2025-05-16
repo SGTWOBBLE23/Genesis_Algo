@@ -62,8 +62,12 @@ def check_trade_discrepancies():
             mt5_info = get_mt5_trade_info()
             db_info, open_trades = get_database_trade_info()
             
+            # Handle type conversion for count comparison
+            mt5_count = int(mt5_info['count']) if isinstance(mt5_info['count'], str) else mt5_info['count']
+            db_count = db_info['count']
+            
             # Check for count mismatch
-            count_diff = abs(mt5_info['count'] - db_info['count'])
+            count_diff = abs(mt5_count - db_count)
             has_discrepancy = count_diff > 0
             
             # Prepare result object
