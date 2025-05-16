@@ -851,7 +851,7 @@ def update_trades():
                                .filter(Trade.ticket.in_(tickets))
                                .all()
         }
-
+        
         # Get list of trades that are marked as OPEN in the database
         # but were not included in this update (they might be closed)
         if len(tickets) > 0:
@@ -860,7 +860,7 @@ def update_trades():
                 Trade.status == TradeStatus.OPEN,
                 ~Trade.ticket.in_(tickets)  # Not in current open trades list
             ).all()
-            
+
             # If we found trades that are marked as OPEN but aren't in the active list
             # update them to CLOSED status
             for missing_trade in all_open_trades:
@@ -871,7 +871,7 @@ def update_trades():
                 context["closed_by"] = "sync_missing"
                 context["last_update"] = datetime.now().isoformat()
                 missing_trade.context = context
-            
+
             if all_open_trades:
                 db.session.commit()
                 logger.info(f"Closed {len(all_open_trades)} trades that are no longer in MT5")
@@ -947,6 +947,105 @@ def update_trades():
     except Exception as e:
         logger.error(f"Error updating trades: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@mt5_api.route('/update_trades/closed', methods=['POST'])
+def update_closed_trades():
+    """Receive updates on closed trades from MT5 EA"""
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        account_id = data.get("account_id")
+        closed_trades_blob = data.get("closed_trades") or {}
+
+        if not account_id:
+            return jsonify({"status": "error", "message": "Missing account_id"}), 400
+        if not closed_trades_blob:
+            return jsonify({"status": "success", "updated_count": 0})
+
+        def _dt(val):
+            """Parse MT5 time either '2025.05.09 12:34:56' or ISO."""
+            if not val:
+                return None
+            for fmt in ("%Y.%m.%d %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+                try:
+                    return datetime.strptime(val, fmt)
+                except ValueError:
+                    continue
+            return None
+
+        # Process closed trades
+        tickets = list(closed_trades_blob.keys())
+        existing_by_id = {
+            t.ticket: t
+            for t in db.session.query(Trade)
+                           .filter(Trade.ticket.in_(tickets))
+                           .all()
+        }
+
+        updated_count = 0
+
+        for ticket, info in closed_trades_blob.items():
+            # Skip unwanted crypto symbols
+            if any(c in info.get("symbol", "") for c in ("BTC", "ETH", "XRP", "DOG", "SOL", "LTC")):
+                continue
+
+            trade = existing_by_id.get(ticket)
+            
+            if trade is None:
+                # Trade doesn't exist in database, create it
+                logger.info(f"Closed trade {ticket} not found in database, creating new record")
+                
+                new_trade = Trade(
+                    account_id=account_id,
+                    ticket=ticket,
+                    symbol=info.get("symbol", ""),
+                    side=TradeSide.BUY if info.get("type", "").upper() == "BUY" else TradeSide.SELL,
+                    lot=float(info.get("lot", 0)),
+                    entry=float(info.get("open_price", 0) or 0) or None,
+                    exit=float(info.get("close_price", 0) or 0) or None,
+                    pnl=float(info.get("profit", 0)),
+                    status=TradeStatus.CLOSED,
+                    opened_at=_dt(info.get("opened_at")),
+                    closed_at=_dt(info.get("closed_at"))
+                )
+                
+                # Add context information
+                context = {"src": "mt5_closed_import", 
+                          "first_seen": datetime.utcnow().isoformat()}
+                new_trade.context = context
+                
+                db.session.add(new_trade)
+                updated_count += 1
+            elif trade.status != TradeStatus.CLOSED:
+                # Update to closed status
+                logger.info(f"Updating trade {ticket} to CLOSED status")
+                
+                trade.status = TradeStatus.CLOSED
+                trade.exit = float(info.get("close_price", 0) or 0) or None
+                trade.pnl = float(info.get("profit", 0))
+                trade.closed_at = _dt(info.get("closed_at"))
+                
+                # Update context
+                context = trade.context or {}
+                context["last_update"] = datetime.utcnow().isoformat()
+                context["closed_by"] = "mt5_report"
+                trade.context = context
+                
+                updated_count += 1
+        
+        db.session.commit()
+        logger.info(f"MT5 update_closed_trades → updated: {updated_count}")
+        
+        return jsonify({
+            "status": "success", 
+            "updated_count": updated_count
+        })
+                
+    except Exception as e:
+        logger.error(f"Error processing closed trades update: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 
 # ──────────────────────────────────────────────────────────────
 #  CLOSE / MODIFY endpoints – called by your Python back-end

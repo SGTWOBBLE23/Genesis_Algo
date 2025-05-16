@@ -1,24 +1,30 @@
 //+------------------------------------------------------------------+
 //|                    MT5_ReportBot.mq5                             |
 //|   Lightweight account/position reporter for MT5 → Flask API      |
-//|   Version: 1.06 – Fixed JSON formatting for update_trades        |
+//|   Version: 2.0 – Added closed trades reporting                   |
 //+------------------------------------------------------------------+
 #property copyright "You"
-#property version   "1.06"
+#property version   "2.0"
 #property strict
 
 //─- Inputs ----------------------------------------------------------
 input string ApiUrl       = "https://4c1f2076-899e-4ced-962a-2903ca4a9bac-00-29hcpk84r1chm.picard.replit.dev";
 input string AccountAlias = "";
+input int    HistoryDays  = 7;  // How many days of history to check for closed trades
 
 //─- Includes --------------------------------------------------------
 #include <JAson.mqh>
 #include <Trade\Trade.mqh>
+#include <Trade\HistoryOrderInfo.mqh>
+#include <Trade\DealInfo.mqh>
 
 //─- Globals ---------------------------------------------------------
 CTrade  Trade;
+CHistoryOrderInfo HistoryOrder;
+CDealInfo Deal;
 string  gAccountId;
 string  gEndpointTrades, gEndpointStatus;
+datetime gLastUpdate = 0;  // Track when we last reported closed trades
 
 //+------------------------------------------------------------------+
 //| Helper: convert string → char[] (exact type expected by WebRequest)
@@ -69,6 +75,7 @@ void OnTimer()
 {
    Print("⏰ Timer triggered - starting API calls");
    Print("Sending open positions...");   SendOpenPositions();
+   Print("Sending closed trades...");    SendRecentlyClosedTrades();
    Print("Sending account status...");   SendAccountStatus();
    Print("Checking close requests...");  CheckCloseRequests();
    Print("Checking modify requests..."); CheckModifyRequests();
@@ -147,6 +154,113 @@ void SendOpenPositions()
    {
       string response = CharArrayToString(result, 0, ArraySize(result));
       PrintFormat("Error response: %s", response);
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Send recently closed trades                                      |
+//+------------------------------------------------------------------+
+void SendRecentlyClosedTrades()
+{
+   // Create JSON using CJAVal to ensure proper formatting
+   CJAVal json;
+   json["account_id"] = gAccountId;
+   
+   // Get history within date range
+   datetime fromDate = gLastUpdate > 0 ? gLastUpdate : TimeCurrent() - HistoryDays * 86400;
+   datetime toDate = TimeCurrent();
+   
+   // Update our last update timestamp for next time
+   gLastUpdate = TimeCurrent();
+   
+   // Create the trades object for closed positions
+   CJAVal closedTrades;
+   int total = 0;
+   
+   // Select history range
+   if(HistorySelect(fromDate, toDate))
+   {
+      // Process all deals in the selected history
+      int totalDeals = HistoryDealsTotal();
+      
+      for(int i=0; i<totalDeals; i++)
+      {
+         ulong dealTicket = HistoryDealGetTicket(i);
+         if(dealTicket == 0) continue;
+         
+         // Only interested in DEAL_ENTRY_OUT deals (position close)
+         if(HistoryDealGetInteger(dealTicket, DEAL_ENTRY) != DEAL_ENTRY_OUT) continue;
+         
+         ulong positionTicket = HistoryDealGetInteger(dealTicket, DEAL_POSITION_ID);
+         string sym = HistoryDealGetString(dealTicket, DEAL_SYMBOL);
+         double lot = HistoryDealGetDouble(dealTicket, DEAL_VOLUME);
+         double entryPrice = 0;
+         double closePrice = HistoryDealGetDouble(dealTicket, DEAL_PRICE);
+         double pl = HistoryDealGetDouble(dealTicket, DEAL_PROFIT);
+         string side = (HistoryDealGetInteger(dealTicket, DEAL_TYPE) == DEAL_TYPE_SELL) ? "BUY" : "SELL";
+         string closeTime = TimeToString(HistoryDealGetInteger(dealTicket, DEAL_TIME), TIME_DATE|TIME_SECONDS);
+         
+         // Try to find the entry price from history orders
+         ulong orderTicket = HistoryDealGetInteger(dealTicket, DEAL_ORDER);
+         if(OrderSelect(orderTicket))
+         {
+            entryPrice = OrderGetDouble(ORDER_PRICE_OPEN);
+         }
+         
+         // Add position to closed trades object
+         CJAVal closedPosition;
+         closedPosition["symbol"] = sym;
+         closedPosition["lot"] = lot;
+         closedPosition["type"] = side;
+         closedPosition["open_price"] = entryPrice;
+         closedPosition["close_price"] = closePrice;
+         closedPosition["profit"] = pl;
+         closedPosition["closed_at"] = closeTime;
+         closedPosition["status"] = "CLOSED";
+         
+         // Add closed position to trades using position ticket as key
+         closedTrades[IntegerToString(positionTicket)] = closedPosition;
+         total++;
+      }
+   }
+   
+   // Only send if we have closed trades to report
+   if(total > 0)
+   {
+      // Add closed trades object to main json
+      json["closed_trades"] = closedTrades;
+      
+      // Convert to string
+      string jsonStr = json.Serialize();
+      
+      // Debug output
+      PrintFormat("DEBUG: Sending %d closed trades: %s", total, jsonStr);
+      
+      char post[];   
+      StrToBytes(jsonStr, post);
+      char result[]; 
+      string resultHdr;
+      string headers = "Content-Type: application/json\r\n";
+   
+      int code = WebRequest("POST",
+                           gEndpointTrades + "/closed",
+                           headers,
+                           "", 5000,
+                           post, ArraySize(post),
+                           result, resultHdr);
+   
+      PrintFormat("[ReportBot] /update_trades/closed → HTTP %d  (closed=%d)", code, total);
+      
+      // If error, print the response for debugging
+      if(code != 200)
+      {
+         string response = CharArrayToString(result, 0, ArraySize(result));
+         PrintFormat("Error response: %s", response);
+      }
+   }
+   else
+   {
+      PrintFormat("No closed trades found since %s", TimeToString(fromDate));
    }
 }
 
